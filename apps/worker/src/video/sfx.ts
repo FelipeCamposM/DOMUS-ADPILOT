@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { caminhoLocal, db, r2Presign, SFX_CATEGORIAS, type MUSICA_TAGS } from "@domus-ads/core";
+import { caminhoDrive, caminhoLocal, db, lerArquivo, SFX_CATEGORIAS, type MUSICA_TAGS } from "@domus-ads/core";
 import { DATA_DIR } from "../env";
 import { ffmpeg } from "./tools";
 
@@ -34,33 +34,32 @@ async function padrao(cat: Sfx): Promise<string> {
   return f;
 }
 
-/** Áudio da biblioteca: no PC é usado direto do disco; no R2 é baixado para a pasta do job. */
-async function obter(storage: string, key: string, destino: string): Promise<string> {
-  if (storage === "local") return caminhoLocal(key);
+/** Áudio da biblioteca: no PC (ou arquivado no Drive) é usado direto do disco; no R2 é baixado para a pasta do job. */
+async function obter(c: { storage: string; r2_key: string; arquivado: boolean }, destino: string): Promise<string> {
+  if (c.arquivado) return caminhoDrive(c.r2_key);
+  if (c.storage === "local") return caminhoLocal(c.r2_key);
   if (existsSync(destino)) return destino;
-  const r = await fetch(await r2Presign(key, "GET", 600));
-  if (!r.ok) throw new Error(`R2 GET ${r.status}`);
   const { writeFile } = await import("node:fs/promises");
-  await writeFile(destino, Buffer.from(await r.arrayBuffer()));
+  await writeFile(destino, await lerArquivo(c));
   return destino;
 }
 
 /** Arquivo para um efeito: da biblioteca do workspace (variando por índice) ou o padrão sintetizado. */
 export async function arquivoSfx(workspaceId: string, cat: Sfx, indice: number, pasta: string): Promise<string> {
-  const lib = await db()<{ id: string; storage: string; r2_key: string }[]>`
-    select id, storage, r2_key from ads.creatives where workspace_id = ${workspaceId} and type = 'SFX' and status = 'READY' and ${cat} = any(tags) and r2_key is not null order by created_at`;
+  const lib = await db()<{ id: string; storage: string; r2_key: string; arquivado: boolean }[]>`
+    select id, storage, r2_key, arquivado from ads.creatives where workspace_id = ${workspaceId} and type = 'SFX' and status = 'READY' and ${cat} = any(tags) and r2_key is not null order by created_at`;
   if (!lib.length) return padrao(cat);
   const item = lib[indice % lib.length]!;
   const destino = join(pasta, `sfx-${item.id}`);
-  return obter(item.storage, item.r2_key, destino);
+  return obter(item, destino);
 }
 
 /** Música licenciada da biblioteca com a tag pedida. Sem nenhuma: null (o vídeo sai sem música, e o projeto avisa). */
 export async function arquivoMusica(workspaceId: string, tag: (typeof MUSICA_TAGS)[number], pasta: string): Promise<{ file: string; name: string } | null> {
-  const [m] = await db()<{ id: string; name: string; storage: string; r2_key: string }[]>`
-    select id, name, storage, r2_key from ads.creatives where workspace_id = ${workspaceId} and type = 'MUSIC' and status = 'READY' and ${tag} = any(tags) and r2_key is not null
+  const [m] = await db()<{ id: string; name: string; storage: string; r2_key: string; arquivado: boolean }[]>`
+    select id, name, storage, r2_key, arquivado from ads.creatives where workspace_id = ${workspaceId} and type = 'MUSIC' and status = 'READY' and ${tag} = any(tags) and r2_key is not null
     order by created_at desc limit 1`;
   if (!m) return null;
   const destino = join(pasta, `music-${m.id}`);
-  return { file: await obter(m.storage, m.r2_key, destino), name: m.name };
+  return { file: await obter(m, destino), name: m.name };
 }

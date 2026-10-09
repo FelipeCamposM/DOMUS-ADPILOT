@@ -8,13 +8,14 @@ import { runImagem, type ImagemPayload } from "./video/imagem";
 import { runVideo, type VideoPayload } from "./video/pipeline";
 import { runCampanhaIA, type CampanhaPayload } from "./ai/campanha";
 import { inicializacaoAtiva, configurarInicializacao } from "./startup";
+import { arquivarExcesso, restaurar } from "./video/arquivo";
 
 /**
  * DOMUS Worker: roda no PC local, sem nenhuma porta aberta. Ele mesmo busca trabalho na fila (ads.jobs) com
  * FOR UPDATE SKIP LOCKED e grava progresso/resultado no banco; a web só lê. A web nunca manda comando de shell:
  * cada tipo de job tem um handler fixo aqui (allowlist).
  */
-const TIPOS: readonly JobType[] = ["SYNC_META", "SYNC_GOOGLE", "AI_CHAT", "AI_LOGIN", "AI_DETECT", "WORKER_STARTUP", "GENERATE_VIDEO", "GENERATE_IMAGE", "AI_CAMPAIGN"];
+const TIPOS: readonly JobType[] = ["SYNC_META", "SYNC_GOOGLE", "AI_CHAT", "AI_LOGIN", "AI_DETECT", "WORKER_STARTUP", "GENERATE_VIDEO", "GENERATE_IMAGE", "AI_CAMPAIGN", "RESTORE_MEDIA"];
 const sql = db();
 const ativos = new Map<string, AbortController>();
 let parando = false;
@@ -48,6 +49,8 @@ async function executar(job: Job) {
       result = await runImagem(job.payload as unknown as ImagemPayload, { signal: ctl.signal, log, progress: async (p) => { await sql`update ads.jobs set progress = ${p} where id = ${job.id}`; } });
     } else if (job.type === "AI_CAMPAIGN") {
       result = await runCampanhaIA(job.payload as unknown as CampanhaPayload, { signal: ctl.signal, log });
+    } else if (job.type === "RESTORE_MEDIA") {
+      result = await restaurar(String(job.payload.creativeId));
     } else if (job.type === "WORKER_STARTUP") {
       // só quando o usuário pede na tela (Configurações → Worker)
       result = await configurarInicializacao(job.payload.enable === true, log);
@@ -143,5 +146,6 @@ await sql`update ads.ai_conversations set status = 'IDLE' where status = 'RUNNIN
 console.log(`DOMUS Worker "${WORKER_ID}" no ar · ${CONCURRENCY} jobs simultâneos · ${recuperados.length} job(s) recuperado(s)`);
 repetir(heartbeat, 30_000);
 repetir(agendarSyncs, 5 * 60_000);
+repetir(async function arquivarNoDrive() { await arquivarExcesso((m) => console.log(`[${agora()}] arquivo: ${m}`)); }, 30 * 60_000);
 repetir(async function detectarContas() { await publicarDetectadas(await detectar()); }, 10 * 60_000);
 await loop();

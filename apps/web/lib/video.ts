@@ -18,22 +18,22 @@ export async function projetos(ws: string): Promise<ProjetoLinha[]> {
 
 export interface ProjetoDetalhe extends ProjetoLinha {
   storyboard: Storyboard | null; job_status: string | null;
-  creative: { id: string; duration_ms: number | null; size_bytes: string | null; width: number | null; height: number | null; metadata: { avisos?: string[]; music?: string | null } } | null;
+  creative: { id: string; duration_ms: number | null; size_bytes: string | null; width: number | null; height: number | null; arquivado: boolean; metadata: { avisos?: string[]; music?: string | null } } | null;
 }
 
 export async function projeto(ws: string, id: string): Promise<ProjetoDetalhe | null> {
   const sql = db();
-  const [p] = await sql<(ProjetoDetalhe & { c_id: string | null; c_dur: number | null; c_size: string | null; c_w: number | null; c_h: number | null; c_meta: { avisos?: string[]; music?: string | null } | null })[]>`
+  const [p] = await sql<(ProjetoDetalhe & { c_id: string | null; c_dur: number | null; c_size: string | null; c_w: number | null; c_h: number | null; c_arq: boolean | null; c_meta: { avisos?: string[]; music?: string | null } | null })[]>`
     select p.id, p.kind, p.title, p.status, p.step_detail, p.error, p.creative_id, p.brief, p.storyboard, p.assets, p.links, p.created_at, p.updated_at,
       j.progress, j.status as job_status, (c.thumbnail_key is not null) as thumb,
-      c.id as c_id, c.duration_ms as c_dur, c.size_bytes::text as c_size, c.width as c_w, c.height as c_h, c.metadata as c_meta
+      c.id as c_id, c.duration_ms as c_dur, c.size_bytes::text as c_size, c.width as c_w, c.height as c_h, c.arquivado as c_arq, c.metadata as c_meta
     from ads.video_projects p
     left join ads.creatives c on c.id = p.creative_id
     left join lateral (select progress, status from ads.jobs where type in ('GENERATE_VIDEO','GENERATE_IMAGE') and payload->>'projectId' = p.id::text order by created_at desc limit 1) j on true
     where p.id = ${id} and p.workspace_id = ${ws}`;
   if (!p) return null;
-  const { c_id, c_dur, c_size, c_w, c_h, c_meta, ...resto } = p;
-  return { ...resto, creative: c_id ? { id: c_id, duration_ms: c_dur, size_bytes: c_size, width: c_w, height: c_h, metadata: c_meta ?? {} } : null };
+  const { c_id, c_dur, c_size, c_w, c_h, c_arq, c_meta, ...resto } = p;
+  return { ...resto, creative: c_id ? { id: c_id, duration_ms: c_dur, size_bytes: c_size, width: c_w, height: c_h, arquivado: !!c_arq, metadata: c_meta ?? {} } : null };
 }
 
 export interface CriativoLinha {

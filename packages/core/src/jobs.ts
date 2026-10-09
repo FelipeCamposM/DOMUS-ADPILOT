@@ -1,6 +1,6 @@
 import type { Json, Sql } from "./db";
 
-export const JOB_TYPES = ["SYNC_META", "SYNC_GOOGLE", "AI_CHAT", "AI_LOGIN", "AI_DETECT", "WORKER_STARTUP", "GENERATE_VIDEO", "GENERATE_IMAGE", "AI_CAMPAIGN"] as const;
+export const JOB_TYPES = ["SYNC_META", "SYNC_GOOGLE", "AI_CHAT", "AI_LOGIN", "AI_DETECT", "WORKER_STARTUP", "GENERATE_VIDEO", "GENERATE_IMAGE", "AI_CAMPAIGN", "RESTORE_MEDIA"] as const;
 export type JobType = (typeof JOB_TYPES)[number];
 
 export interface Job {

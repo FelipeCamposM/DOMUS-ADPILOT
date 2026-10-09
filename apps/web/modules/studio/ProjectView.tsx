@@ -15,7 +15,7 @@ export interface ProjetoView {
   id: string; title: string; status: string; step_detail: string | null; error: string | null; progress: number | null;
   brief: { formato: string; duracao: number; voz: string; vozNome?: string; musica: string; produto: string };
   storyboard: { scenes: Cena[]; duration: number; music: { tag: string } | null } | null;
-  creative: { id: string; duration_ms: number | null; size_bytes: string | null; width: number | null; height: number | null; avisos: string[]; music: string | null } | null;
+  creative: { id: string; duration_ms: number | null; size_bytes: string | null; width: number | null; height: number | null; arquivado: boolean; avisos: string[]; music: string | null } | null;
   thumb: boolean;
 }
 
@@ -94,6 +94,9 @@ export function ProjectView({ p, podeEditar }: { p: ProjetoView; podeEditar: boo
               <Progresso status={st.status} step={st.step} progress={st.progress} error={st.error} />
             )}
           </div>
+          {p.creative?.arquivado && (
+            <p className="subtle small" style={{ marginTop: 10 }}>Este vídeo estava arquivado no Drive e está sendo restaurado (o worker do PC precisa estar ligado). Recarregue a página em alguns segundos.</p>
+          )}
           {p.creative && (
             <div className="cluster" style={{ marginTop: 12, justifyContent: "space-between" }}>
               <span className="subtle caption">

@@ -288,12 +288,20 @@ Na tela do projeto:
 A lista do Studio mostra o progresso de cada projeto. Passando o mouse, a miniatura de um vídeo vira prévia em
 movimento.
 
-**Armazenamento:** vídeos, imagens, áudios e arquivos ficam **no PC**, em `MEDIA_DIR` (padrão
-`D:\DOMUS-AdPilot-Media`), com a estrutura `ads/workspaces/<id>/videos|images|thumbnails|music|sfx/`. O banco guarda
-só a chave e onde o arquivo está. Para voltar a usar o Cloudflare R2, use `STORAGE=r2` no `.env`.
+**Armazenamento (R2 + arquivo no Google Drive):** com `STORAGE=r2` (o padrão em produção), vídeos, imagens e áudios
+ficam no **Cloudflare R2**, de onde o site online mostra e baixa direto. A estrutura é
+`ads/workspaces/<id>/videos|images|thumbnails|music|sfx/`; o banco guarda só a chave.
 
-Com o armazenamento no PC, **a web precisa rodar no mesmo PC do worker** (`pnpm dev`) para mostrar e baixar os
-arquivos. Na Vercel, use `STORAGE=r2` (o R2 gratuito tem 10 GB).
+- **Cópia no Drive:** com `DRIVE_DIR` no `.env` (a pasta do Google Drive para computador, ex.:
+  `G:\Meu Drive\AdPilot`), o worker guarda uma cópia de tudo que gera. O Google Drive para computador sobe para a nuvem.
+- **Arquivamento automático:** a cada 30 min o worker soma o que o AdPilot ocupa no R2. Passou de `R2_LIMITE_GB`
+  (padrão 6, porque o bucket grátis de 10 GB é dividido com a Domus), os arquivos **menos usados** (nada usado nas
+  últimas 24 h) saem do R2 e ficam só no Drive. Miniaturas nunca saem.
+- **Restauro automático:** abrir um arquivo arquivado pede ao worker que o traga de volta. Imagens mostram "Arquivado no
+  Drive, restaurando…" e o vídeo mostra um aviso; recarregue em alguns segundos. **O worker do PC precisa estar ligado.**
+- **Mídia antiga do PC:** `pnpm media:migrar` sobe para o R2 (e copia no Drive) o que ainda estava como armazenamento
+  local. Pode rodar de novo sem problema. Depois, a pasta `MEDIA_DIR` pode ser apagada.
+- `STORAGE=local` ainda existe (tudo no disco do PC, em `MEDIA_DIR`), mas aí a web só funciona no mesmo PC do worker.
 
 ### Criativos
 - **Vídeos** e **Imagens**: tudo que o Studio gerou no workspace (clique para abrir o projeto).
@@ -471,11 +479,16 @@ no Agendador de Tarefas (logon do seu usuário). O mesmo botão desliga.
 1. Importe o repositório. Em **Root Directory** use `apps/web`; o framework é Next.js.
 2. Copie as variáveis do `.env` para o projeto: as de Supabase, `TOKEN_ENCRYPTION_KEY`, `ADMIN_EMAILS` e as de
    Meta/Google, **`DIRECT_URL`** (o pooler em modo sessão, porta 5432; a porta 6543 embaralha consultas paralelas) e as
-   do **R2** (a web assina as URLs de vídeo e de upload). **Não** são necessárias na Vercel: as do worker e o Resend.
+   do **R2** com **`STORAGE=r2`** (a web assina as URLs de vídeo e de upload). **Não** são necessárias na Vercel: as do
+   worker (`WORKER_*`, `MEDIA_DIR`, `DRIVE_DIR`).
+   Em produção: projeto `domus-adpilot`, domínio `adpilot.digitaldomus.com.br` (CNAME `adpilot` → `cname.vercel-dns.com`
+   na Cloudflare, sem proxy), funções em São Paulo (`gru1`).
 3. Adicione o domínio de produção ao redirect do OAuth do Google (seção 5).
 4. **CORS do bucket R2** (para enviar músicas e efeitos pelo navegador): no painel da Cloudflare, em R2 → bucket →
    Settings → CORS Policy, inclua `PUT`, `GET` e `HEAD` para a origem da plataforma (`http://localhost:3200` em
    desenvolvimento e o domínio de produção). Sem isso, ver e baixar vídeos funciona, mas o upload na biblioteca é recusado.
+   **Já feito:** uma regra separada para `https://adpilot.digitaldomus.com.br` e `http://localhost:3200`; a regra dos
+   sites da Domus ficou como estava.
 
 ---
 

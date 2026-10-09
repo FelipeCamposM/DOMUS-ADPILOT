@@ -6,6 +6,7 @@
     "dev": "pnpm --parallel --filter web --filter worker dev",
     "worker": "pnpm --filter worker start",
     "worker:account": "pnpm --filter worker account",
+    "media:migrar": "pnpm --filter worker media:migrar",
     "build": "pnpm --filter web build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",

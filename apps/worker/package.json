@@ -5,6 +5,7 @@
   "scripts": {
     "start": "tsx src/index.ts",
     "account": "tsx src/accounts-cli.ts",
+    "media:migrar": "tsx src/media-migrar.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "dev": "tsx src/index.ts"

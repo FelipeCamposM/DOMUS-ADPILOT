@@ -1,5 +1,5 @@
-import { anexosSchema, brandSchema, caminhoLocal, db, r2Presign, type Brand } from "@domus-ads/core";
-import { copyFile, mkdir, writeFile } from "node:fs/promises";
+import { anexosSchema, brandSchema, db, lerArquivo, type Brand } from "@domus-ads/core";
+import { mkdir, writeFile } from "node:fs/promises";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import { join } from "node:path";
@@ -12,7 +12,7 @@ import { rodar, FFPROBE } from "./tools";
  */
 export interface ContextoCriativo { texto: string; imagens: string[]; brand: Brand }
 
-interface Asset { id: string; name: string; type: string; storage: string; r2_key: string; mime: string | null; uso: string; nota: string }
+interface Asset { id: string; name: string; type: string; storage: string; r2_key: string; arquivado: boolean; mime: string | null; uso: string; nota: string }
 
 export async function contextoCriativo(projectId: string, workspaceId: string, pasta: string, log: (m: string) => Promise<void>): Promise<ContextoCriativo> {
   const sql = db();
@@ -24,7 +24,7 @@ export async function contextoCriativo(projectId: string, workspaceId: string, p
 
   const ids = [...anexos.assets.map((a) => a.creativeId), ...(brand.logoId ? [brand.logoId] : [])];
   const linhas = ids.length ? await sql<Omit<Asset, "uso" | "nota">[]>`
-    select id, name, type, storage, r2_key, mime from ads.creatives
+    select id, name, type, storage, r2_key, arquivado, mime from ads.creatives
     where id = any(${ids}::uuid[]) and workspace_id = ${workspaceId} and status = 'READY' and r2_key is not null` : [];
   const dirAssets = join(pasta, "assets");
   await mkdir(dirAssets, { recursive: true });
@@ -33,12 +33,8 @@ export async function contextoCriativo(projectId: string, workspaceId: string, p
   const imagens: string[] = [];
   const preparar = async (c: Omit<Asset, "uso" | "nota">, uso: string, nota: string, nomeArquivo: string) => {
     const destino = join(dirAssets, nomeArquivo);
-    if (c.storage === "local") await copyFile(caminhoLocal(c.r2_key), destino);
-    else {
-      const r = await fetch(await r2Presign(c.r2_key, "GET", 600));
-      if (!r.ok) throw new Error(`Não consegui baixar o anexo “${c.name}”`);
-      await writeFile(destino, Buffer.from(await r.arrayBuffer()));
-    }
+    const corpo = await lerArquivo(c).catch(() => { throw new Error(`Não consegui baixar o anexo “${c.name}”`); });
+    await writeFile(destino, corpo);
     const dim = await dimensoes(destino);
     const rel = `assets/${nomeArquivo}`;
     if (c.type === "IMAGE") imagens.push(rel);

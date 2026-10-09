@@ -8,3 +8,5 @@ node_modules
 .worker-data
 # lockfile do npm criado por engano: o projeto usa pnpm
 package-lock.json
+
+.vercel

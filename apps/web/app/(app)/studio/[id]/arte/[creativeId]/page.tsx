@@ -1,8 +1,7 @@
-import { anexosSchema, brandSchema, caminhoLocal, db, r2Presign } from "@domus-ads/core";
+import { anexosSchema, brandSchema, db, lerArquivo, pedirRestauro } from "@domus-ads/core";
 import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { readFile } from "node:fs/promises";
 import { z } from "zod";
 import { can, requireCtx } from "@/lib/ctx";
 import { ArtEditor, type AssetEmbutido } from "@/modules/studio/ArtEditor";
@@ -36,11 +35,13 @@ export default async function EditarArtePage({ params }: { params: Promise<{ id:
     const n = /^anexo-(\d+)\./.exec(nome)?.[1];
     const creativeId = nome.startsWith("logo.") ? logoId : n ? anexos[Number(n) - 1]?.creativeId : null;
     if (!creativeId) continue;
-    const [a] = await sql<{ storage: string; r2_key: string | null; mime: string | null; size_bytes: string | null }[]>`
-      select storage, r2_key, mime, size_bytes from ads.creatives where id = ${creativeId} and workspace_id = ${ctx.workspace.id} and status = 'READY'`;
+    const [a] = await sql<{ storage: string; r2_key: string | null; arquivado: boolean; mime: string | null; size_bytes: string | null }[]>`
+      select storage, r2_key, arquivado, mime, size_bytes from ads.creatives where id = ${creativeId} and workspace_id = ${ctx.workspace.id} and status = 'READY'`;
     if (!a?.r2_key || Number(a.size_bytes ?? 0) > LIMITE) continue;
+    // arquivado no Drive: o site não enxerga; pede o restauro e a prévia mostra o espaço vazio até lá
+    if (a.arquivado) { await pedirRestauro(sql, creativeId, ctx.workspace.id); continue; }
     try {
-      const buf = a.storage === "local" ? await readFile(caminhoLocal(a.r2_key)) : Buffer.from(await (await fetch(await r2Presign(a.r2_key, "GET", 300))).arrayBuffer());
+      const buf = await lerArquivo({ storage: a.storage, r2_key: a.r2_key });
       embutidos.push({ caminho: `assets/${nome}`, dados: `data:${a.mime ?? "application/octet-stream"};base64,${buf.toString("base64")}` });
     } catch {
       // sem o arquivo neste servidor: a prévia mostra o espaço vazio, a arte final continua com ele
