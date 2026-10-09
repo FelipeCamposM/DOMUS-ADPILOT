@@ -1,0 +1,143 @@
+"use client";
+
+import { AlertTriangle, Bell, Bot, Check, ChevronsUpDown, LogOut, Menu, Search } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState, useTransition, type ReactNode } from "react";
+import { ago } from "@/lib/format";
+import { Motion } from "../motion/Motion";
+import { sair, trocarWorkspace } from "./actions";
+import { CommandPalette } from "./CommandPalette";
+import { Popover } from "./Popover";
+import { Sidebar } from "./Sidebar";
+import { Toaster, toast } from "./toast";
+
+export interface ShellProps {
+  children: ReactNode;
+  user: { email: string };
+  workspaces: { id: string; name: string; role: string }[];
+  workspaceId: string;
+  campanhas: { id: string; name: string }[];
+  notificacoes: {
+    acoes: { id: string; summary: string; conversation_id: string | null; created_at: string }[];
+    falhas: { id: string; type: string; error: string | null; finished_at: string }[];
+  };
+  worker: { online: boolean; lastSeen: string | null };
+}
+
+export function Shell(p: ShellProps) {
+  const router = useRouter();
+  const [paleta, setPaleta] = useState(false);
+  const [menu, setMenu] = useState<"ws" | "bell" | "user" | null>(null);
+  const [mobile, setMobile] = useState(false);
+  const [pend, start] = useTransition();
+  const fechar = useCallback(() => setMenu(null), []);
+  const fecharPaleta = useCallback(() => setPaleta(false), []);
+  const ws = p.workspaces.find((w) => w.id === p.workspaceId)!;
+  const total = p.notificacoes.acoes.length + p.notificacoes.falhas.length;
+
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setPaleta((v) => !v); }
+    };
+    window.addEventListener("keydown", k);
+    return () => window.removeEventListener("keydown", k);
+  }, []);
+
+  // Contadores e status do worker se atualizam sozinhos a cada 30 s (sem recarregar a página).
+  useEffect(() => {
+    const t = setInterval(() => { if (document.visibilityState === "visible") router.refresh(); }, 30_000);
+    return () => clearInterval(t);
+  }, [router]);
+
+  const trocar = (id: string) => start(async () => {
+    try {
+      await trocarWorkspace(id);
+      setMenu(null);
+      router.refresh();
+    } catch (e) {
+      toast.err((e as Error).message);
+    }
+  });
+
+  return (
+    <div className="shell">
+      <Sidebar pendentes={p.notificacoes.acoes.length} open={mobile} />
+      {mobile && <div className="overlay only-mobile" style={{ zIndex: 90 }} onClick={() => setMobile(false)} />}
+      <div className="main">
+        <header className="topbar">
+          <button className="chip only-mobile" onClick={() => setMobile((v) => !v)} aria-label="Abrir menu"><Menu aria-hidden /></button>
+
+          <div style={{ position: "relative" }}>
+            <button className="chip" onClick={() => setMenu(menu === "ws" ? null : "ws")} aria-haspopup="menu" aria-expanded={menu === "ws"}
+              style={{ color: "rgb(var(--c-text-primary))", fontWeight: 650, opacity: pend ? 0.6 : 1 }}>
+              <span className="brand-mark" style={{ width: 20, height: 20, borderRadius: 6, fontSize: 11, fontWeight: 800 }}>{ws.name[0]}</span>
+              {ws.name}
+              <ChevronsUpDown aria-hidden />
+            </button>
+            <Popover open={menu === "ws"} onClose={fechar} className="ws-menu">
+              <div className="nav-group" style={{ margin: "6px 10px" }}>Workspaces</div>
+              {p.workspaces.map((w) => (
+                <button key={w.id} className="menu-item" onClick={() => trocar(w.id)} data-active={w.id === ws.id}>
+                  <span className="brand-mark" style={{ width: 22, height: 22, borderRadius: 6, fontSize: 11 }}>{w.name[0]}</span>
+                  <span style={{ flex: 1 }}>{w.name}</span>
+                  <span className="subtle" style={{ fontSize: 11 }}>{w.role}</span>
+                  {w.id === ws.id && <Check aria-hidden />}
+                </button>
+              ))}
+            </Popover>
+          </div>
+
+          <button className="chip chip-busca" onClick={() => setPaleta(true)} style={{ justifyContent: "flex-start" }}>
+            <Search aria-hidden /> <span style={{ flex: 1, textAlign: "left" }}>Buscar…</span> <span className="kbd">Ctrl K</span>
+          </button>
+
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+            <Link href="/settings#worker" className="chip" suppressHydrationWarning title={p.worker.lastSeen ? `Último sinal ${ago(p.worker.lastSeen)}` : "O worker nunca se conectou"}>
+              <span className={`dot ${p.worker.online ? "on" : "err"}`} aria-hidden />
+              Worker {p.worker.online ? "online" : "offline"}
+            </Link>
+
+            <div style={{ position: "relative" }}>
+              <button className="chip" onClick={() => setMenu(menu === "bell" ? null : "bell")} aria-label={`Notificações (${total})`} style={{ position: "relative" }}>
+                <Bell aria-hidden />
+                {total > 0 && <span className="count" style={{ position: "absolute", top: -6, right: -6, minWidth: 18, height: 18, padding: "0 5px", borderRadius: 99, fontSize: 10.5, fontWeight: 800, display: "grid", placeItems: "center", background: "rgb(var(--c-brand))", color: "rgb(var(--c-brand-ink))" }}>{total}</span>}
+              </button>
+              <Popover open={menu === "bell"} onClose={fechar} align="right" width={360}>
+                {total === 0 && <div className="empty" style={{ padding: 24 }}>Tudo em dia.</div>}
+                {p.notificacoes.acoes.map((a) => (
+                  <Link key={a.id} href={a.conversation_id ? `/ai/${a.conversation_id}` : "/ai"} className="menu-item" onClick={fechar}>
+                    <Bot aria-hidden style={{ color: "rgb(var(--c-brand))" }} />
+                    <span style={{ flex: 1 }}><b style={{ fontWeight: 600 }}>Aprovar:</b> {a.summary}<br /><span className="subtle" style={{ fontSize: 11 }}>{ago(a.created_at)}</span></span>
+                  </Link>
+                ))}
+                {p.notificacoes.falhas.map((f) => (
+                  <Link key={f.id} href="/jobs" className="menu-item" onClick={fechar}>
+                    <AlertTriangle aria-hidden style={{ color: "rgb(var(--c-error))" }} />
+                    <span style={{ flex: 1 }}>Job {f.type} falhou<br /><span className="subtle" style={{ fontSize: 11 }}>{f.error?.slice(0, 80)}</span></span>
+                  </Link>
+                ))}
+              </Popover>
+            </div>
+
+            <div style={{ position: "relative" }}>
+              <button className="chip" onClick={() => setMenu(menu === "user" ? null : "user")} aria-label="Conta">
+                <span style={{ width: 22, height: 22, borderRadius: 99, display: "grid", placeItems: "center", background: "rgb(var(--c-bg-elevated))", fontWeight: 700, fontSize: 11 }}>
+                  {p.user.email[0]?.toUpperCase()}
+                </span>
+              </button>
+              <Popover open={menu === "user"} onClose={fechar} align="right">
+                <div style={{ padding: "8px 10px" }} className="subtle">{p.user.email}</div>
+                <form action={sair}><button className="menu-item" type="submit"><LogOut aria-hidden /> Sair</button></form>
+              </Popover>
+            </div>
+          </div>
+        </header>
+        <main className="content" id="conteudo">{p.children}</main>
+      </div>
+      <CommandPalette open={paleta} onClose={fecharPaleta} campanhas={p.campanhas} />
+      <Toaster />
+      <Motion />
+    </div>
+  );
+}

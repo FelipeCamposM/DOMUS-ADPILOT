@@ -1,0 +1,10 @@
+node_modules
+.next
+.env
+.env.local
+.vercel
+*.tsbuildinfo
+# logins das contas de IA e pastas das conversas: NUNCA commitar
+.worker-data
+# lockfile do npm criado por engano: o projeto usa pnpm
+package-lock.json

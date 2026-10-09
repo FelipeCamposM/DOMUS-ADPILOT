@@ -1,0 +1,23 @@
+{
+  "name": "domus-adpilot",
+  "private": true,
+  "packageManager": "pnpm@10.12.1",
+  "scripts": {
+    "dev": "pnpm --parallel --filter web --filter worker dev",
+    "worker": "pnpm --filter worker start",
+    "worker:account": "pnpm --filter worker account",
+    "build": "pnpm --filter web build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "db:migrate": "pnpm --filter @domus-ads/core migrate",
+    "user:create": "pnpm --filter @domus-ads/core user:create",
+    "worker:startup": "powershell -ExecutionPolicy Bypass -File apps/worker/scripts/inicializacao.ps1",
+    "dev:web": "pnpm --filter web dev"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "ffmpeg-static",
+      "esbuild"
+    ]
+  }
+}

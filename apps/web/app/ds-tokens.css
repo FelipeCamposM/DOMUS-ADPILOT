@@ -1,0 +1,115 @@
+/*
+ * DOMUS AdPilot — tokens herdados do SIAPLUS Design System v2 (mesmos nomes, mesmos valores).
+ * Cores em canais RGB: rgb(var(--c-x)) ou rgb(var(--c-x) / 0.1).
+ */
+:root {
+  /* ── Cor: superfícies (escuro, 90% neutro) ─────────────────────────── */
+  --c-bg-main: 10 10 14;          /* #0A0A0E  fundo da página */
+  --c-bg-surface: 20 20 27;       /* #14141B  cartões, painéis */
+  --c-bg-elevated: 28 28 37;      /* #1C1C25  itens sobre cartões, hover */
+  --c-bg-inset: 7 7 10;           /* #07070A  campos, poços */
+  --c-border: 38 38 50;           /* #262632 */
+  --c-border-strong: 56 56 72;    /* #383848 */
+
+  /* ── Cor: texto ─────────────────────────────────────────────────────── */
+  --c-text-primary: 250 250 252;  /* #FAFAFC */
+  --c-text-secondary: 150 150 168;/* #9696A8 */
+  --c-text-tertiary: 102 102 120; /* #666678 */
+
+  /* ── Cor: marca DOMUS (roxo) — ação, ativo, foco, gráficos. Mesmos tons da landing DOMUS ── */
+  --c-brand: 168 85 255;          /* #A855FF  violeta DOMUS vivo */
+  --c-brand-strong: 140 60 245;   /* #8C3CF5  hover / meio do gradiente */
+  --c-brand-deep: 106 31 224;     /* #6A1FE0 */
+  --c-glow: 192 132 252;          /* #C084FC  luz dos brilhos (mais clara que a marca) */
+  --c-brand-ink: 255 255 255;     /* texto sobre a marca */
+  --c-lilac: 228 190 255;         /* #E4BEFF  texto/realce roxo legível no fundo escuro */
+  --gradient-brand: linear-gradient(135deg, #C084FC 0%, #A855FF 30%, #8C3CF5 65%, #6A1FE0 100%); /* decorativo */
+  --gradient-btn: linear-gradient(135deg, #A855FF 0%, #8C3CF5 50%, #6A1FE0 100%);                 /* sob texto branco */
+
+  /* ── Cor: estados ───────────────────────────────────────────────────── */
+  --c-success: 61 220 151;        /* #3DDC97  sucesso fica verde: não confundir com a marca */
+  --c-error: 255 77 94;           /* #FF4D5E */
+  --c-warning: 255 176 32;        /* #FFB020 */
+  --c-info: 91 140 255;           /* #5B8CFF */
+
+  /* ── Tipografia ─────────────────────────────────────────────────────── */
+  --font-sans: var(--font-jakarta), "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-accent: var(--font-serif), "Instrument Serif", Georgia, serif; /* só marketing: palavras de ênfase em itálico */
+  --font-mono: ui-monospace, "Cascadia Code", "Segoe UI Mono", monospace;
+
+  --fs-display: clamp(2.75rem, 1.6rem + 5.4vw, 6rem);   /* 44 → 96 */
+  --fs-h1: clamp(2.25rem, 1.6rem + 3vw, 4rem);          /* 36 → 64 */
+  --fs-h2: clamp(1.875rem, 1.4rem + 2.2vw, 3.25rem);    /* 30 → 52 */
+  --fs-h3: clamp(1.25rem, 1.1rem + 0.6vw, 1.5rem);      /* 20 → 24 */
+  --fs-body-lg: clamp(1.0625rem, 1rem + 0.35vw, 1.25rem);/* 17 → 20 */
+  --fs-body: 1rem;
+  --fs-body-sm: 0.875rem;
+  --fs-caption: 0.8125rem;
+  --fs-micro: 0.75rem;
+
+  --lh-tight: 1.04;
+  --lh-heading: 1.12;
+  --lh-body: 1.6;
+  --ls-display: -0.035em;
+  --ls-heading: -0.025em;
+  --ls-eyebrow: 0.14em;
+
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+  --fw-extrabold: 800;
+
+  /* ── Espaço (base 4px) ──────────────────────────────────────────────── */
+  --space-1: 0.25rem;  --space-2: 0.5rem;  --space-3: 0.75rem; --space-4: 1rem;
+  --space-5: 1.25rem;  --space-6: 1.5rem;  --space-8: 2rem;    --space-10: 2.5rem;
+  --space-12: 3rem;    --space-16: 4rem;   --space-20: 5rem;   --space-24: 6rem;
+  --space-32: 8rem;
+  --section-y: clamp(4.5rem, 3rem + 6vw, 8.5rem);
+  --container: 1200px;
+  --gutter: clamp(1rem, 0.5rem + 2vw, 2rem);
+
+  /* ── Raio ───────────────────────────────────────────────────────────── */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-2xl: 28px;
+  --radius-full: 999px;
+
+  /* ── Sombra e brilho ────────────────────────────────────────────────── */
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-md: 0 8px 24px -8px rgb(0 0 0 / 0.55);
+  --shadow-lg: 0 24px 60px -20px rgb(0 0 0 / 0.7);
+  /* brilho em camadas: contorno de luz + halo próximo + halo largo */
+  --shadow-glow: 0 0 0 1px rgb(var(--c-glow) / 0.45), 0 8px 30px -6px rgb(var(--c-brand) / 0.7), 0 0 70px -10px rgb(var(--c-brand) / 0.6);
+  --glow-sm: 0 0 14px rgb(var(--c-brand) / 0.55);
+  --glow-md: 0 0 0 1px rgb(var(--c-glow) / 0.25), 0 0 28px -4px rgb(var(--c-brand) / 0.45);
+  --ring: 0 0 0 3px rgb(var(--c-brand) / 0.4), 0 0 22px rgb(var(--c-brand) / 0.35);
+
+  /* ── Movimento ──────────────────────────────────────────────────────── */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);        /* entradas */
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);    /* trocas */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1); /* toques de interação */
+  --dur-fast: 150ms;
+  --dur-base: 250ms;
+  --dur-slow: 450ms;
+  --dur-slower: 800ms;
+
+  /* ── Camadas ────────────────────────────────────────────────────────── */
+  --z-base: 1;
+  --z-sticky: 40;
+  --z-nav: 50;
+  --z-overlay: 100;
+
+  color-scheme: dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0ms;
+    --dur-base: 0ms;
+    --dur-slow: 0ms;
+    --dur-slower: 0ms;
+  }
+}
