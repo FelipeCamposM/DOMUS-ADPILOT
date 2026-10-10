@@ -170,8 +170,25 @@ contas de IA, a voz local e o render local. O seletor **Vídeo | Imagem** fica n
 
   Cada arquivo aceita uma nota (ex.: "print na cena 2"). A IA **abre e olha cada imagem** antes de criar. Ela só
   consegue ler arquivos da pasta daquele projeto; fora dela o acesso é negado.
-- **Links** (site do produto, post, referência): o worker lê o texto público da página e passa como contexto. Links
-  para a rede local (localhost, 192.168…, 10…) são recusados.
+- **Links** (site do produto, post ou perfil do Instagram, referência): o worker lê a página e passa para a IA o texto,
+  **até 6 fotos** (salvas na pasta do projeto como `assets/refN-M.jpg`, que a IA olha e pode colocar na arte) e as
+  **cores** (do CSS do site e as predominantes de cada foto). Links escritos no meio das **orientações** também valem
+  (até 6 no total). Links para a rede local (localhost, 192.168…, 10…) são recusados.
+  - **Instagram:** de um **post** (`instagram.com/p/…`) vem a foto do post. De um **perfil**, sem login, vêm só a bio
+    e miniaturas pequenas (240 px) dos últimos posts: boas para a paleta, fracas para usar na arte. Para fotos grandes,
+    cole links de posts ou envie as imagens.
+  - As fotos baixadas não aparecem na biblioteca; somem quando o projeto é apagado.
+- **Imagens enviadas:** além de a IA olhar, o worker extrai as cores predominantes de cada uma.
+
+**Identidade visual (vídeo e imagem):** escolha no topo da coluna da direita.
+- **Do workspace:** usa a marca de Configurações → Marca (cores, logo, fontes, tom).
+- **Das referências:** para criar peças de **outra marca** dentro do mesmo workspace (ex.: um carrossel para um
+  cliente). A marca do workspace e o logo dela não entram; a paleta vem dos links e imagens, e as cenas prontas dos
+  vídeos são pintadas com ela (fundo, destaque, texto). Workspace sem marca configurada já começa nesta opção.
+- Peça nas orientações o que quiser, ex.: "use as fotos do site https://… e as cores do Instagram deles".
+
+**Botão de gerar:** precisa do **produto** e do **objetivo ou das orientações** (o objetivo é opcional quando as
+orientações explicam a peça). Enquanto faltar algo, aparece embaixo do botão o que preencher.
 
 **Orientações para a IA (vídeo e imagem):** campo livre no topo do briefing (até 4000 caracteres). Escreva do que se
 trata a peça como se falasse com um diretor de criação: história, tom, o que mostrar, o que evitar. A IA segue isso com

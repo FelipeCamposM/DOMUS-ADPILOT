@@ -9,6 +9,7 @@ import { EstiloPicker, type Estilo } from "./EstiloPicker";
 import { Palco } from "./Palco";
 import { criarImagem } from "./actions";
 import { Anexos, paraEnvio, type AnexosValor, type ArquivoLib } from "./Anexos";
+import { faltando, Identidade, type IdentidadeValor } from "./Identidade";
 
 const FORMATOS = [
   { v: "1:1", l: "Quadrado", d: "Feed", w: 28, h: 28 },
@@ -25,7 +26,8 @@ export function NewImageForm({ produto, biblioteca, brand }: {
   const [pend, start] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
   const [anexos, setAnexos] = useState<AnexosValor>({ assets: [], links: [] });
-  const [f, setF] = useState({ produto, objetivo: "", descricao: "", publico: "", cta: "", cores: "", estilo: "premium, moderno, tipografia forte", texto: "", formato: "1:1", variacoes: 3, orientacao: "", tipo: "avulsa" as "avulsa" | "carrossel", slides: 5, estiloVisual: "livre" as Estilo });
+  const [f, setF] = useState({ produto, objetivo: "", descricao: "", publico: "", cta: "", cores: "", estilo: "premium, moderno, tipografia forte", texto: "", formato: "1:1", variacoes: 3, orientacao: "", tipo: "avulsa" as "avulsa" | "carrossel", slides: 5, estiloVisual: "livre" as Estilo, identidade: (brand.preenchida ? "workspace" : "referencias") as IdentidadeValor });
+  const falta = faltando(f);
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((x) => ({ ...x, [k]: v }));
 
   const carrossel = f.tipo === "carrossel";
@@ -50,11 +52,11 @@ export function NewImageForm({ produto, biblioteca, brand }: {
         <div className="field">
           <label className="label" htmlFor="orientacao" style={{ display: "flex", gap: 6, alignItems: "center" }}><MessageSquareText size={14} aria-hidden /> Orientações para a IA (do que se trata, livre)</label>
           <textarea id="orientacao" className="input" rows={5} style={{ height: "auto", paddingBlock: 12, resize: "vertical" }} maxLength={4000}
-            placeholder="Ex.: Carrossel explicando em 5 passos como o professor regulariza o SIAP sem sair de casa. Tom didático e próximo, nada de juridiquês. Quero que a capa provoque: 'você está perdendo dinheiro?'"
+            placeholder="Ex.: Carrossel de 6 slides para a https://www.yourcookies.com: use as fotos dos cookies do site e a paleta do Instagram deles. Capa com gancho, um sabor por slide, CTA para encomendar no último."
             value={f.orientacao} onChange={(e) => set("orientacao", e.target.value)} />
           <span className="subtle caption" style={{ textAlign: "right" }}>{f.orientacao.length}/4000 · a IA segue isto com prioridade, sem inventar fatos</span>
         </div>
-        <Campo id="objetivo" label="Objetivo da arte" valor={f.objetivo} on={(v) => set("objetivo", v)} max={300} ph="Ex.: gerar testes grátis entre professores de Goiás" />
+        <Campo id="objetivo" label="Objetivo da arte (opcional se as orientações explicarem)" valor={f.objetivo} on={(v) => set("objetivo", v)} max={300} ph="Ex.: gerar testes grátis entre professores de Goiás" />
         <div className="field">
           <label className="label" htmlFor="descricao">Descrição e argumentos (o que a IA pode afirmar)</label>
           <textarea id="descricao" className="input" rows={3} style={{ height: "auto", paddingBlock: 12, resize: "vertical" }} maxLength={2000}
@@ -63,13 +65,14 @@ export function NewImageForm({ produto, biblioteca, brand }: {
         <Campo id="texto" label="Texto obrigatório na arte (opcional)" valor={f.texto} on={(v) => set("texto", v)} max={200} ph="Ex.: Seu SIAP em dia em minutos" />
         <div className="kpis" style={{ gridTemplateColumns: "1fr 1fr" }}>
           <Campo id="publico" label="Público" valor={f.publico} on={(v) => set("publico", v)} max={300} />
-          <Campo id="cores" label="Cores (vazio = identidade visual)" valor={f.cores} on={(v) => set("cores", v)} max={200} />
+          <Campo id="cores" label="Cores (vazio = identidade escolhida)" valor={f.cores} on={(v) => set("cores", v)} max={200} />
         </div>
         <Campo id="estilo" label="Estilo" valor={f.estilo} on={(v) => set("estilo", v)} max={300} />
       </div>
       <div className="studio-anexos"><Anexos valor={anexos} onChange={setAnexos} biblioteca={biblioteca} brand={brand} /></div>
 
       <div className="stack studio-lateral" style={{ gap: 16 }}>
+        <Identidade valor={f.identidade} onChange={(v) => set("identidade", v)} marcaPreenchida={brand.preenchida} nomeWorkspace={produto} />
         <div className="panel" data-enter style={{ padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
           <div className="panel-title">Estilo visual</div>
           <EstiloPicker valor={f.estiloVisual} onChange={(v) => set("estiloVisual", v)} />
@@ -121,9 +124,10 @@ export function NewImageForm({ produto, biblioteca, brand }: {
           </div></Revelar>
         </div>
         {erro && <p className="error-text" role="alert">{erro}</p>}
-        <button className="btn btn-primary btn-lg" onClick={enviar} disabled={pend || f.objetivo.trim().length < 2 || f.produto.trim().length < 2} data-enter>
+        <button className="btn btn-primary btn-lg" onClick={enviar} disabled={pend || !!falta} title={falta ?? undefined} data-enter>
           {pend ? <Loader2 className="animate-spin" aria-hidden /> : <><Sparkles aria-hidden /> {carrossel ? "Planejar carrossel" : "Criar conceitos"} <ArrowRight className="seta" aria-hidden /></>}
         </button>
+        {falta && <p className="subtle caption" role="status" style={{ textAlign: "center", color: "rgb(var(--c-warning))" }}>Para liberar: {falta.toLowerCase()}</p>}
         <p className="subtle caption" style={{ textAlign: "center" }}>Primeiro você aprova {carrossel ? "os slides" : "os conceitos"}; depois, cerca de 1 minuto por {carrossel ? "slide" : "imagem"} no PC do worker.</p>
       </div>
     </div>

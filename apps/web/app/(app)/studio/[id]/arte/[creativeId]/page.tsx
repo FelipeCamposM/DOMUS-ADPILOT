@@ -26,14 +26,17 @@ export default async function EditarArtePage({ params }: { params: Promise<{ id:
     where p.id = ${ids.data.id} and p.workspace_id = ${ctx.workspace.id}`;
   if (!p) notFound();
 
-  // assets/logo.* e assets/anexo-N.* (como o worker nomeia) → bytes do arquivo, embutidos como data: URI
+  // assets/logo.*, assets/anexo-N.* e assets/refN-M.* (fotos dos links), como o worker nomeia → embutidos como data: URI
   const anexos = anexosSchema.parse({ assets: p.assets ?? [], links: [] }).assets;
   const logoId = brandSchema.parse(p.brand ?? {}).logoId;
   const nomes = [...new Set([...c.metadata.composition.matchAll(/assets\/([\w.-]+)/g)].map((m) => m[1]!))];
   const embutidos: AssetEmbutido[] = [];
   for (const nome of nomes) {
     const n = /^anexo-(\d+)\./.exec(nome)?.[1];
-    const creativeId = nome.startsWith("logo.") ? logoId : n ? anexos[Number(n) - 1]?.creativeId : null;
+    const ref = /^ref\d+-\d+\./.test(nome)
+      ? (await sql<{ id: string }[]>`select id from ads.creatives where workspace_id = ${ctx.workspace.id} and metadata->>'refDe' = ${ids.data.id} and metadata->>'arquivo' = ${nome}`)[0]?.id
+      : null;
+    const creativeId = nome.startsWith("logo.") ? logoId : n ? anexos[Number(n) - 1]?.creativeId : ref;
     if (!creativeId) continue;
     const [a] = await sql<{ storage: string; r2_key: string | null; arquivado: boolean; mime: string | null; size_bytes: string | null }[]>`
       select storage, r2_key, arquivado, mime, size_bytes from ads.creatives where id = ${creativeId} and workspace_id = ${ctx.workspace.id} and status = 'READY'`;

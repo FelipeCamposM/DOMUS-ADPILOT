@@ -200,10 +200,10 @@ export async function apagarVideo(projectId: string) {
     requireRole(ctx, "editor");
     const p = await doWorkspace(ctx, projectId);
     if (p.ocupado) throw new Error("Cancele a geração antes de apagar");
-    // o vídeo final ou todas as variações de imagem do projeto (banco + arquivos)
+    // o vídeo final, todas as variações de imagem e as fotos baixadas dos links do projeto (banco + arquivos)
     const gerados = await db()<{ id: string; storage: string; r2_key: string | null; thumbnail_key: string | null }[]>`
       select id, storage, r2_key, thumbnail_key from ads.creatives
-      where workspace_id = ${ctx.workspace.id} and (id = ${p.creative_id ?? null} or metadata->>'projectId' = ${p.id}) and type in ('VIDEO','IMAGE')`;
+      where workspace_id = ${ctx.workspace.id} and (id = ${p.creative_id ?? null} or metadata->>'projectId' = ${p.id} or metadata->>'refDe' = ${p.id}) and type in ('VIDEO','IMAGE')`;
     for (const c of gerados) {
       for (const k of [c.r2_key, c.thumbnail_key]) if (k) await apagarArquivo(c.storage, k).catch(() => {});
       await db()`delete from ads.creatives where id = ${c.id}`;

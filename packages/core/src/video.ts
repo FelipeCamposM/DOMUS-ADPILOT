@@ -26,9 +26,18 @@ export type EstiloVisual = keyof typeof ESTILOS;
 export const TIPOS_CENA = ["abertura", "titulo", "lista", "numero", "comparacao", "produto", "citacao", "cta"] as const;
 export type TipoCena = (typeof TIPOS_CENA)[number];
 
+/**
+ * Identidade visual da peça: a do workspace (Configurações → Marca) ou a das referências do projeto (sites, Instagram e
+ * imagens enviadas: o worker baixa as fotos e extrai a paleta). Serve para criar artes de outra marca no mesmo workspace.
+ */
+export const IDENTIDADES = ["workspace", "referencias"] as const;
+export type Identidade = (typeof IDENTIDADES)[number];
+const temObjetivo = (b: { objetivo: string; orientacao: string }) => b.objetivo.length >= 2 || b.orientacao.length >= 2;
+const MSG_OBJETIVO = { message: "Escreva o objetivo ou as orientações para a IA", path: ["objetivo"] };
+
 export const briefSchema = z.object({
   produto: z.string().trim().min(2, "Informe o produto").max(120),
-  objetivo: z.string().trim().min(2, "Informe o objetivo").max(300),
+  objetivo: z.string().trim().max(300).default(""),
   descricao: z.string().trim().max(2000).default(""),
   // orientação livre ("do que se trata"), como se falasse com o diretor de criação
   orientacao: z.string().trim().max(4000, "Orientação muito longa (até 4000 caracteres)").default(""),
@@ -46,7 +55,8 @@ export const briefSchema = z.object({
   efeitos: z.coerce.boolean().default(true),
   estiloVisual: z.enum(Object.keys(ESTILOS) as [EstiloVisual, ...EstiloVisual[]], { message: "Estilo inválido" }).default("hud"),
   legendas: z.coerce.boolean().default(true),
-});
+  identidade: z.enum(IDENTIDADES).default("workspace"),
+}).refine(temObjetivo, MSG_OBJETIVO);
 export type Brief = z.infer<typeof briefSchema>;
 
 /** Imagens: formatos de feed/stories e o 1,91:1 dos anúncios com link da Meta. */
@@ -58,7 +68,7 @@ export const MAX_SLIDES = 20;
 
 export const briefImagemSchema = z.object({
   produto: z.string().trim().min(2, "Informe o produto").max(120),
-  objetivo: z.string().trim().min(2, "Informe o objetivo").max(300),
+  objetivo: z.string().trim().max(300).default(""),
   descricao: z.string().trim().max(2000).default(""),
   orientacao: z.string().trim().max(4000, "Orientação muito longa (até 4000 caracteres)").default(""),
   tipo: z.enum(["avulsa", "carrossel"]).default("avulsa"),
@@ -71,7 +81,8 @@ export const briefImagemSchema = z.object({
   texto: z.string().trim().max(200).default(""), // texto exato desejado na arte (opcional)
   formato: z.enum(Object.keys(FORMATOS_IMAGEM) as [FormatoImagem, ...FormatoImagem[]], { message: "Formato inválido" }),
   variacoes: z.coerce.number().int().min(1, "Mínimo 1 variação").max(4, "Máximo 4 variações").default(3),
-}).refine((b) => b.tipo !== "carrossel" || b.formato === "1:1" || b.formato === "4:5", { message: "Carrossel do Instagram: use 1:1 ou 4:5", path: ["formato"] });
+  identidade: z.enum(IDENTIDADES).default("workspace"),
+}).refine(temObjetivo, MSG_OBJETIVO).refine((b) => b.tipo !== "carrossel" || b.formato === "1:1" || b.formato === "4:5", { message: "Carrossel do Instagram: use 1:1 ou 4:5", path: ["formato"] });
 export type BriefImagem = z.infer<typeof briefImagemSchema>;
 
 /** Storyboard estruturado (spec §18): gerado antes do código, editável depois. Tempos em segundos absolutos. */

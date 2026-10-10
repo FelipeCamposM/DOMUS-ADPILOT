@@ -42,7 +42,7 @@ ${REGRAS_CONTEXTO}
 
 const briefingTexto = (b: BriefImagem) => `<briefing>
 Produto: ${b.produto}
-Objetivo: ${b.objetivo}
+Objetivo: ${b.objetivo || "(não informado: siga as orientações do cliente)"}
 Descrição: ${b.descricao || "-"}
 Público: ${b.publico || "-"}
 CTA: ${b.cta || "-"}

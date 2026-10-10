@@ -9,6 +9,7 @@ import { EstiloPicker, type Estilo } from "./EstiloPicker";
 import { Palco } from "./Palco";
 import { criarVideo } from "./actions";
 import { Anexos, paraEnvio, type AnexosValor, type ArquivoLib } from "./Anexos";
+import { faltando, Identidade, type IdentidadeValor } from "./Identidade";
 
 const FORMATOS = [
   { v: "9:16", l: "Vertical", d: "Reels, Stories, Shorts", w: 18, h: 32 },
@@ -38,7 +39,9 @@ export function NewVideoForm({ produto, musicas, biblioteca, brand, vozesEl }: {
   const [f, setF] = useState({
     produto, objetivo: "", descricao: "", publico: "", cta: "", estilo: "premium, moderno, tipografia forte", cores: "",
     duracao: 15, formato: "9:16", voz: "pf_dora", vozNome: "", musica: "auto", efeitos: true, orientacao: "", estiloVisual: "hud" as Estilo, legendas: true,
+    identidade: (brand.preenchida ? "workspace" : "referencias") as IdentidadeValor,
   });
+  const falta = faltando(f);
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((x) => ({ ...x, [k]: v }));
   const [ouvindo, setOuvindo] = useState<HTMLAudioElement | null>(null);
   const ouvir = (url: string) => { ouvindo?.pause(); const a = new Audio(url); void a.play(); setOuvindo(a); };
@@ -66,7 +69,7 @@ export function NewVideoForm({ produto, musicas, biblioteca, brand, vozesEl }: {
             value={f.orientacao} onChange={(e) => set("orientacao", e.target.value)} />
           <span className="subtle caption" style={{ textAlign: "right" }}>{f.orientacao.length}/4000 · a IA segue isto com prioridade, sem inventar fatos</span>
         </div>
-        <Campo id="objetivo" label="Objetivo do vídeo" valor={f.objetivo} on={(v) => set("objetivo", v)} max={300} ph="Ex.: vender o SIAPLUS para professores da rede estadual de Goiás" />
+        <Campo id="objetivo" label="Objetivo do vídeo (opcional se as orientações explicarem)" valor={f.objetivo} on={(v) => set("objetivo", v)} max={300} ph="Ex.: vender o SIAPLUS para professores da rede estadual de Goiás" />
         <div className="field">
           <label className="label" htmlFor="descricao">Descrição e argumentos (o que a IA pode afirmar)</label>
           <textarea id="descricao" className="input" rows={4} style={{ height: "auto", paddingBlock: 12, resize: "vertical" }} maxLength={2000}
@@ -82,6 +85,7 @@ export function NewVideoForm({ produto, musicas, biblioteca, brand, vozesEl }: {
       <div className="studio-anexos"><Anexos valor={anexos} onChange={setAnexos} biblioteca={biblioteca} brand={brand} /></div>
 
       <div className="stack studio-lateral" style={{ gap: 16 }}>
+        <Identidade valor={f.identidade} onChange={(v) => set("identidade", v)} marcaPreenchida={brand.preenchida} nomeWorkspace={produto} />
         <div className="panel" data-enter style={{ padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
           <div className="panel-title">Estilo visual</div>
           <EstiloPicker valor={f.estiloVisual} onChange={(v) => set("estiloVisual", v)} />
@@ -150,9 +154,10 @@ export function NewVideoForm({ produto, musicas, biblioteca, brand, vozesEl }: {
         </div>
 
         {erro && <p className="error-text" role="alert">{erro}</p>}
-        <button className="btn btn-primary btn-lg" onClick={enviar} disabled={pend || f.objetivo.trim().length < 2 || f.produto.trim().length < 2} data-enter>
+        <button className="btn btn-primary btn-lg" onClick={enviar} disabled={pend || !!falta} title={falta ?? undefined} data-enter>
           {pend ? <Loader2 className="animate-spin" aria-hidden /> : <><Sparkles aria-hidden /> Criar roteiro <ArrowRight className="seta" aria-hidden /></>}
         </button>
+        {falta && <p className="subtle caption" role="status" style={{ textAlign: "center", color: "rgb(var(--c-warning))" }}>Para liberar: {falta.toLowerCase()}</p>}
         <p className="subtle caption" style={{ textAlign: "center" }}>Primeiro você aprova o roteiro; depois, de 3 a 8 minutos no PC do worker.</p>
       </div>
     </div>

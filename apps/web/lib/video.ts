@@ -45,7 +45,7 @@ export async function criativos(ws: string, tipos: string[]): Promise<CriativoLi
   return db()<CriativoLinha[]>`
     select c.id, c.name, c.type, c.status, c.mime, c.size_bytes::text, c.width, c.height, c.duration_ms, c.tags, c.license,
       (c.thumbnail_key is not null) as thumb, c.created_at, c.metadata->>'projectId' as project_id
-    from ads.creatives c where c.workspace_id = ${ws} and c.type = any(${tipos}) and c.status <> 'UPLOADING'
+    from ads.creatives c where c.workspace_id = ${ws} and c.type = any(${tipos}) and c.status <> 'UPLOADING' and not ('referencia' = any(c.tags))
     order by c.created_at desc limit 300`;
 }
 
