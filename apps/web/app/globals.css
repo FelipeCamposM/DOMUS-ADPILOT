@@ -639,3 +639,5 @@ input[type="color"]:hover { transform: scale(1.08); box-shadow: 0 0 14px rgb(var
 .local-busca { display: flex; gap: 8px; align-items: center; max-width: 560px; }
 .local-opcoes { top: calc(100% + 6px); left: 0; right: 0; max-height: 320px; overflow-y: auto; }
 .local-opcoes .menu-item:disabled { opacity: 0.5; cursor: default; }
+.conta-avatar[data-google] { background: #fff; }
+.conta-avatar-g svg { width: 10px; height: 10px; }

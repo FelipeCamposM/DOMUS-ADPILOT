@@ -10,17 +10,27 @@ import { Popover } from "../shell/Popover";
 const idGoogle = (id: string) => id.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3");
 const fuso = (tz: string | null) => (tz ? tz.split("/").pop()!.replace(/_/g, " ") : null);
 
-/** Foto do Google de quem conectou; sem foto (conexão antiga), as iniciais. */
+const G = () => (
+  <svg viewBox="0 0 48 48" width="58%" height="58%" aria-hidden>
+    <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.6 13.3l7.9 6.2C12.4 13.7 17.7 9.5 24 9.5z" />
+    <path fill="#4285F4" d="M46.1 24.6c0-1.6-.1-3.1-.4-4.6H24v9h12.4c-.5 2.9-2.2 5.3-4.6 6.9l7.4 5.7c4.3-4 6.9-9.9 6.9-17z" />
+    <path fill="#FBBC05" d="M10.5 28.7c-.5-1.4-.8-3-.8-4.7s.3-3.2.8-4.7l-7.9-6.2C.9 16.5 0 20.1 0 24s.9 7.5 2.6 10.9l7.9-6.2z" />
+    <path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.4-5.7c-2.1 1.4-4.8 2.2-8.5 2.2-6.3 0-11.6-4.2-13.5-10l-7.9 6.2C6.6 42.6 14.6 48 24 48z" />
+  </svg>
+);
+
+/** Foto do Google de quem conectou; sem perfil (conexão anterior ao perfil), o logo do Google. */
 function Avatar({ c, size = 36 }: { c: ContaGoogle; size?: number }) {
   const [erro, setErro] = useState(false);
-  const nome = c.perfil.nome || c.perfil.email || c.conexao;
+  const nome = c.perfil.nome || c.perfil.email;
+  if (!nome) return <span className="conta-avatar" data-google style={{ width: size, height: size }} title="Reconecte em Conexões para mostrar a foto de quem conectou"><G /></span>;
   const iniciais = nome.split(/[\s@.]+/).filter(Boolean).slice(0, 2).map((p) => p[0]!.toUpperCase()).join("");
   return (
-    <span className="conta-avatar" style={{ width: size, height: size, fontSize: size * 0.38 }} title={c.perfil.email ?? c.conexao}>
+    <span className="conta-avatar" style={{ width: size, height: size, fontSize: size * 0.38 }} title={c.perfil.email ?? nome}>
       {c.perfil.foto && !erro
         ? <img src={c.perfil.foto} alt="" referrerPolicy="no-referrer" onError={() => setErro(true)} width={size} height={size} />
         : iniciais}
-      <span className="conta-avatar-g" aria-hidden>G</span>
+      <span className="conta-avatar-g" aria-hidden><G /></span>
     </span>
   );
 }
