@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Escolha, Revelar } from "../motion/Escolha";
 import { toast } from "../shell/toast";
+import type { ContaGoogle } from "@/lib/contas";
+import { ContaSelect } from "./ContaSelect";
 import { criarRascunho } from "./rascunhos";
 
-export interface ContaGoogle { id: string; name: string; external_id: string; currency: string }
 
 /** Nova campanha de Pesquisa: a IA escreve a proposta a partir do pedido, ou começa um rascunho em branco. */
 export function NovaCampanha({ contas }: { contas: ContaGoogle[] }) {
@@ -37,9 +38,7 @@ export function NovaCampanha({ contas }: { contas: ContaGoogle[] }) {
       <div className="kpis" style={{ gridTemplateColumns: "2fr 1fr", gap: 12 }}>
         <div className="field">
           <label className="label" htmlFor="conta">Conta do Google Ads</label>
-          <select id="conta" className="select" style={{ height: 44 }} value={f.contaId} onChange={(e) => set("contaId", e.target.value)}>
-            {contas.map((c) => <option key={c.id} value={c.id}>{c.name} · {c.external_id.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3")}</option>)}
-          </select>
+          <ContaSelect id="conta" contas={contas} valor={f.contaId} onChange={(v) => set("contaId", v)} />
         </div>
         <div className="field">
           <label className="label" htmlFor="orc">Orçamento diário ({moeda})</label>

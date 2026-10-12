@@ -600,3 +600,35 @@ input[type="color"]:hover { transform: scale(1.08); box-shadow: 0 0 14px rgb(var
 @media (prefers-reduced-motion: reduce) {
   .cx-fab::before, .cx-mascote, .cx-mascote .cx-eyes, .cx-mascote .cx-leg, .cx-typing i, .cx-live, .cx-panel, .cx-hello, .cx-sug, .cx-hist { animation: none !important; }
 }
+
+/* Seletor de conta do Google Ads */
+.conta-trigger { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 58px; padding: 9px 12px; text-align: left; cursor: pointer; color: inherit;
+  background: rgb(var(--c-bg-inset)); border: 1px solid rgb(var(--c-border-strong)); border-radius: var(--radius-md);
+  transition: border-color var(--dur-fast), box-shadow var(--dur-base) var(--ease-out), background var(--dur-fast); }
+.conta-trigger:hover:not(:disabled) { border-color: rgb(var(--c-brand) / 0.55); background: rgb(var(--c-brand) / 0.04); }
+.conta-trigger:focus-visible, .conta-trigger[aria-expanded="true"] { outline: none; border-color: rgb(var(--c-brand) / 0.8); box-shadow: 0 0 0 4px rgb(var(--c-brand) / 0.14); }
+.conta-trigger:disabled { opacity: 0.6; cursor: default; }
+.conta-avatar { position: relative; flex-shrink: 0; border-radius: 50%; display: grid; place-items: center; font-weight: 700; color: #fff;
+  background: radial-gradient(120% 120% at 30% 20%, rgb(var(--c-glow)), rgb(var(--c-brand)) 50%, rgb(var(--c-brand-deep))); box-shadow: 0 0 0 2px rgb(var(--c-bg-surface)), 0 0 0 3px rgb(var(--c-brand) / 0.45); }
+.conta-avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+.conta-avatar-g { position: absolute; right: -3px; bottom: -3px; width: 15px; height: 15px; border-radius: 50%; display: grid; place-items: center; font: 800 9px/1 var(--font-sans);
+  background: #fff; color: #4285F4; box-shadow: 0 0 0 2px rgb(var(--c-bg-surface)); }
+.conta-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.conta-nome { font-weight: 620; font-size: 13.5px; color: rgb(var(--c-text-primary)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; }
+.conta-meta { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 11.5px; color: rgb(var(--c-text-tertiary)); }
+.conta-meta > span + span::before { content: "·"; margin-right: 10px; color: rgb(var(--c-text-tertiary) / 0.6); }
+.conta-meta .mono { color: rgb(var(--c-lilac)); letter-spacing: 0.02em; }
+.conta-quem { font-size: 11px; color: rgb(var(--c-text-tertiary)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.conta-menu { padding: 6px; max-width: calc(100vw - 32px); }
+.conta-opcao { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px; border: 0; border-radius: 10px; background: none; text-align: left; cursor: pointer; color: inherit;
+  transition: background var(--dur-fast); }
+.conta-opcao:hover, .conta-opcao:focus-visible { background: rgb(var(--c-text-primary) / 0.06); outline: none; }
+.conta-opcao[data-active="true"] { background: rgb(var(--c-brand) / 0.1); }
+.conta-opcao .conta-info .conta-info { gap: 3px; }
+.conta-gerenciar { display: flex; align-items: center; gap: 8px; margin-top: 4px; padding: 10px; border-top: 1px solid rgb(var(--c-border)); font-size: 12.5px; color: rgb(var(--c-text-secondary)); border-radius: 0 0 8px 8px; }
+.conta-gerenciar:hover { color: rgb(var(--c-lilac)); }
+.conta-vazia { display: flex; align-items: center; gap: 12px; min-height: 58px; padding: 10px 14px; border: 1px dashed rgb(var(--c-warning) / 0.5); border-radius: var(--radius-md); color: rgb(var(--c-warning)); background: rgb(var(--c-warning) / 0.05); }
+.conta-vazia span { display: flex; flex-direction: column; gap: 2px; }
+.conta-vazia b { font-weight: 620; font-size: 13px; }
+.conta-vazia small { font-size: 11.5px; color: rgb(var(--c-text-tertiary)); }
+.conta-vazia:hover { background: rgb(var(--c-warning) / 0.09); }

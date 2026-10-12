@@ -34,8 +34,12 @@ export async function GET(req: NextRequest) {
       redirect_uri: new URL("/api/connections/google/callback", req.url).toString(),
     }),
   });
-  const tok = (await r.json()) as { refresh_token?: string };
+  const tok = (await r.json()) as { refresh_token?: string; access_token?: string };
   if (!r.ok || !tok.refresh_token) return fim("erro=google-token");
+  // quem autorizou: só para exibir (falhar aqui não impede a conexão)
+  const u = await fetch("https://openidconnect.googleapis.com/v1/userinfo", { headers: { Authorization: `Bearer ${tok.access_token}` } })
+    .then((x) => (x.ok ? (x.json() as Promise<{ name?: string; email?: string; picture?: string }>) : {}), () => ({})) as { name?: string; email?: string; picture?: string };
+  const perfil = { nome: u.name ?? null, email: u.email ?? null, foto: u.picture?.startsWith("https://") ? u.picture : null };
 
   let contas = 0;
   try {
@@ -44,10 +48,19 @@ export async function GET(req: NextRequest) {
     return fim(`erro=google-api&msg=${encodeURIComponent((e as Error).message.slice(0, 200))}`);
   }
   const sql = db();
-  const [k] = await sql<{ id: string }[]>`
-    insert into ads.ad_connections (workspace_id, provider, label, credentials_enc, created_by)
-    values (${ws.id}, 'GOOGLE', ${salvo.data.label}, ${encrypt({ refreshToken: tok.refresh_token })}, ${ctx.user.id}) returning id`;
-  await audit(sql, { workspaceId: ws.id, actor: ctx.actor, action: "Conectar Google Ads", entityType: "connection", entityId: k!.id, entityName: salvo.data.label, after: { contas } });
+  // reconectar a mesma conta Google (ou a conexão antiga, de antes de guardarmos o perfil) atualiza em vez de duplicar as contas
+  const existentes = await sql<{ id: string; email: string | null }[]>`
+    select id, perfil->>'email' as email from ads.ad_connections where workspace_id = ${ws.id} and provider = 'GOOGLE' and status <> 'REVOKED'`;
+  const mesma = existentes.find((e) => perfil.email && e.email === perfil.email)
+    ?? (existentes.filter((e) => !e.email).length === 1 ? existentes.find((e) => !e.email) : undefined);
+  const [k] = mesma
+    ? await sql<{ id: string }[]>`
+        update ads.ad_connections set credentials_enc = ${encrypt({ refreshToken: tok.refresh_token })}, perfil = ${sql.json(perfil)}, status = 'ACTIVE', last_error = null
+        where id = ${mesma.id} returning id`
+    : await sql<{ id: string }[]>`
+        insert into ads.ad_connections (workspace_id, provider, label, credentials_enc, created_by, perfil)
+        values (${ws.id}, 'GOOGLE', ${salvo.data.label}, ${encrypt({ refreshToken: tok.refresh_token })}, ${ctx.user.id}, ${sql.json(perfil)}) returning id`;
+  await audit(sql, { workspaceId: ws.id, actor: ctx.actor, action: mesma ? "Reconectar Google Ads" : "Conectar Google Ads", entityType: "connection", entityId: k!.id, entityName: salvo.data.label, after: { contas } });
   await enqueueJob(sql, { workspaceId: ws.id, type: "SYNC_GOOGLE", payload: { connectionId: k!.id }, createdBy: ctx.user.id });
   return fim(`ok=google&contas=${contas}`);
 }

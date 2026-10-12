@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     client_id: clientId,
     redirect_uri: new URL("/api/connections/google/callback", req.url).toString(),
     response_type: "code",
-    scope: "https://www.googleapis.com/auth/adwords",
+    scope: "https://www.googleapis.com/auth/adwords openid email profile", // perfil: nome e foto no seletor de contas
     access_type: "offline",
     prompt: "consent", // garante refresh_token mesmo se já autorizado antes
     state,

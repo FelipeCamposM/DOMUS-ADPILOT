@@ -4,8 +4,10 @@ import { googleSearchSchema, IDIOMAS, LANCES, LIMITES_RSA, palavraParaTexto, tex
 import { AlertTriangle, CheckCircle2, ChevronDown, Loader2, Plus, Rocket, Save, ShieldCheck, Sparkles, Trash2, Wand2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
+import type { ContaGoogle } from "@/lib/contas";
 import { Escolha } from "../motion/Escolha";
 import { toast } from "../shell/toast";
+import { ContaSelect } from "./ContaSelect";
 import { ajustarComIA, apagarRascunho, publicar, salvarRascunho, validar } from "./rascunhos";
 
 type Anuncio = { titulos: string[]; descricoes: string[]; caminho1: string; caminho2: string };
@@ -54,7 +56,7 @@ function onde(path: PropertyKey[]): string {
   return partes.join(" › ");
 }
 
-export function DraftEditor({ d, contas, moeda, podeEditar, podePublicar }: { d: RascunhoView; contas: { id: string; name: string }[]; moeda: string; podeEditar: boolean; podePublicar: boolean }) {
+export function DraftEditor({ d, contas, moeda, podeEditar, podePublicar }: { d: RascunhoView; contas: ContaGoogle[]; moeda: string; podeEditar: boolean; podePublicar: boolean }) {
   const router = useRouter();
   const [e, setE] = useState<Estado>(() => doSpec(d.spec));
   const [conta, setConta] = useState(d.ad_account_id ?? contas[0]?.id ?? "");
@@ -119,9 +121,8 @@ export function DraftEditor({ d, contas, moeda, podeEditar, podePublicar }: { d:
           <div className="kpis" style={{ gridTemplateColumns: "2fr 1fr", gap: 12 }}>
             <Campo label="URL final (página de destino)" valor={e.urlFinal} on={(v) => muda((x) => ({ ...x, urlFinal: v }))} max={2000} off={bloqueado} />
             <div className="field">
-              <label className="label">Conta do Google Ads</label>
-              <select className="select" style={{ height: 44 }} value={conta} disabled={bloqueado} onChange={(ev) => { setConta(ev.target.value); setSujo(true); }}>{contas.length ? contas.map((c) => <option key={c.id} value={c.id}>{c.name}</option>) : <option value="">Nenhuma conta conectada</option>}</select>
-              {!contas.length && <a href="/connections" className="small" style={{ color: "rgb(var(--c-warning))", textDecoration: "underline" }}>Conecte o Google Ads em Conexões e clique em Sincronizar</a>}
+              <label className="label" htmlFor="conta-google">Conta do Google Ads</label>
+              <ContaSelect id="conta-google" contas={contas} valor={conta} disabled={bloqueado} onChange={(v) => { setConta(v); setSujo(true); }} />
             </div>
           </div>
           <div className="field">

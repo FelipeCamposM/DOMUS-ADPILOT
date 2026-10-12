@@ -3,6 +3,7 @@ import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
+import { contasGoogle } from "@/lib/contas";
 import { can, requireCtx } from "@/lib/ctx";
 import { DraftEditor, type RascunhoView } from "@/modules/campaigns/DraftEditor";
 
@@ -16,8 +17,7 @@ export default async function RascunhoPage({ params }: { params: Promise<{ id: s
   const [d] = await sql<(Omit<RascunhoView, "validated_at"> & { validated_at: Date | null; updated_at: Date })[]>`
     select id, name, status, source, error, validated_at, ad_account_id, spec, updated_at from ads.campaign_drafts where id = ${id.data} and workspace_id = ${ctx.workspace.id}`;
   if (!d) notFound();
-  const contas = await sql<{ id: string; name: string; currency: string }[]>`
-    select a.id, a.name, a.currency from ads.ad_accounts a where a.workspace_id = ${ctx.workspace.id} and a.provider = 'GOOGLE' order by a.name`;
+  const contas = await contasGoogle(ctx.workspace.id);
   const moeda = contas.find((c) => c.id === d.ad_account_id)?.currency ?? "BRL";
   return (
     <div className="page" style={{ maxWidth: 1400 }}>

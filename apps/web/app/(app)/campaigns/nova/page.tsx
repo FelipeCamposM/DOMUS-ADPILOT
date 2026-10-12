@@ -1,18 +1,16 @@
-import { db } from "@domus-ads/core";
 import { ChevronLeft, PlugZap } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { contasGoogle } from "@/lib/contas";
 import { can, requireCtx } from "@/lib/ctx";
-import { NovaCampanha, type ContaGoogle } from "@/modules/campaigns/NovaCampanha";
+import { NovaCampanha } from "@/modules/campaigns/NovaCampanha";
 
 export const metadata = { title: "Nova campanha" };
 
 export default async function NovaCampanhaPage() {
   const ctx = await requireCtx();
   if (!can(ctx, "editor")) redirect("/campaigns");
-  const contas = await db()<ContaGoogle[]>`
-    select a.id, a.name, a.external_id, a.currency from ads.ad_accounts a join ads.ad_connections k on k.id = a.connection_id
-    where a.workspace_id = ${ctx.workspace.id} and a.provider = 'GOOGLE' and k.status <> 'REVOKED' order by a.name`;
+  const contas = await contasGoogle(ctx.workspace.id);
   return (
     <div className="page">
       <div className="page-head">
