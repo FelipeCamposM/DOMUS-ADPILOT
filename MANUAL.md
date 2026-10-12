@@ -430,20 +430,18 @@ Isolamento (a IA só lê os dados que o worker manda):
 5. Opcional: `META_APP_SECRET` no `.env` faz toda chamada levar `appsecret_proof`.
 
 ### Google Ads (do zero)
-São 3 coisas: uma **conta de administrador** (MCC), um **developer token** (dado pelo Google para usar a API) e um
-**cliente OAuth** (para o botão "Conectar Google Ads" funcionar). Use o mesmo e-mail Google da empresa em tudo.
+São 2 coisas: uma **conta de administrador** (MCC) e um **cliente OAuth** num projeto do Google Cloud (para o botão
+"Conectar Google Ads" funcionar). Use o mesmo e-mail Google da empresa em tudo. Desde setembro de 2026 o Google não usa
+mais developer token: o nível de acesso à API fica no **projeto do Google Cloud** que tem o cliente OAuth.
 
 1. **Conta de administrador (MCC)**: em `ads.google.com/home/tools/manager-accounts` → "Criar conta de administrador"
    (país Brasil, moeda BRL). Dentro dela, vincule as contas de anúncio que já existem (Contas → + → "Vincular conta
    existente"; o dono da conta aceita o convite) ou crie uma conta nova.
-2. **Developer token**: na MCC → **Administrador** (ícone de engrenagem) → **Central de API**. Preencha o formulário
-   (site, e-mail de contato, aceite os termos). O token sai na hora com nível **"Acesso de teste"**: só funciona com
-   **contas de teste**. Para contas reais, peça na mesma tela o **"Acesso básico"** e descreva o uso, por exemplo:
-   "ferramenta interna para gerenciar e criar as campanhas das nossas próprias contas". O Google costuma responder
-   em alguns dias úteis e pode pedir mais detalhes por e-mail.
-   - Para testar antes da aprovação: crie uma **conta de administrador de teste** (no link do passo 1, opção de conta de
-     teste) e, dentro dela, uma conta de anúncio de teste. Contas de teste não veiculam anúncios nem gastam: servem
-     para validar a criação de campanhas daqui.
+2. **Nível de acesso**: no Google Cloud, em **APIs e serviços → Google Ads API** (página de visão geral), peça o acesso
+   **Explorador** (contas reais, cerca de 2.880 operações/dia, suficiente para uso interno). Para o **Básico** (15.000/dia)
+   o Google exige antes a **verificação de marca** (Google Auth Platform → Central de verificação: página inicial e
+   política de privacidade no domínio, domínio verificado no Search Console). A "Central de API" do Google Ads agora
+   serve só para a API App Conversion Tracking: não use.
 3. **Google Cloud** (`console.cloud.google.com`):
    - Crie um projeto (ex.: "DOMUS AdPilot").
    - Em **APIs e serviços → Biblioteca**, procure **Google Ads API** e clique em **Ativar**.
@@ -456,7 +454,6 @@ São 3 coisas: uma **conta de administrador** (MCC), um **developer token** (dad
      `https://SEU-DOMINIO/api/connections/google/callback`). Copie o **ID do cliente** e a **Chave secreta**.
 4. `.env` (raiz do projeto):
    ```
-   GOOGLE_ADS_DEVELOPER_TOKEN=<token da Central de API>
    GOOGLE_ADS_CLIENT_ID=<ID do cliente OAuth>
    GOOGLE_ADS_CLIENT_SECRET=<chave secreta OAuth>
    GOOGLE_ADS_LOGIN_CUSTOMER_ID=<id da MCC, só números, sem traços>

@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
   const ctx = await requireCtx();
   requireRole(ctx, "admin");
   const clientId = process.env.GOOGLE_ADS_CLIENT_ID;
-  if (!clientId || !process.env.GOOGLE_ADS_CLIENT_SECRET || !process.env.GOOGLE_ADS_DEVELOPER_TOKEN) {
+  if (!clientId || !process.env.GOOGLE_ADS_CLIENT_SECRET) {
     return NextResponse.redirect(new URL("/connections?erro=google-env", req.url));
   }
   const label = (req.nextUrl.searchParams.get("label") ?? "Google Ads").slice(0, 80);

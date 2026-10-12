@@ -37,7 +37,7 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
       <Connections
         conexoes={conexoes.map((k) => ({ ...k, last_synced_at: k.last_synced_at?.toISOString() ?? null, contas: contas.filter((a) => a.connection_id === k.id) }))}
         podeAdmin={can(ctx, "admin")}
-        googleConfigurado={!!(process.env.GOOGLE_ADS_CLIENT_ID && process.env.GOOGLE_ADS_CLIENT_SECRET && process.env.GOOGLE_ADS_DEVELOPER_TOKEN)}
+        googleConfigurado={!!(process.env.GOOGLE_ADS_CLIENT_ID && process.env.GOOGLE_ADS_CLIENT_SECRET)}
       />
     </div>
   );

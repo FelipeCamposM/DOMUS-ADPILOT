@@ -98,8 +98,7 @@ export function Connections({ conexoes, podeAdmin, googleConfigurado }: { conexo
           </form>
         ) : (
           <p className="muted small">
-            O Google Ads ainda não está configurado no servidor. Defina <code>GOOGLE_ADS_CLIENT_ID</code>, <code>GOOGLE_ADS_CLIENT_SECRET</code> e{" "}
-            <code>GOOGLE_ADS_DEVELOPER_TOKEN</code> (passo a passo no MANUAL.md, seção “Google Ads”).
+            O Google Ads ainda não está configurado no servidor. Defina <code>GOOGLE_ADS_CLIENT_ID</code> e <code>GOOGLE_ADS_CLIENT_SECRET</code> (passo a passo no MANUAL.md, seção “Google Ads”).
           </p>
         )}
       </Dialog>

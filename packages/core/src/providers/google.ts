@@ -45,9 +45,11 @@ export class GoogleAdsProvider implements AdsProvider {
   private async headers(): Promise<Record<string, string>> {
     const h: Record<string, string> = {
       Authorization: `Bearer ${await googleAccessToken(this.creds.refreshToken)}`,
-      "developer-token": env("GOOGLE_ADS_DEVELOPER_TOKEN"),
       "Content-Type": "application/json",
     };
+    // Desde set/2026 o nível de acesso vem do projeto Google Cloud do cliente OAuth; o token virou opcional
+    const dev = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
+    if (dev) h["developer-token"] = dev;
     const login = process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID;
     if (login) h["login-customer-id"] = cid(login);
     return h;
