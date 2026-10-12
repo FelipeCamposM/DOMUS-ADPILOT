@@ -1,6 +1,6 @@
 "use server";
 
-import { audit, db, encrypt, enqueueJob, MetaAdsProvider } from "@domus-ads/core";
+import { audit, db, encrypt, enqueueJob, InstagramApi, jobDeSync, MetaAdsProvider, salvarPerfisInstagram } from "@domus-ads/core";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { run } from "@/lib/action";
@@ -30,6 +30,25 @@ export async function conectarMeta(input: { label: string; token: string }) {
   });
 }
 
+/** Conecta o Instagram (perfis Profissionais das Páginas que o token enxerga). Valida e grava os perfis na hora. */
+export async function conectarInstagram(input: { label: string; token: string }) {
+  return run(async () => {
+    const ctx = await requireCtx();
+    requireRole(ctx, "admin");
+    const p = metaSchema.parse(input);
+    const perfis = await new InstagramApi(p.token).contas();
+    if (!perfis.length) throw new Error("O token é válido, mas não enxerga nenhum Instagram. A conta precisa ser Profissional, ligada a uma Página do Facebook, e o usuário do sistema precisa ter acesso à Página e ao Instagram.");
+    const sql = db();
+    const [k] = await sql<{ id: string }[]>`
+      insert into ads.ad_connections (workspace_id, provider, label, credentials_enc, created_by, last_synced_at)
+      values (${ctx.workspace.id}, 'INSTAGRAM', ${p.label}, ${encrypt({ accessToken: p.token })}, ${ctx.user.id}, now()) returning id`;
+    await salvarPerfisInstagram(ctx.workspace.id, k!.id, perfis);
+    await audit(sql, { workspaceId: ctx.workspace.id, actor: ctx.actor, action: "Conectar Instagram", entityType: "connection", entityId: k!.id, entityName: p.label, after: { perfis: perfis.map((x) => x.username) } });
+    revalidatePath("/", "layout");
+    return perfis.map((x) => `@${x.username}`).join(", ");
+  });
+}
+
 export async function sincronizarConexao(connectionId: string) {
   return run(async () => {
     const ctx = await requireCtx();
@@ -40,7 +59,7 @@ export async function sincronizarConexao(connectionId: string) {
     if (!k) throw new Error("Conexão não encontrada");
     const [dup] = await sql`select 1 from ads.jobs where status in ('PENDING','RUNNING') and payload->>'connectionId' = ${k.id}`;
     if (dup) throw new Error("Já existe uma sincronização desta conexão na fila");
-    await enqueueJob(sql, { workspaceId: ctx.workspace.id, type: k.provider === "META" ? "SYNC_META" : "SYNC_GOOGLE", payload: { connectionId: k.id }, createdBy: ctx.user.id });
+    await enqueueJob(sql, { workspaceId: ctx.workspace.id, type: jobDeSync(k.provider), payload: { connectionId: k.id }, createdBy: ctx.user.id });
     revalidatePath("/jobs");
   });
 }

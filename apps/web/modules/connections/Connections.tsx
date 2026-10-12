@@ -1,18 +1,20 @@
 "use client";
 
-import { AlertTriangle, ArrowRight, CalendarClock, Check, KeyRound, Layers, Loader2, Megaphone, Plus, RefreshCw, ShieldCheck, Trash2, UserRound } from "lucide-react";
+import { AlertTriangle, ArrowRight, CalendarClock, Check, ExternalLink, Images, KeyRound, Layers, Loader2, Megaphone, Plus, RefreshCw, ShieldCheck, Trash2, UserRound, Users } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { ago } from "@/lib/format";
 import { Dialog } from "../shell/Dialog";
 import { toast } from "../shell/toast";
-import { conectarMeta, removerConexao, sincronizarConexao } from "./actions";
-import { GoogleAdsLogo, LogoPlataforma, MetaLogo } from "./Logos";
+import { conectarInstagram, conectarMeta, removerConexao, sincronizarConexao } from "./actions";
+import { GoogleAdsLogo, InstagramLogo, LogoPlataforma, MetaLogo } from "./Logos";
 
 export interface Conexao {
   id: string; provider: string; label: string; status: string; last_error: string | null; last_synced_at: string | null; created_at: string;
   perfil: { nome?: string | null; email?: string | null; foto?: string | null }; sincronizando: boolean;
   contas: { id: string; name: string; external_id: string; currency: string; timezone: string | null; status: string; campanhas: number; ativas: number }[];
+  perfis: { id: string; username: string; nome: string | null; foto: string | null; seguidores: number | null; publicacoes: number | null }[];
 }
 type Aviso = { tipo: "erro"; codigo: string; msg: string | null } | { tipo: "ok"; contas: number } | null;
 
@@ -23,7 +25,8 @@ const ERROS: Record<string, string> = {
   "google-token": "O Google não devolveu o token de acesso. Tente de novo.",
   "google-api": "O Google Ads recusou o acesso.",
 };
-const NOME = { META: "Meta Ads", GOOGLE: "Google Ads" } as Record<string, string>;
+const NOME = { META: "Meta Ads", GOOGLE: "Google Ads", INSTAGRAM: "Instagram" } as Record<string, string>;
+const num = (n: number | null) => (n == null ? "-" : new Intl.NumberFormat("pt-BR", { notation: n >= 10_000 ? "compact" : "standard" }).format(n));
 const idConta = (p: string, id: string) => (p === "GOOGLE" ? id.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3") : id.replace(/^act_/, ""));
 const fuso = (tz: string | null) => (tz ? tz.split("/").pop()!.replace(/_/g, " ") : null);
 const data = (iso: string) => new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
@@ -32,7 +35,7 @@ export function Connections({ conexoes, podeAdmin, podeEditar, googleConfigurado
   conexoes: Conexao[]; podeAdmin: boolean; podeEditar: boolean; googleConfigurado: boolean; aviso: Aviso;
 }) {
   const router = useRouter();
-  const [modal, setModal] = useState<"meta" | "google" | null>(null);
+  const [modal, setModal] = useState<"meta" | "google" | "instagram" | null>(null);
   const [remover, setRemover] = useState<Conexao | null>(null);
   const [falha, setFalha] = useState<{ titulo: string; msg: string } | null>(null);
   const lido = useRef(false);
@@ -64,6 +67,8 @@ export function Connections({ conexoes, podeAdmin, podeEditar, googleConfigurado
             itens={["Campanhas, conjuntos e métricas", "Pausar, ativar e orçamento"]} conectadas={por("META")} onClick={() => setModal("meta")} />
           <PlataformaCard logo={<GoogleAdsLogo size={30} />} nome="Google Ads" desc="Login com a conta Google que acessa a conta de administrador (MCC)."
             itens={["Contas da MCC entram sozinhas", "Criar campanhas de Pesquisa"]} conectadas={por("GOOGLE")} onClick={() => setModal("google")} />
+          <PlataformaCard logo={<InstagramLogo size={30} />} nome="Instagram" desc="Conta Profissional ligada a uma Página do Facebook, pelo token do usuário do sistema."
+            itens={["Posts, carrosséis, Reels e stories", "Agendar e ver o feed"]} conectadas={por("INSTAGRAM")} onClick={() => setModal("instagram")} />
         </section>
       )}
 
@@ -80,7 +85,8 @@ export function Connections({ conexoes, podeAdmin, podeEditar, googleConfigurado
         </section>
       )}
 
-      <MetaDialog open={modal === "meta"} onClose={() => setModal(null)} />
+      <TokenDialog plataforma="META" open={modal === "meta"} onClose={() => setModal(null)} />
+      <TokenDialog plataforma="INSTAGRAM" open={modal === "instagram"} onClose={() => setModal(null)} />
       <GoogleDialog open={modal === "google"} onClose={() => setModal(null)} configurado={googleConfigurado} />
       <RemoverDialog k={remover} onClose={() => setRemover(null)} />
       <Dialog open={!!falha} onClose={() => setFalha(null)} title={falha?.titulo ?? ""}>
@@ -124,6 +130,9 @@ function ConexaoCard({ k, podeAdmin, podeEditar, onRemover, onReconectar }: { k:
   });
   const campanhas = k.contas.reduce((s, a) => s + a.campanhas, 0);
   const ativas = k.contas.reduce((s, a) => s + a.ativas, 0);
+  const ig = k.provider === "INSTAGRAM";
+  const seguidores = k.perfis.reduce((s, a) => s + (a.seguidores ?? 0), 0);
+  const posts = k.perfis.reduce((s, a) => s + (a.publicacoes ?? 0), 0);
   const erro = k.status !== "ACTIVE" || !!k.last_error;
   const rodando = k.sincronizando || pend;
 
@@ -141,7 +150,7 @@ function ConexaoCard({ k, podeAdmin, podeEditar, onRemover, onReconectar }: { k:
           <div className="cn-con-sub">
             <span>{NOME[k.provider] ?? k.provider}</span>
             {(k.perfil.email || k.perfil.nome) && <span className="cn-quem"><Avatar k={k} />{k.perfil.email ?? k.perfil.nome}</span>}
-            {k.provider === "META" && <span className="cn-quem"><KeyRound size={12} aria-hidden /> Usuário do sistema</span>}
+            {k.provider !== "GOOGLE" && <span className="cn-quem"><KeyRound size={12} aria-hidden /> Usuário do sistema</span>}
           </div>
         </div>
         <div className="cluster" style={{ gap: 6, flexWrap: "nowrap" }}>
@@ -156,8 +165,13 @@ function ConexaoCard({ k, podeAdmin, podeEditar, onRemover, onReconectar }: { k:
       </header>
 
       <div className="cn-stats">
-        <div><Layers size={14} aria-hidden /><b>{k.contas.length}</b><span>conta{k.contas.length === 1 ? "" : "s"}</span></div>
-        <div><Megaphone size={14} aria-hidden /><b>{campanhas}</b><span>campanha{campanhas === 1 ? "" : "s"} · {ativas} ativa{ativas === 1 ? "" : "s"}</span></div>
+        {ig ? <>
+          <div><Users size={14} aria-hidden /><b>{num(seguidores)}</b><span>seguidores · {k.perfis.length} perfil{k.perfis.length === 1 ? "" : "s"}</span></div>
+          <div><Images size={14} aria-hidden /><b>{num(posts)}</b><span>publicações</span></div>
+        </> : <>
+          <div><Layers size={14} aria-hidden /><b>{k.contas.length}</b><span>conta{k.contas.length === 1 ? "" : "s"}</span></div>
+          <div><Megaphone size={14} aria-hidden /><b>{campanhas}</b><span>campanha{campanhas === 1 ? "" : "s"} · {ativas} ativa{ativas === 1 ? "" : "s"}</span></div>
+        </>}
         <div><RefreshCw size={14} aria-hidden /><b suppressHydrationWarning>{ago(k.last_synced_at)}</b><span>última sincronização</span></div>
         <div><CalendarClock size={14} aria-hidden /><b suppressHydrationWarning>{data(k.created_at)}</b><span>conectada em</span></div>
       </div>
@@ -165,7 +179,16 @@ function ConexaoCard({ k, podeAdmin, podeEditar, onRemover, onReconectar }: { k:
       {k.last_error && <div className="cn-erro"><AlertTriangle size={15} aria-hidden /><span>{k.last_error}</span></div>}
 
       <div className="cn-contas">
-        {k.contas.length === 0 ? (
+        {ig ? (k.perfis.length === 0 ? <p className="subtle small" style={{ padding: "4px 2px" }}>Nenhum perfil encontrado. Sincronize de novo.</p> : k.perfis.map((a) => (
+          <Link key={a.id} href={`/instagram?conta=${a.id}`} className="cn-conta cn-perfil">
+            <span className="cn-conta-nome" style={{ gap: 10 }}>
+              {a.foto ? <img src={a.foto} alt="" className="cn-perfil-foto" referrerPolicy="no-referrer" /> : <span className="cn-perfil-foto" />}
+              @{a.username}{a.nome && <span className="subtle" style={{ fontWeight: 400 }}>&nbsp;· {a.nome}</span>}
+            </span>
+            <span className="cn-conta-meta"><span>{num(a.seguidores)} seguidores</span><span>{num(a.publicacoes)} publicações</span></span>
+            <span className="cn-conta-camp" style={{ color: "rgb(var(--c-lilac))" }}>Ver perfil <ExternalLink size={12} aria-hidden /></span>
+          </Link>
+        ))) : k.contas.length === 0 ? (
           <p className="subtle small" style={{ padding: "4px 2px" }}>{rodando ? "Buscando as contas…" : "As contas aparecem depois da primeira sincronização."}</p>
         ) : k.contas.map((a) => (
           <div key={a.id} className="cn-conta">
@@ -223,36 +246,49 @@ const GLogo = () => (
   </svg>
 );
 
-function MetaDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+const TOKEN = {
+  META: {
+    titulo: "Conectar Meta Ads", sub: "Facebook e Instagram (anúncios)", label: "Meta Ads", acao: conectarMeta,
+    passos: [<>No <b>Business Manager</b>: Configurações do negócio → Usuários do sistema.</>, <>Dê ao usuário acesso às <b>contas de anúncio</b> e clique em <b>Gerar token</b>.</>,
+      <>Marque <code>ads_management</code> e <code>ads_read</code>, sem expiração, e cole abaixo.</>],
+    ok: (r: string) => `Meta conectada: ${r} conta(s). Sincronizando…`,
+  },
+  INSTAGRAM: {
+    titulo: "Conectar Instagram", sub: "Publicar posts, carrosséis, Reels e stories", label: "Instagram", acao: conectarInstagram,
+    passos: [<>A conta do Instagram precisa ser <b>Profissional</b> e estar <b>ligada a uma Página</b> do Facebook.</>,
+      <>No <b>Business Manager</b> → Usuários do sistema: dê acesso à <b>Página</b> e à <b>conta do Instagram</b> (controle total).</>,
+      <>Gere o token marcando <code>instagram_basic</code>, <code>instagram_content_publish</code>, <code>pages_show_list</code>, <code>pages_read_engagement</code> e <code>business_management</code>, sem expiração.</>],
+    ok: (r: string) => `Instagram conectado: ${r}`,
+  },
+} as const;
+
+function TokenDialog({ plataforma, open, onClose }: { plataforma: "META" | "INSTAGRAM"; open: boolean; onClose: () => void }) {
   const router = useRouter();
-  const [label, setLabel] = useState("Meta Ads");
+  const t = TOKEN[plataforma];
+  const [label, setLabel] = useState<string>(t.label);
   const [token, setToken] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [pend, start] = useTransition();
   const salvar = () => start(async () => {
     setErro(null);
-    const r = await conectarMeta({ label, token });
+    const r = await t.acao({ label, token });
     if (!r.ok) return setErro(r.error);
-    toast.ok(`Meta conectada: ${r.data} conta(s) encontrada(s). Sincronizando…`);
+    toast.ok(t.ok(String(r.data)));
     setToken("");
     onClose();
     router.refresh();
   });
   return (
-    <Dialog open={open} onClose={onClose} title="Conectar Meta Ads">
-      <div className="cn-modal-hero"><span className="cn-plat-logo"><MetaLogo size={30} /></span><div><b>Meta Ads</b><span className="subtle small">Facebook e Instagram</span></div></div>
-      <ol className="cn-passos">
-        <li>No <b>Business Manager</b>: Configurações do negócio → Usuários do sistema.</li>
-        <li>Dê ao usuário acesso às contas de anúncio e clique em <b>Gerar token</b>.</li>
-        <li>Marque <code>ads_management</code> e <code>ads_read</code>, sem expiração, e cole abaixo.</li>
-      </ol>
+    <Dialog open={open} onClose={onClose} title={t.titulo}>
+      <div className="cn-modal-hero"><span className="cn-plat-logo"><LogoPlataforma p={plataforma} size={30} /></span><div><b>{NOME[plataforma]}</b><span className="subtle small">{t.sub}</span></div></div>
+      <ol className="cn-passos">{t.passos.map((p, i) => <li key={i}>{p}</li>)}</ol>
       <div className="field">
-        <label className="label" htmlFor="mlabel">Nome da conexão</label>
-        <input id="mlabel" className="input" value={label} onChange={(e) => setLabel(e.target.value)} maxLength={80} />
+        <label className="label" htmlFor={`label-${plataforma}`}>Nome da conexão</label>
+        <input id={`label-${plataforma}`} className="input" value={label} onChange={(e) => setLabel(e.target.value)} maxLength={80} />
       </div>
       <div className="field">
-        <label className="label" htmlFor="mtoken">Token de acesso</label>
-        <input id="mtoken" className="input mono" type="password" autoComplete="off" value={token} onChange={(e) => setToken(e.target.value)} placeholder="EAAG…" />
+        <label className="label" htmlFor={`token-${plataforma}`}>Token de acesso</label>
+        <input id={`token-${plataforma}`} className="input mono" type="password" autoComplete="off" value={token} onChange={(e) => setToken(e.target.value)} placeholder="EAAG…" />
       </div>
       <p className="cn-seguro"><ShieldCheck size={14} aria-hidden /> O token é validado agora e salvo cifrado; ele nunca volta para o navegador.</p>
       {erro && <div className="cn-falha" role="alert"><AlertTriangle aria-hidden /><p>{erro}</p></div>}
@@ -281,8 +317,9 @@ function RemoverDialog({ k, onClose }: { k: Conexao | null; onClose: () => void 
         <>
           <div className="cn-modal-hero"><span className="cn-plat-logo"><LogoPlataforma p={k.provider} size={28} /></span><div><b>{k.label}</b><span className="subtle small">{NOME[k.provider]}</span></div></div>
           <div className="cn-falha"><AlertTriangle aria-hidden />
-            <p>Saem da plataforma <b>{k.contas.length} conta(s)</b>, <b>{campanhas} campanha(s)</b> e as métricas sincronizadas delas.
-              Nada muda na {k.provider === "META" ? "Meta" : "Google"}: as campanhas continuam rodando lá. Dá para conectar de novo depois.</p>
+            <p>{k.provider === "INSTAGRAM"
+              ? <>Saem da plataforma <b>{k.perfis.length} perfil(is)</b> e as publicações agendadas ou em rascunho deles. Nada muda no Instagram: o que já foi publicado continua lá.</>
+              : <>Saem da plataforma <b>{k.contas.length} conta(s)</b>, <b>{campanhas} campanha(s)</b> e as métricas sincronizadas delas. Nada muda na {k.provider === "META" ? "Meta" : "Google"}: as campanhas continuam rodando lá.</>} Dá para conectar de novo depois.</p>
           </div>
           <div className="cluster" style={{ justifyContent: "flex-end" }}>
             <button className="btn btn-ghost btn-sm" onClick={onClose} disabled={pend}>Cancelar</button>

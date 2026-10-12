@@ -94,6 +94,8 @@ export const CONHECIMENTO = `
   fazer no Google Ads/Gerenciador de Anúncios.
 - Studio: gera vídeos e artes (posts, carrosséis) com a marca do workspace ou com identidade tirada de referências
   (site, Instagram, imagens enviadas).
+- Instagram (menu Instagram): perfil igual ao Instagram web, publicar post, carrossel, Reels e story, agendar, legenda e
+  hashtags pela IA, prévia do celular e da grade. Precisa conta Profissional ligada a uma Página e a conexão Instagram.
 - Conexões: Meta por token de usuário do sistema; Google pelo botão Conectar Google Ads (OAuth da MCC) + Sincronizar.
 - O worker roda no PC da empresa: sem ele ligado, IA, sincronização e geração de mídia ficam na fila.
 `;

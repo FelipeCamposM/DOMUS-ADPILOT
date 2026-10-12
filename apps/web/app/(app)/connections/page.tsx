@@ -8,7 +8,7 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
   const ctx = await requireCtx();
   const sp = await searchParams;
   const sql = db();
-  const conexoes = await sql<Omit<Conexao, "contas">[]>`
+  const conexoes = await sql<Omit<Conexao, "contas" | "perfis">[]>`
     select k.id, k.provider, k.label, k.status, k.last_error, k.perfil,
       to_char(k.last_synced_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as last_synced_at,
       to_char(k.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as created_at,
@@ -20,6 +20,9 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
     from ads.ad_accounts a left join ads.campaigns c on c.ad_account_id = a.id and c.status <> 'ARCHIVED'
     where a.workspace_id = ${ctx.workspace.id} group by a.id order by a.name`;
 
+  const perfis = await sql<(Conexao["perfis"][number] & { connection_id: string })[]>`
+    select id, connection_id, username, nome, foto, seguidores, publicacoes from ads.instagram_accounts where workspace_id = ${ctx.workspace.id} order by username`;
+
   return (
     <div className="page">
       <div className="page-head">
@@ -30,7 +33,7 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
         </div>
       </div>
       <Connections
-        conexoes={conexoes.map((k) => ({ ...k, contas: contas.filter((a) => a.connection_id === k.id) }))}
+        conexoes={conexoes.map((k) => ({ ...k, contas: contas.filter((a) => a.connection_id === k.id), perfis: perfis.filter((a) => a.connection_id === k.id) }))}
         podeAdmin={can(ctx, "admin")}
         podeEditar={can(ctx, "editor")}
         googleConfigurado={!!(process.env.GOOGLE_ADS_CLIENT_ID && process.env.GOOGLE_ADS_CLIENT_SECRET)}

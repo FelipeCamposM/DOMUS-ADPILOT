@@ -442,6 +442,25 @@ Isolamento (a IA só lê os dados que o worker manda):
 4. Na plataforma: **Conexões → Conectar Meta Ads**, cole o token.
 5. Opcional: `META_APP_SECRET` no `.env` faz toda chamada levar `appsecret_proof`.
 
+### Instagram (publicar pela plataforma)
+Precisa: conta do Instagram **Profissional** (Empresa ou Criador) **ligada a uma Página do Facebook**, e um **app da Meta**
+(o mesmo do token de anúncios serve).
+1. No app do Instagram: Configurações → Conta → Tipo de conta = Profissional. Em "Página", ligue à Página da empresa.
+2. `business.facebook.com` → Configurações do negócio:
+   - **Contas → Páginas**: a Página precisa estar no Business Manager. **Contas → Contas do Instagram**: adicione o perfil.
+   - **Usuários → Usuários do sistema**: escolha (ou crie, tipo Admin) o usuário do sistema → **Atribuir ativos**: a Página
+     (controle total) e a conta do Instagram (controle total).
+   - **Gerar novo token** → escolha o app → marque `instagram_basic`, `instagram_content_publish`, `pages_show_list`,
+     `pages_read_engagement` e `business_management` (some `ads_management`/`ads_read` se quiser usar o mesmo token para
+     anúncios) → validade "Nunca".
+3. Na plataforma: **Conexões → Instagram → Conectar**, cole o token. Os perfis aparecem na hora.
+4. Menu **Instagram**: perfil igual ao Instagram web (publicações, Reels, planejados), **Nova publicação** (post, carrossel,
+   Reels, story), legenda e hashtags pela IA, prévia no celular e "No perfil" (como fica a grade), publicar agora ou agendar.
+   No Studio, os botões **Instagram / Publicar carrossel / Publicar Reels** abrem o editor já com as mídias.
+- O worker publica (precisa estar ligado na hora agendada). Imagens viram JPEG; fora de 4:5 a 1,91:1 (feed) ou 9:16
+  (story) entram inteiras sobre um fundo desfocado, sem corte. Limite da Meta: ~50 publicações por dia por perfil.
+- Não dá pela API: música da biblioteca do Instagram, filtros, figurinhas/enquetes de story, marcar produtos.
+
 ### Google Ads (do zero)
 São 2 coisas: uma **conta de administrador** (MCC) e um **cliente OAuth** num projeto do Google Cloud (para o botão
 "Conectar Google Ads" funcionar). Use o mesmo e-mail Google da empresa em tudo. Desde setembro de 2026 o Google não usa

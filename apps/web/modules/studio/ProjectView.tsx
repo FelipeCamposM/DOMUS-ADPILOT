@@ -5,6 +5,7 @@ import { AudioLines, Check, ClipboardCheck, Clapperboard, Download, FileCode2, F
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Escolha } from "../motion/Escolha";
+import { BotaoPublicar } from "../instagram/BotaoPublicar";
 import { toast } from "../shell/toast";
 import { ajustarComIA, apagarVideo, cancelarVideo, gerarDeNovo, regerarComStoryboard } from "./actions";
 
@@ -102,7 +103,10 @@ export function ProjectView({ p, podeEditar }: { p: ProjetoView; podeEditar: boo
               <span className="subtle caption">
                 {[p.creative.duration_ms && seg(p.creative.duration_ms / 1000), p.creative.width && `${p.creative.width}×${p.creative.height}`, p.creative.size_bytes && `${(Number(p.creative.size_bytes) / 1048576).toFixed(1).replace(".", ",")} MB`, `voz ${VOZ[p.brief.voz] ?? (p.brief.vozNome || p.brief.voz)}`, p.creative.music ? `música: ${p.creative.music}` : null].filter(Boolean).join(" · ")}
               </span>
-              <a className="btn btn-secondary btn-xs" href={`/api/creatives/${p.creative.id}/file?download=1`}><Download aria-hidden /> Baixar MP4</a>
+              <div className="cluster" style={{ gap: 6 }}>
+                <BotaoPublicar tipo="REELS" midias={[p.creative.id]} rotulo="Publicar Reels" />
+                <a className="btn btn-secondary btn-xs" href={`/api/creatives/${p.creative.id}/file?download=1`}><Download aria-hidden /> Baixar MP4</a>
+              </div>
             </div>
           )}
           {p.creative?.avisos.map((a) => <p key={a} className="small" style={{ color: "rgb(var(--c-warning))", marginTop: 8 }}>{a}</p>)}

@@ -1,7 +1,10 @@
 import type { Json, Sql } from "./db";
 
-export const JOB_TYPES = ["SYNC_META", "SYNC_GOOGLE", "AI_CHAT", "AI_LOGIN", "AI_DETECT", "WORKER_STARTUP", "GENERATE_VIDEO", "GENERATE_IMAGE", "AI_CAMPAIGN", "RESTORE_MEDIA"] as const;
+export const JOB_TYPES = ["SYNC_META", "SYNC_GOOGLE", "AI_CHAT", "AI_LOGIN", "AI_DETECT", "WORKER_STARTUP", "GENERATE_VIDEO", "GENERATE_IMAGE", "AI_CAMPAIGN", "RESTORE_MEDIA", "SYNC_INSTAGRAM", "PUBLISH_INSTAGRAM", "AI_INSTAGRAM_CAPTION"] as const;
 export type JobType = (typeof JOB_TYPES)[number];
+
+/** Job de sincronização de cada tipo de conexão. */
+export const jobDeSync = (provider: string): JobType => (provider === "META" ? "SYNC_META" : provider === "INSTAGRAM" ? "SYNC_INSTAGRAM" : "SYNC_GOOGLE");
 
 export interface Job {
   id: string; workspace_id: string | null; type: JobType; payload: Record<string, unknown>; attempts: number; max_attempts: number;

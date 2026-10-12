@@ -1,3 +1,5 @@
+import { createLucideIcon } from "lucide-react";
+
 /** Logos oficiais das plataformas (Meta: simple-icons, CC0; Google Ads: as três formas da marca nas cores oficiais). */
 export function GoogleAdsLogo({ size = 28 }: { size?: number }) {
   return (
@@ -22,4 +24,28 @@ export function MetaLogo({ size = 28 }: { size?: number }) {
   );
 }
 
-export const LogoPlataforma = ({ p, size }: { p: string; size?: number }) => (p === "META" ? <MetaLogo size={size} /> : <GoogleAdsLogo size={size} />);
+/** Instagram: o glifo da câmera sobre o degradê oficial. */
+export function InstagramLogo({ size = 28 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden>
+      <defs>
+        <radialGradient id="ig-grad" cx="0.3" cy="1.07" r="1.3">
+          <stop offset="0" stopColor="#FFDD55" /><stop offset="0.1" stopColor="#FFDD55" /><stop offset="0.5" stopColor="#FF543E" /><stop offset="1" stopColor="#C837AB" />
+        </radialGradient>
+      </defs>
+      <rect x="1" y="1" width="22" height="22" rx="6.5" fill="url(#ig-grad)" />
+      <rect x="5.5" y="5.5" width="13" height="13" rx="4" fill="none" stroke="#fff" strokeWidth="1.7" />
+      <circle cx="12" cy="12" r="3.1" fill="none" stroke="#fff" strokeWidth="1.7" />
+      <circle cx="16.1" cy="7.9" r="0.95" fill="#fff" />
+    </svg>
+  );
+}
+
+/** Glifo de linha do Instagram no padrão dos ícones lucide (menu lateral, paleta de comandos). */
+export const InstagramIcon = createLucideIcon("instagram", [
+  ["rect", { x: "2", y: "2", width: "20", height: "20", rx: "5", key: "q" }],
+  ["circle", { cx: "12", cy: "12", r: "4", key: "c" }],
+  ["line", { x1: "17.5", y1: "6.5", x2: "17.51", y2: "6.5", key: "p" }],
+]);
+
+export const LogoPlataforma = ({ p, size }: { p: string; size?: number }) => (p === "META" ? <MetaLogo size={size} /> : p === "INSTAGRAM" ? <InstagramLogo size={size} /> : <GoogleAdsLogo size={size} />);

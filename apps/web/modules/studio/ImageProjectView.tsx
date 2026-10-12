@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, Check, ClipboardCheck, Download, Loader2, MouseP
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
+import { BotaoPublicar } from "../instagram/BotaoPublicar";
 import { toast } from "../shell/toast";
 import { ajustarVariacao, apagarVariacao, apagarVideo, aprovarConceitos, cancelarVideo, descartarRevisao, gerarDeNovo, maisVariacoes } from "./actions";
 
@@ -80,6 +81,7 @@ export function ImageProjectView({ id, status, step, error, progress, formato, v
             {podeEditar && (
               <>
                 {variacoes.length > 1 && <button className="btn btn-secondary btn-xs" onClick={() => void baixarTodos()}><Download aria-hidden /> Baixar {carrossel ? "carrossel" : "todas"}</button>}
+                {carrossel && !revisao && variacoes.length > 1 && <BotaoPublicar tipo="CARROSSEL" midias={variacoes.slice(0, 10).map((v) => v.id)} rotulo="Publicar carrossel" />}
                 {!revisao && !carrossel && <button className="btn btn-primary btn-xs" disabled={pend} onClick={() => acao(() => maisVariacoes(id, 2), "Pensando em mais 2 conceitos")}><Plus aria-hidden /> Mais 2 variações</button>}
                 {!revisao && carrossel && <button className="btn btn-primary btn-xs" disabled={pend} onClick={() => confirm("Planejar um carrossel novo? O atual continua até você aprovar o novo.") && acao(() => gerarDeNovo(id), "Planejando outro carrossel")}><RefreshCw aria-hidden /> Outro carrossel</button>}
                 <button className="btn btn-ghost btn-xs" disabled={pend} onClick={() => confirm("Apagar o projeto e todas as imagens?") && start(async () => {
@@ -165,6 +167,7 @@ export function ImageProjectView({ id, status, step, error, progress, formato, v
             ) : (
               <div className="cluster" style={{ gap: 6 }}>
                 <a className="btn btn-secondary btn-xs" href={`/api/creatives/${v.id}/file?download=1`}><Download aria-hidden /> PNG</a>
+                {podeEditar && !carrossel && <BotaoPublicar tipo="FEED" midias={[v.id]} />}
                 {podeEditar && !rodando && <Link className="btn btn-ghost btn-xs" href={`/studio/${id}/arte/${v.id}`} title="Arrastar, redimensionar e editar os textos (sem IA)"><MousePointer2 aria-hidden /> Editar</Link>}
                 {podeEditar && <button className="btn btn-ghost btn-xs" disabled={rodando} onClick={() => { setAjustando(v.id); setPedido(""); }}><Wand2 aria-hidden /> Ajustar com IA</button>}
                 <span style={{ flex: 1 }} />

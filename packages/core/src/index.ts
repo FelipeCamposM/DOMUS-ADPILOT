@@ -16,3 +16,5 @@ export * from "./settings";
 export * from "./composicao";
 export * from "./google-search";
 export * from "./drafts";
+export * from "./instagram";
+export * from "./instagram-regras";

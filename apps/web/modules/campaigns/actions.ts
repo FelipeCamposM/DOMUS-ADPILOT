@@ -1,6 +1,6 @@
 "use server";
 
-import { db, enqueueJob, setCampaignBudget, setCampaignStatus } from "@domus-ads/core";
+import { db, enqueueJob, jobDeSync, setCampaignBudget, setCampaignStatus } from "@domus-ads/core";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { run } from "@/lib/action";
@@ -39,7 +39,7 @@ export async function sincronizarTudo() {
       where k.workspace_id = ${ctx.workspace.id} and k.status <> 'REVOKED'
         and not exists (select 1 from ads.jobs j where j.status in ('PENDING', 'RUNNING') and j.payload->>'connectionId' = k.id::text)`;
     for (const k of conexoes) {
-      await enqueueJob(sql, { workspaceId: ctx.workspace.id, type: k.provider === "META" ? "SYNC_META" : "SYNC_GOOGLE", payload: { connectionId: k.id }, createdBy: ctx.user.id });
+      await enqueueJob(sql, { workspaceId: ctx.workspace.id, type: jobDeSync(k.provider), payload: { connectionId: k.id }, createdBy: ctx.user.id });
     }
     revalidatePath("/jobs");
     return conexoes.length;

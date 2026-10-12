@@ -1,5 +1,5 @@
 import { CONCURRENCY, SYNC_INTERVAL_MIN, WORKER_ID } from "./env"; // primeiro: carrega o .env
-import { claimJob, completeJob, db, enqueueJob, failJob, jobLog, migrate, recoverJobs, syncConnection, type Job, type JobType } from "@domus-ads/core";
+import { claimJob, completeJob, db, enqueueJob, failJob, jobDeSync, jobLog, migrate, recoverJobs, syncConnection, syncInstagram, type Job, type JobType } from "@domus-ads/core";
 import { createServer } from "node:net";
 import { hostname } from "node:os";
 import { runChatTurn } from "./ai/chat";
@@ -9,13 +9,15 @@ import { runVideo, type VideoPayload } from "./video/pipeline";
 import { runCampanhaIA, type CampanhaPayload } from "./ai/campanha";
 import { inicializacaoAtiva, configurarInicializacao } from "./startup";
 import { arquivarExcesso, restaurar } from "./video/arquivo";
+import { gerarLegenda, type LegendaPayload } from "./instagram/legenda";
+import { publicarInstagram } from "./instagram/publicar";
 
 /**
  * DOMUS Worker: roda no PC local, sem nenhuma porta aberta. Ele mesmo busca trabalho na fila (ads.jobs) com
  * FOR UPDATE SKIP LOCKED e grava progresso/resultado no banco; a web só lê. A web nunca manda comando de shell:
  * cada tipo de job tem um handler fixo aqui (allowlist).
  */
-const TIPOS: readonly JobType[] = ["SYNC_META", "SYNC_GOOGLE", "AI_CHAT", "AI_LOGIN", "AI_DETECT", "WORKER_STARTUP", "GENERATE_VIDEO", "GENERATE_IMAGE", "AI_CAMPAIGN", "RESTORE_MEDIA"];
+const TIPOS: readonly JobType[] = ["SYNC_META", "SYNC_GOOGLE", "AI_CHAT", "AI_LOGIN", "AI_DETECT", "WORKER_STARTUP", "GENERATE_VIDEO", "GENERATE_IMAGE", "AI_CAMPAIGN", "RESTORE_MEDIA", "SYNC_INSTAGRAM", "PUBLISH_INSTAGRAM", "AI_INSTAGRAM_CAPTION"];
 const sql = db();
 const ativos = new Map<string, AbortController>();
 let parando = false;
@@ -49,6 +51,12 @@ async function executar(job: Job) {
       result = await runImagem(job.payload as unknown as ImagemPayload, { signal: ctl.signal, log, progress: async (p) => { await sql`update ads.jobs set progress = ${p} where id = ${job.id}`; } });
     } else if (job.type === "AI_CAMPAIGN") {
       result = await runCampanhaIA(job.payload as unknown as CampanhaPayload, { signal: ctl.signal, log });
+    } else if (job.type === "SYNC_INSTAGRAM") {
+      result = await syncInstagram(String(job.payload.connectionId), log);
+    } else if (job.type === "PUBLISH_INSTAGRAM") {
+      result = await publicarInstagram(String(job.payload.postId), { signal: ctl.signal, log });
+    } else if (job.type === "AI_INSTAGRAM_CAPTION") {
+      result = await gerarLegenda(job.payload as unknown as LegendaPayload, { signal: ctl.signal, log });
     } else if (job.type === "RESTORE_MEDIA") {
       result = await restaurar(String(job.payload.creativeId));
     } else if (job.type === "WORKER_STARTUP") {
@@ -93,6 +101,15 @@ async function heartbeat() {
             on conflict (id) do update set last_seen = now(), info = ads.worker_status.info || excluded.info`;
 }
 
+/** Instagram agendado: na hora marcada, vira job de publicação (um por publicação). */
+async function publicarAgendados() {
+  const devidos = await sql<{ id: string; workspace_id: string }[]>`
+    select p.id, p.workspace_id from ads.instagram_posts p
+    where p.status = 'AGENDADO' and p.agendado_para <= now()
+      and not exists (select 1 from ads.jobs j where j.type = 'PUBLISH_INSTAGRAM' and j.status in ('PENDING','RUNNING') and j.payload->>'postId' = p.id::text)`;
+  for (const p of devidos) await enqueueJob(sql, { workspaceId: p.workspace_id, type: "PUBLISH_INSTAGRAM", payload: { postId: p.id }, maxAttempts: 1 });
+}
+
 /** Sincronização automática: conexões sem sync há mais de SYNC_INTERVAL_MIN e sem job pendente. */
 async function agendarSyncs() {
   const devidas = await sql<{ id: string; workspace_id: string; provider: string }[]>`
@@ -101,7 +118,7 @@ async function agendarSyncs() {
       and not exists (select 1 from ads.jobs j where j.payload->>'connectionId' = k.id::text
         and (j.status in ('PENDING','RUNNING') or (j.status = 'FAILED' and j.finished_at > now() - interval '30 minutes')))`;
   for (const k of devidas) {
-    await enqueueJob(sql, { workspaceId: k.workspace_id, type: k.provider === "META" ? "SYNC_META" : "SYNC_GOOGLE", payload: { connectionId: k.id, auto: true } });
+    await enqueueJob(sql, { workspaceId: k.workspace_id, type: jobDeSync(k.provider), payload: { connectionId: k.id, auto: true } });
   }
 }
 
@@ -135,7 +152,11 @@ await migrate(process.env.DIRECT_URL, (m) => console.log(m)); // banco sempre em
 await sql`update ads.ai_logins set status = 'FAILED', error = 'Worker reiniciado durante o login', updated_at = now()
            where status in ('STARTING','AWAITING_USER','CODE_SUBMITTED')`;
 await sql`update ads.jobs set status = 'FAILED', error = 'Worker reiniciado', finished_at = now()
-           where status = 'RUNNING' and type in ('AI_LOGIN','WORKER_STARTUP','GENERATE_VIDEO','GENERATE_IMAGE')`;
+           where status = 'RUNNING' and type in ('AI_LOGIN','WORKER_STARTUP','GENERATE_VIDEO','GENERATE_IMAGE','PUBLISH_INSTAGRAM','AI_INSTAGRAM_CAPTION')`;
+// queda no meio de uma publicação: não dá para saber se o Instagram chegou a publicar; avisa em vez de repetir
+await sql`update ads.instagram_posts set status = 'FALHOU', erro = 'O worker reiniciou durante a publicação. Confira no perfil se ela saiu antes de tentar de novo.', updated_at = now()
+           where status = 'PUBLICANDO'`;
+await sql`update ads.instagram_posts set sugestao = null where sugestao->>'gerando' = 'true'`;
 await sql`update ads.video_projects set status = 'FAILED', error = 'Worker reiniciado durante a geração. Gere de novo.', updated_at = now()
            where status in ('SCRIPTING','VOICE','COMPOSING','RENDERING','MIXING','UPLOADING')`;
 const recuperados = await recoverJobs(sql, WORKER_ID);
@@ -146,6 +167,7 @@ await sql`update ads.ai_conversations set status = 'IDLE' where status = 'RUNNIN
 console.log(`DOMUS Worker "${WORKER_ID}" no ar · ${CONCURRENCY} jobs simultâneos · ${recuperados.length} job(s) recuperado(s)`);
 repetir(heartbeat, 30_000);
 repetir(agendarSyncs, 5 * 60_000);
+repetir(publicarAgendados, 30_000);
 repetir(async function arquivarNoDrive() { await arquivarExcesso((m) => console.log(`[${agora()}] arquivo: ${m}`)); }, 30 * 60_000);
 repetir(async function detectarContas() { await publicarDetectadas(await detectar()); }, 10 * 60_000);
 await loop();
