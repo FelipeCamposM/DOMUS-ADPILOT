@@ -164,6 +164,10 @@ medição de conversões e diagnóstico. Também lê os dados do workspace (camp
 "Sobre a marca") e pode deixar propostas de pausar/ativar/orçamento para aprovar, como o chat da IA.
 - **Histórico** (ícone de relógio): conversas do consultor, separadas das do chat IA. Abrir retoma de onde parou.
 - **+**: nova conversa. **Esc** fecha. A última conversa reabre sozinha.
+- **Vê a tela aberta**: cada pergunta leva a rota, o texto visível e os campos preenchidos da página. Num rascunho de
+  campanha, ele recebe a campanha completa (versão salva) e faz o ajuste que você pedir, por exemplo "deixe só 1 grupo,
+  o orçamento vai ser R$ 5/dia": a proposta aparece como cartão **[Aprovar]/[Cancelar]** e só muda o rascunho depois de
+  aprovada. Salve o editor antes de pedir, senão ele trabalha sobre a última versão salva.
 - A base de conhecimento fica em `apps/worker/src/ai/conhecimento.ts`: edite para ensinar algo novo (reinicie o worker).
 
 ### Studio (vídeos e imagens)

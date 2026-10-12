@@ -1,14 +1,14 @@
-import { db, parseActionBlocks, toDecimal, type Json } from "@domus-ads/core";
+import { db, parseActionBlocks, toDecimal, type GoogleSearchSpec, type Json } from "@domus-ads/core";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { CONV_DIR } from "../env";
 import { runCli, type AiProvider } from "./cli";
 import { resolveConfigDir } from "./login";
-import { instrucoes, snapshot } from "./context";
+import { contextoPagina, instrucoes, snapshot } from "./context";
 import { blockedUntil, type Usage } from "./limits";
 
 interface Conta { id: string; provider: AiProvider; name: string; config_dir: string; priority: number }
-interface Msg { id: number; role: string; content: string; status: string }
+interface Msg { id: number; role: string; content: string; status: string; meta: { pagina?: unknown } }
 
 const brl = (v: string, moeda: string) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: moeda }).format(Number(v));
 const MAX_HIST = 60_000;
@@ -23,7 +23,7 @@ export async function runChatTurn(conversationId: string, signal: AbortSignal, l
   const [conv] = await sql<{ id: string; workspace_id: string; title: string; provider_pref: string; tipo: string }[]>`
     select id, workspace_id, title, provider_pref, tipo from ads.ai_conversations where id = ${conversationId}`;
   if (!conv) throw new Error("Conversa não encontrada");
-  const msgs = await sql<Msg[]>`select id::int as id, role, content, status from ads.ai_messages where conversation_id = ${conv.id} order by id`;
+  const msgs = await sql<Msg[]>`select id::int as id, role, content, status, meta from ads.ai_messages where conversation_id = ${conv.id} order by id`;
   const pergunta = [...msgs].reverse().find((m) => m.role === "user");
   if (!pergunta) throw new Error("Nada para responder");
 
@@ -65,6 +65,7 @@ export async function runChatTurn(conversationId: string, signal: AbortSignal, l
       const naoVistas = msgs.filter((m) => m.id !== pergunta.id && m.status === "DONE" && (m.role === "user" || m.role === "assistant") && (!sess || m.id > sess.last_message_id));
       const prompt = [
         await snapshot(conv.workspace_id),
+        conv.tipo === "consultor" ? await contextoPagina(conv.workspace_id, pergunta.meta?.pagina) : "",
         naoVistas.length ? `<historico${sess ? "_que_voce_nao_viu" : ""}>\n${historico(naoVistas)}\n</historico${sess ? "_que_voce_nao_viu" : ""}>` : "",
         `<mensagem_do_usuario>\n${pergunta.content}\n</mensagem_do_usuario>`,
       ].filter(Boolean).join("\n\n");
@@ -89,7 +90,9 @@ export async function runChatTurn(conversationId: string, signal: AbortSignal, l
             insert into ads.ai_sessions (conversation_id, ai_account_id, session_id, last_message_id) values (${conv.id}, ${conta.id}, ${r.sessionId}, ${resp!.id})
             on conflict (conversation_id, ai_account_id) do update set session_id = excluded.session_id, last_message_id = excluded.last_message_id`;
         }
-        const acoes = await registrarAcoes(conv.workspace_id, conv.id, resp!.id, texto);
+        const { n: acoes, erros } = await registrarAcoes(conv.workspace_id, conv.id, resp!.id, texto);
+        // proposta fora do formato: avisa na própria resposta em vez de sumir calada
+        if (erros.length) texto += `\n\n> ⚠️ Uma proposta veio com erro e foi descartada (${erros.slice(0, 3).join("; ")}). Peça de novo que eu refaço.`;
         await gravando;
         await sql`
           update ads.ai_messages set content = ${texto}, status = 'DONE', provider = ${conta.provider}, ai_account_id = ${conta.id},
@@ -147,11 +150,21 @@ function historico(msgs: Msg[]): string {
 }
 
 /** Propostas da IA viram ads.ai_actions PENDING_APPROVAL, só para campanhas deste workspace. Nada executa aqui. */
-async function registrarAcoes(workspaceId: string, conversationId: string, messageId: number, texto: string): Promise<number> {
+async function registrarAcoes(workspaceId: string, conversationId: string, messageId: number, texto: string): Promise<{ n: number; erros: string[] }> {
   const sql = db();
-  const { actions } = parseActionBlocks(texto);
+  const { actions, erros } = parseActionBlocks(texto);
   let n = 0;
   for (const a of actions) {
+    if (a.type === "UPDATE_DRAFT") {
+      const [d] = await sql<{ name: string; status: string; spec: { grupos?: { palavras?: unknown[] }[]; orcamentoDiario?: string } }[]>`
+        select name, status, spec from ads.campaign_drafts where id = ${a.draftId} and workspace_id = ${workspaceId}`;
+      if (!d || !["DRAFT", "FAILED"].includes(d.status)) { erros.push("rascunho não encontrado ou já publicado"); continue; }
+      await sql`
+        insert into ads.ai_actions (workspace_id, conversation_id, message_id, type, payload, summary, reason)
+        values (${workspaceId}, ${conversationId}, ${messageId}, ${a.type}, ${sql.json(a as unknown as Json)}, ${resumoRascunho(d.name, d.spec, a.spec)}, ${a.reason ?? null})`;
+      n++;
+      continue;
+    }
     const [c] = await sql<{ name: string; daily_budget: string | null; status: string; currency: string }[]>`
       select c.name, c.daily_budget::text, c.status, ac.currency from ads.campaigns c join ads.ad_accounts ac on ac.id = c.ad_account_id
       where c.id = ${a.campaignId} and c.workspace_id = ${workspaceId}`;
@@ -176,5 +189,17 @@ async function registrarAcoes(workspaceId: string, conversationId: string, messa
       values (${workspaceId}, ${conversationId}, ${messageId}, ${a.type}, ${sql.json(payload as Json)}, ${summary}, ${a.reason ?? null})`;
     n++;
   }
-  return n;
+  return { n, erros };
+}
+
+/** "Ajustar rascunho “X”: 5 → 1 grupo · 52 → 9 palavras-chave · orçamento 50.00 → 5.00/dia" */
+function resumoRascunho(nome: string, antes: { grupos?: { palavras?: unknown[] }[]; orcamentoDiario?: string }, depois: GoogleSearchSpec): string {
+  const kw = (g?: { palavras?: unknown[] }[]) => (g ?? []).reduce((s, x) => s + (x.palavras?.length ?? 0), 0);
+  const partes: string[] = [];
+  const ga = antes.grupos?.length ?? 0, gd = depois.grupos.length;
+  if (ga !== gd) partes.push(`${ga} → ${gd} grupo(s)`);
+  const ka = kw(antes.grupos), kd = kw(depois.grupos);
+  if (ka !== kd) partes.push(`${ka} → ${kd} palavras-chave`);
+  if (antes.orcamentoDiario && antes.orcamentoDiario !== depois.orcamentoDiario) partes.push(`orçamento ${antes.orcamentoDiario} → ${depois.orcamentoDiario}/dia`);
+  return `Ajustar rascunho “${nome}”${partes.length ? `: ${partes.join(" · ")}` : ""}`;
 }

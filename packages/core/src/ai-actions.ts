@@ -1,7 +1,8 @@
 import { z } from "zod";
 import type { Actor } from "./audit";
 import { setCampaignBudget, setCampaignStatus } from "./campaigns";
-import { db } from "./db";
+import { db, type Json } from "./db";
+import { googleSearchSchema } from "./google-search";
 
 /**
  * Allowlist de ações que a IA pode PROPOR. Nada aqui executa sozinho: vira ads.ai_actions PENDING_APPROVAL e só roda
@@ -14,12 +15,15 @@ export const aiActionSchema = z.discriminatedUnion("type", [
     type: z.literal("UPDATE_BUDGET"), campaignId: z.string().uuid(),
     dailyBudget: z.string().regex(/^\d{1,12}([.,]\d{1,2})?$/, "Orçamento inválido"), reason: z.string().max(500).optional(),
   }),
+  // rascunho de campanha (ainda não publicado): a IA devolve a campanha COMPLETA já ajustada
+  z.object({ type: z.literal("UPDATE_DRAFT"), draftId: z.string().uuid(), spec: googleSearchSchema, reason: z.string().max(500).optional() }),
 ]);
 export type AiAction = z.infer<typeof aiActionSchema>;
 
 /** Extrai blocos ```domus-action {json}``` da resposta da IA. Blocos inválidos são ignorados (e contados). */
-export function parseActionBlocks(text: string): { actions: AiAction[]; invalid: number } {
+export function parseActionBlocks(text: string): { actions: AiAction[]; invalid: number; erros: string[] } {
   const actions: AiAction[] = [];
+  const erros: string[] = [];
   let invalid = 0;
   for (const m of text.matchAll(/```domus-action\s*([\s\S]*?)```/g)) {
     try {
@@ -27,13 +31,14 @@ export function parseActionBlocks(text: string): { actions: AiAction[]; invalid:
       for (const item of Array.isArray(raw) ? raw : [raw]) {
         const r = aiActionSchema.safeParse(item);
         if (r.success) actions.push(r.data);
-        else invalid++;
+        else { invalid++; erros.push(...r.error.issues.slice(0, 5).map((i) => `${i.path.join(".")}: ${i.message}`)); }
       }
     } catch {
       invalid++;
+      erros.push("bloco sem JSON válido");
     }
   }
-  return { actions, invalid };
+  return { actions, invalid, erros };
 }
 
 /** Executa uma ação aprovada (com trava: só sai de PENDING_APPROVAL uma vez). */
@@ -45,6 +50,14 @@ export async function approveAiAction(workspaceId: string, actionId: string, act
   if (!a) throw new Error("Ação não encontrada ou já decidida");
   try {
     const p = aiActionSchema.parse(a.payload);
+    if (p.type === "UPDATE_DRAFT") {
+      const r = await sql`
+        update ads.campaign_drafts set spec = ${sql.json(p.spec as unknown as Json)}, name = ${p.spec.nome}, validated_at = null, error = null, updated_at = now()
+        where id = ${p.draftId} and workspace_id = ${workspaceId} and status in ('DRAFT', 'FAILED')`;
+      if (!r.count) throw new Error("Rascunho não encontrado ou já publicado/em geração");
+      await sql`update ads.ai_actions set status = 'EXECUTED' where id = ${a.id}`;
+      return;
+    }
     const base = { workspaceId, campaignId: p.campaignId, actor, source: "AI_RECOMMENDATION" as const };
     if (p.type === "UPDATE_BUDGET") await setCampaignBudget({ ...base, dailyBudget: p.dailyBudget });
     else await setCampaignStatus({ ...base, status: p.type === "PAUSE_CAMPAIGN" ? "PAUSED" : "ACTIVE" });

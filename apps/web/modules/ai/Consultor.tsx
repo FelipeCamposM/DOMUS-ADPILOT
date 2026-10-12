@@ -21,6 +21,22 @@ const CHAVE = "adpilot:consultor";
 const lerSalvo = () => { try { return localStorage.getItem(CHAVE); } catch { return null; } };
 const salvar = (id: string | null) => { try { if (id) localStorage.setItem(CHAVE, id); else localStorage.removeItem(CHAVE); } catch { /* sem storage: só não lembra a conversa */ } };
 
+/** Retrato da tela aberta: rota, título, texto visível e valores dos campos (o innerText não traz o que está digitado). */
+function lerTela() {
+  const main = document.getElementById("conteudo");
+  if (!main) return undefined;
+  const campos: string[] = [];
+  main.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>("input, textarea, select").forEach((el) => {
+    if (el instanceof HTMLInputElement && ["checkbox", "radio"].includes(el.type) && !el.checked) return;
+    const v = el instanceof HTMLSelectElement ? el.selectedOptions[0]?.text ?? "" : el.value;
+    if (!v.trim() || el.type === "password" || el.type === "hidden") return;
+    const rotulo = el.labels?.[0]?.textContent?.trim() || el.getAttribute("aria-label") || el.getAttribute("placeholder") || el.name || "campo";
+    campos.push(`${rotulo}: ${v.slice(0, 2000)}`);
+  });
+  const texto = `${main.innerText.replace(/\n{3,}/g, "\n\n").trim()}${campos.length ? `\n\nCampos preenchidos na tela:\n${campos.join("\n")}` : ""}`;
+  return { path: location.pathname + location.search, titulo: document.title, texto: texto.slice(0, 20_000) };
+}
+
 const saudacao = () => { const h = new Date().getHours(); return h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite"; };
 
 /** Consultor de tráfego pago: bolha flutuante no canto direito, com histórico próprio (conversas tipo "consultor"). */
@@ -79,7 +95,7 @@ export function Consultor({ podeEditar }: { podeEditar: boolean }) {
     start(async () => {
       setTxt("");
       if (!st) {
-        const r = await novaConversa({ texto: t, provider: "auto", tipo: "consultor" });
+        const r = await novaConversa({ texto: t, provider: "auto", tipo: "consultor", pagina: lerTela() });
         if (!r.ok) { setTxt(t); return toast.err(r.error); }
         salvar(r.data);
         await carregar(r.data);
@@ -87,7 +103,7 @@ export function Consultor({ podeEditar }: { podeEditar: boolean }) {
       }
       const otimista: ChatMsg = { id: -Date.now(), role: "user", content: t, status: "DONE", provider: null, meta: {}, created_at: new Date().toISOString() };
       setSt({ ...st, conversation: { ...st.conversation, status: "RUNNING" }, messages: [...st.messages, otimista] });
-      const r = await enviarMensagem(st.conversation.id, { texto: t, provider: st.conversation.provider_pref });
+      const r = await enviarMensagem(st.conversation.id, { texto: t, provider: st.conversation.provider_pref, pagina: lerTela() });
       if (!r.ok) { toast.err(r.error); setTxt(t); }
       await carregar(st.conversation.id);
     });
@@ -159,7 +175,7 @@ export function Consultor({ podeEditar }: { podeEditar: boolean }) {
                   <div className="cx-hello">
                     <div className="cx-hello-mark"><Mascote size={40} /></div>
                     <h2>{saudacao()}! Em que posso ajudar?</h2>
-                    <p>Sou seu consultor de tráfego pago. Tiro dúvidas de Google Ads e Meta Ads e leio as campanhas, rascunhos e conexões deste workspace.</p>
+                    <p>Sou seu consultor de tráfego pago. Vejo a tela que você tem aberta e os dados do workspace: tiro dúvidas e, num rascunho de campanha, faço os ajustes que você pedir (você aprova antes).</p>
                     <div className="cx-sugs">
                       {SUGESTOES.map((s) => (
                         <button key={s.t} className="cx-sug" onClick={() => enviar(s.t)} disabled={!podeEditar || pend}>
