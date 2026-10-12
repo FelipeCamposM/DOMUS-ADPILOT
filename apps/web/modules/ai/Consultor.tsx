@@ -7,7 +7,7 @@ import { ago } from "@/lib/format";
 import { toast } from "../shell/toast";
 import { apagarConversa, cancelarResposta, enviarMensagem, novaConversa } from "./actions";
 import { Mensagem } from "./Chat";
-import { ClaudeIcon } from "./ClaudeIcon";
+import { Mascote } from "./Mascote";
 
 interface Item { id: string; title: string; status: string; updated_at: string }
 
@@ -113,7 +113,7 @@ export function Consultor({ podeEditar }: { podeEditar: boolean }) {
     <>
       <button className="cx-fab" data-open={aberto} data-busy={!!rodando} onClick={() => setAberto((a) => !a)} aria-expanded={aberto}
         aria-label={aberto ? "Fechar consultor" : "Abrir consultor de tráfego"}>
-        <span className="cx-fab-icon">{aberto ? <X size={22} aria-hidden /> : <ClaudeIcon size={26} />}</span>
+        <span className="cx-fab-icon">{aberto ? <X size={22} aria-hidden /> : <Mascote size={30} />}</span>
         {!aberto && <span className="cx-fab-label">Consultor</span>}
       </button>
 
@@ -123,7 +123,7 @@ export function Consultor({ podeEditar }: { podeEditar: boolean }) {
             {vista === "historico" ? (
               <button className="cx-icon-btn" onClick={() => setVista("conversa")} aria-label="Voltar"><ArrowLeft size={17} aria-hidden /></button>
             ) : (
-              <span className="cx-avatar" data-busy={!!rodando}><ClaudeIcon size={18} /></span>
+              <span className="cx-avatar" data-busy={!!rodando}><Mascote size={22} /></span>
             )}
             <div style={{ minWidth: 0, flex: 1 }}>
               <div className="cx-title">{vista === "historico" ? "Histórico" : "Consultor de tráfego"}</div>
@@ -141,7 +141,7 @@ export function Consultor({ podeEditar }: { podeEditar: boolean }) {
               {itens === null ? (
                 <div className="stack" style={{ gap: 8 }}>{[0, 1, 2].map((i) => <div key={i} className="skeleton" style={{ height: 54, borderRadius: 14 }} />)}</div>
               ) : itens.length === 0 ? (
-                <div className="cx-empty-mini"><ClaudeIcon size={28} /><p>Nenhuma conversa ainda.</p><button className="cx-link" onClick={nova}>Começar uma</button></div>
+                <div className="cx-empty-mini"><Mascote size={34} /><p>Nenhuma conversa ainda.</p><button className="cx-link" onClick={nova}>Começar uma</button></div>
               ) : itens.map((c) => (
                 <div key={c.id} className="cx-hist" data-active={c.id === st?.conversation.id}>
                   <button className="cx-hist-main" onClick={() => abrir(c.id)}>
@@ -157,7 +157,7 @@ export function Consultor({ podeEditar }: { podeEditar: boolean }) {
               <div ref={lista} className="cx-body cx-chat">
                 {!st ? (
                   <div className="cx-hello">
-                    <div className="cx-hello-mark"><ClaudeIcon size={34} /></div>
+                    <div className="cx-hello-mark"><Mascote size={40} /></div>
                     <h2>{saudacao()}! Em que posso ajudar?</h2>
                     <p>Sou seu consultor de tráfego pago. Tiro dúvidas de Google Ads e Meta Ads e leio as campanhas, rascunhos e conexões deste workspace.</p>
                     <div className="cx-sugs">
