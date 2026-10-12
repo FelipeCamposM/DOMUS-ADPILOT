@@ -136,7 +136,7 @@ export function Chat({ inicial, podeEditar, sugestao, provedores }: {
   );
 }
 
-export function Mensagem({ m, acoes, podeEditar, onDecidiu }: { m: ChatMsg; acoes: ChatAction[]; podeEditar: boolean; onDecidiu: () => void }) {
+export function Mensagem({ m, acoes, podeEditar, onDecidiu, semMeta }: { m: ChatMsg; acoes: ChatAction[]; podeEditar: boolean; onDecidiu: () => void; semMeta?: boolean }) {
   if (m.role === "user") return <div className="term-msg" data-msg={m.id}><div className="term-user">{m.content}</div></div>;
   if (m.role === "system") return <div className="term-msg term-sys" data-msg={m.id}>{m.content}</div>;
   const meta = m.meta as { account?: string; model?: string; outputTokens?: number; costUsd?: number | null; durationMs?: number; error?: string; switches?: string[] };
@@ -156,7 +156,7 @@ export function Mensagem({ m, acoes, podeEditar, onDecidiu }: { m: ChatMsg; acoe
           ) : null}
           {m.status === "ERROR" && <p className="error-text" style={{ marginTop: 6 }}>{meta.error ?? "Falha na resposta"}</p>}
           {acoes.length > 0 && <div className="stack" style={{ gap: 8, marginTop: 12 }}>{acoes.map((a) => <AcaoCard key={a.id} a={a} podeEditar={podeEditar} onDecidiu={onDecidiu} />)}</div>}
-          {m.status === "DONE" && (
+          {m.status === "DONE" && !semMeta && (
             <div className="subtle" style={{ fontSize: 11, marginTop: 8 }}>
               {[m.provider, meta.account, meta.model, meta.outputTokens != null && `${meta.outputTokens} tokens`, meta.durationMs != null && `${(meta.durationMs / 1000).toFixed(1)} s`, meta.costUsd != null && `US$ ${meta.costUsd.toFixed(4)}`].filter(Boolean).join(" · ")}
             </div>
