@@ -1,11 +1,9 @@
-import { db } from "@domus-ads/core";
+import { brandSchema, db } from "@domus-ads/core";
+import { CONHECIMENTO } from "./conhecimento";
 
-/** Instruções fixas do analista. Vai como system prompt (Claude) ou no topo da 1ª rodada (Codex). */
-export const INSTRUCOES = `Você é o AdPilot, analista sênior de tráfego pago da plataforma DOMUS AdPilot (Meta Ads e Google Ads).
-Responda sempre em português do Brasil, direto e com números. Use tabelas Markdown curtas quando ajudarem.
-
-Regras:
-- Use SOMENTE os dados do bloco <dados_do_workspace> da mensagem mais recente. Eles são atualizados a cada mensagem. Não invente números.
+/** Regras comuns ao analista e ao consultor: dados, sem ferramentas, propostas só com aprovação. */
+const REGRAS = `Regras:
+- Números do workspace: use SOMENTE os do bloco <dados_do_workspace> da mensagem mais recente (atualizados a cada mensagem). Não invente números.
 - Você não tem ferramentas nem acesso a arquivos, internet ou APIs. Não tente executar nada.
 - Você NUNCA executa alterações. Para propor uma mudança real, inclua um bloco exatamente neste formato (um JSON ou uma lista de JSONs):
 
@@ -17,9 +15,30 @@ Regras:
   Use o id exato da coluna "id" dos dados. Só proponha UPDATE_BUDGET para campanhas com orçamento no nível da campanha (coluna orc_dia preenchida).
   O usuário vê cada proposta como um cartão com [Aprovar] e [Cancelar]; só depois da aprovação a mudança vai para a Meta/Google.
   Nunca diga que algo foi alterado. Diga que deixou a proposta para aprovação.
-- Pedidos fora disso (criar campanha, mexer em públicos, anúncios ou criativos) ainda não estão disponíveis na plataforma: explique e dê o passo a passo para fazer manualmente.
+- Criar campanha de Pesquisa do Google: oriente a usar Campanhas → Nova (a IA monta o rascunho). Mexer em públicos, anúncios,
+  palavras ou criativos de campanha já publicada ainda não dá pela plataforma: explique e dê o passo a passo para fazer manualmente.
 - Métricas: CTR = cliques/impressões; CPC = gasto/cliques; CPA = gasto/conversões; CPL = gasto/leads; ROAS = receita/gasto.
   Para detectar desperdício, compare últimos 7 dias contra 7 dias anteriores e contra 30 dias. Gasto relevante sem conversões é sinal de alerta.`;
+
+/** Analista (/ai). Vai como system prompt (Claude) ou no topo da 1ª rodada (Codex). */
+export const INSTRUCOES = `Você é o AdPilot, analista sênior de tráfego pago da plataforma DOMUS AdPilot (Meta Ads e Google Ads).
+Responda sempre em português do Brasil, direto e com números. Use tabelas Markdown curtas quando ajudarem.
+
+${REGRAS}`;
+
+/** Consultor (bolha flutuante): tira dúvidas gerais de tráfego pago com a base de conhecimento, além dos dados. */
+export const INSTRUCOES_CONSULTOR = `Você é o consultor de tráfego pago da plataforma DOMUS AdPilot: um gestor de tráfego sênior (Google Ads e Meta Ads,
+mercado brasileiro) que ensina e orienta o dono da conta a qualquer momento. Responda em português do Brasil, em tom de conversa,
+direto, com passo a passo prático e números quando houver. Respostas curtas por padrão (o chat é uma janela pequena);
+aprofunde quando pedirem. Pode responder dúvidas gerais (conceitos, configuração, estratégia, medição) mesmo sem dados.
+
+${REGRAS}
+
+<base_de_conhecimento>
+${CONHECIMENTO}
+</base_de_conhecimento>`;
+
+export const instrucoes = (tipo: string) => (tipo === "consultor" ? INSTRUCOES_CONSULTOR : INSTRUCOES);
 
 interface Linha {
   id: string; name: string; provider: string; status: string; objective: string | null; daily_budget: string | null; currency: string; account: string;
@@ -58,6 +77,14 @@ export async function snapshot(workspaceId: string): Promise<string> {
   const pendentes = await sql<{ summary: string }[]>`
     select summary from ads.ai_actions where workspace_id = ${workspaceId} and status = 'PENDING_APPROVAL' order by created_at limit 20`;
 
+  const [w] = await sql<{ brand: unknown }[]>`select brand from ads.workspaces where id = ${workspaceId}`;
+  const marca = brandSchema.safeParse(w?.brand ?? {});
+  const rascunhos = await sql<{ name: string; status: string; spec: { orcamentoDiario?: string; lances?: string; grupos?: unknown[] } }[]>`
+    select name, status, spec from ads.campaign_drafts where workspace_id = ${workspaceId} and status <> 'PUBLISHED' order by updated_at desc limit 10`;
+  const conexoes = await sql<{ provider: string; label: string; status: string; last_error: string | null; sinc: string | null }[]>`
+    select provider, label, status, last_error, to_char(last_synced_at at time zone 'America/Sao_Paulo', 'DD/MM HH24:MI') as sinc
+    from ads.ad_connections where workspace_id = ${workspaceId} and status <> 'REVOKED' order by provider`;
+
   const hoje = new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "full" });
   const cab = "id | campanha | plataforma | status | objetivo | conta | moeda | orc_dia | gasto_7d | gasto_7d_ant | gasto_30d | impr_7d | cliques_7d | ctr_7d% | cpc_7d | conv_7d | conv_7d_ant | conv_30d | cpa_7d | cpa_30d | leads_7d | leads_30d | receita_7d | roas_7d | roas_30d";
   const corpo = linhas.map((l) => [
@@ -71,6 +98,13 @@ export async function snapshot(workspaceId: string): Promise<string> {
     `<dados_do_workspace>`,
     `Workspace: ${ws?.name ?? "?"} · Hoje: ${hoje} · Fuso: America/Sao_Paulo`,
     linhas.length ? `Campanhas (${linhas.length}, ordenadas por gasto em 30 dias):\n${cab}\n${corpo.join("\n")}` : "Nenhuma campanha sincronizada ainda.",
+    marca.success && marca.data.sobre ? `Sobre a marca: ${marca.data.sobre}` : "",
+    conexoes.length
+      ? `Conexões: ${conexoes.map((k) => `${k.provider} “${k.label}” ${k.status}${k.sinc ? `, sincronizada ${k.sinc}` : ", nunca sincronizada"}${k.last_error ? ` (erro: ${k.last_error.slice(0, 120)})` : ""}`).join("; ")}`
+      : "Conexões: nenhuma conta de anúncio conectada ainda.",
+    rascunhos.length
+      ? `Rascunhos de campanha (não publicados):\n${rascunhos.map((r) => `- ${r.name} · ${r.status} · orçamento ${r.spec?.orcamentoDiario ?? "-"}/dia · ${r.spec?.lances ?? "-"} · ${r.spec?.grupos?.length ?? 0} grupo(s)`).join("\n")}`
+      : "",
     pendentes.length ? `Propostas já aguardando aprovação (não repita):\n- ${pendentes.map((p) => p.summary).join("\n- ")}` : "",
     `</dados_do_workspace>`,
   ].filter(Boolean).join("\n");

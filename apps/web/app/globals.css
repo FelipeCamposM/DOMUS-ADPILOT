@@ -424,3 +424,12 @@ input[type="color"]:hover { transform: scale(1.08); box-shadow: 0 0 14px rgb(var
 @media (prefers-reduced-motion: reduce) {
   .solta-quadro, .solta-quadro-icone, .solta-icone, .solta-anel, .treme, .solta-tela { animation: none; }
 }
+
+/* Consultor de tráfego: bolha flutuante + painel */
+.consultor-fab { position: fixed; right: 20px; bottom: 20px; z-index: 60; width: 52px; height: 52px; border-radius: 50%; border: 0; cursor: pointer; display: grid; place-items: center; color: #fff; background: rgb(var(--c-brand)); box-shadow: 0 10px 30px -8px rgb(var(--c-brand) / 0.7), 0 2px 6px rgb(0 0 0 / 0.25); transition: transform var(--dur-base) var(--ease-out); }
+.consultor-fab:hover { transform: translateY(-2px) scale(1.04); }
+.consultor-fab:focus-visible { outline: 2px solid rgb(var(--c-brand)); outline-offset: 3px; }
+.consultor-fab svg { width: 24px; height: 24px; }
+.consultor-painel { position: fixed; right: 20px; bottom: 84px; z-index: 60; width: min(420px, calc(100vw - 32px)); height: min(640px, calc(100dvh - 110px)); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 24px 60px -12px rgb(0 0 0 / 0.45); }
+.consultor-painel .md { font-size: 13.5px; }
+@media (max-width: 640px) { .consultor-fab { right: 16px; bottom: 16px; } .consultor-painel { right: 16px; bottom: 76px; } }

@@ -157,6 +157,15 @@ Exemplos que funcionam bem:
 - "Qual campanha tem o melhor CPA?"
 - "Aumente 20% das campanhas com ROAS acima de 4." (vira uma proposta por campanha, para aprovar)
 
+### Consultor de tráfego (bolha no canto direito)
+Botão redondo no canto inferior direito de todas as telas. É um gestor de tráfego sênior para tirar dúvidas a qualquer
+hora: conceitos (correspondência, lances, Índice de Qualidade), configuração do Google Ads e da Meta, orçamento pequeno,
+medição de conversões e diagnóstico. Também lê os dados do workspace (campanhas com métricas, rascunhos, conexões e o
+"Sobre a marca") e pode deixar propostas de pausar/ativar/orçamento para aprovar, como o chat da IA.
+- **Histórico** (ícone de relógio): conversas do consultor, separadas das do chat IA. Abrir retoma de onde parou.
+- **+**: nova conversa. **Esc** fecha. A última conversa reabre sozinha.
+- A base de conhecimento fica em `apps/worker/src/ai/conhecimento.ts`: edite para ensinar algo novo (reinicie o worker).
+
 ### Studio (vídeos e imagens)
 Gera vídeos e imagens de anúncio a partir de um briefing. Tudo roda no PC do worker, sem custo de API: usa as suas
 contas de IA, a voz local e o render local. O seletor **Vídeo | Imagem** fica no topo de "Novo".

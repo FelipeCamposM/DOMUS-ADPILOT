@@ -136,7 +136,7 @@ export function Chat({ inicial, podeEditar, sugestao, provedores }: {
   );
 }
 
-function Mensagem({ m, acoes, podeEditar, onDecidiu }: { m: ChatMsg; acoes: ChatAction[]; podeEditar: boolean; onDecidiu: () => void }) {
+export function Mensagem({ m, acoes, podeEditar, onDecidiu }: { m: ChatMsg; acoes: ChatAction[]; podeEditar: boolean; onDecidiu: () => void }) {
   if (m.role === "user") return <div className="term-msg" data-msg={m.id}><div className="term-user">{m.content}</div></div>;
   if (m.role === "system") return <div className="term-msg term-sys" data-msg={m.id}>{m.content}</div>;
   const meta = m.meta as { account?: string; model?: string; outputTokens?: number; costUsd?: number | null; durationMs?: number; error?: string; switches?: string[] };

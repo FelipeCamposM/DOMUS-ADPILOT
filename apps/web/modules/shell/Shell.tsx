@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, useTransition, type ReactNode } from "react";
 import { ago } from "@/lib/format";
+import { Consultor } from "../ai/Consultor";
 import { Motion } from "../motion/Motion";
 import { sair, trocarWorkspace } from "./actions";
 import { CommandPalette } from "./CommandPalette";
@@ -136,6 +137,7 @@ export function Shell(p: ShellProps) {
         <main className="content" id="conteudo">{p.children}</main>
       </div>
       <CommandPalette open={paleta} onClose={fecharPaleta} campanhas={p.campanhas} />
+      <Consultor key={p.workspaceId} podeEditar={["editor", "admin", "owner"].includes(p.workspaces.find((w) => w.id === p.workspaceId)?.role ?? "")} />
       <Toaster />
       <Motion />
     </div>

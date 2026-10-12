@@ -9,6 +9,7 @@ import { requireCtx, requireRole, type Ctx } from "@/lib/ctx";
 const texto = z.string().trim().min(1, "Escreva uma mensagem").max(16_000, "Mensagem muito longa (máx. 16 mil caracteres)");
 const pref = z.enum(["auto", "claude", "codex"], { message: "Modelo inválido" });
 const uuid = z.string().uuid("Identificador inválido");
+const tipo = z.enum(["analista", "consultor"], { message: "Tipo de conversa inválido" }).default("analista");
 
 async function conversaDoWorkspace(ctx: Ctx, id: string) {
   const [c] = await db()<{ id: string; status: string }[]>`
@@ -28,13 +29,14 @@ async function enfileirar(ctx: Ctx, conversationId: string, conteudo: string) {
   });
 }
 
-export async function novaConversa(input: { texto: string; provider: string }) {
+export async function novaConversa(input: { texto: string; provider: string; tipo?: string }) {
   return run(async () => {
     const ctx = await requireCtx();
     requireRole(ctx, "editor");
     const t = texto.parse(input.texto);
     const [c] = await db()<{ id: string }[]>`
-      insert into ads.ai_conversations (workspace_id, user_id, provider_pref) values (${ctx.workspace.id}, ${ctx.user.id}, ${pref.parse(input.provider)}) returning id`;
+      insert into ads.ai_conversations (workspace_id, user_id, provider_pref, tipo)
+      values (${ctx.workspace.id}, ${ctx.user.id}, ${pref.parse(input.provider)}, ${tipo.parse(input.tipo)}) returning id`;
     await enfileirar(ctx, c!.id, t);
     revalidatePath("/ai", "layout");
     return c!.id;

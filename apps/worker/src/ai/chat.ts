@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { CONV_DIR } from "../env";
 import { runCli, type AiProvider } from "./cli";
 import { resolveConfigDir } from "./login";
-import { INSTRUCOES, snapshot } from "./context";
+import { instrucoes, snapshot } from "./context";
 import { blockedUntil, type Usage } from "./limits";
 
 interface Conta { id: string; provider: AiProvider; name: string; config_dir: string; priority: number }
@@ -20,8 +20,8 @@ const MAX_HIST = 60_000;
  */
 export async function runChatTurn(conversationId: string, signal: AbortSignal, log: (m: string) => Promise<void>) {
   const sql = db();
-  const [conv] = await sql<{ id: string; workspace_id: string; title: string; provider_pref: string }[]>`
-    select id, workspace_id, title, provider_pref from ads.ai_conversations where id = ${conversationId}`;
+  const [conv] = await sql<{ id: string; workspace_id: string; title: string; provider_pref: string; tipo: string }[]>`
+    select id, workspace_id, title, provider_pref, tipo from ads.ai_conversations where id = ${conversationId}`;
   if (!conv) throw new Error("Conversa não encontrada");
   const msgs = await sql<Msg[]>`select id::int as id, role, content, status from ads.ai_messages where conversation_id = ${conv.id} order by id`;
   const pergunta = [...msgs].reverse().find((m) => m.role === "user");
@@ -30,7 +30,7 @@ export async function runChatTurn(conversationId: string, signal: AbortSignal, l
   const pasta = join(CONV_DIR, conv.id);
   mkdirSync(pasta, { recursive: true });
   const sysFile = join(pasta, "instrucoes.md");
-  writeFileSync(sysFile, INSTRUCOES, "utf8");
+  writeFileSync(sysFile, instrucoes(conv.tipo), "utf8");
 
   // Resposta em construção: a web faz polling e mostra o texto chegando.
   const [resp] = await sql<{ id: number }[]>`
