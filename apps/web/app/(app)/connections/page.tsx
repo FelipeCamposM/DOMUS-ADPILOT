@@ -4,23 +4,19 @@ import { Connections, type Conexao } from "@/modules/connections/Connections";
 
 export const metadata = { title: "Conexões" };
 
-const ERROS: Record<string, string> = {
-  "google-env": "Google Ads não configurado no servidor (veja o MANUAL.md).",
-  "google-state": "A autorização do Google expirou ou não confere. Tente de novo.",
-  "google-permissao": "Você precisa ser admin do workspace para conectar contas.",
-  "google-token": "O Google não devolveu o token de acesso. Tente de novo.",
-  "google-api": "O Google Ads recusou o acesso",
-};
-
 export default async function ConnectionsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const ctx = await requireCtx();
   const sp = await searchParams;
   const sql = db();
-  const conexoes = await sql<(Omit<Conexao, "contas" | "last_synced_at"> & { last_synced_at: Date | null })[]>`
-    select id, provider, label, status, last_error, last_synced_at from ads.ad_connections
-    where workspace_id = ${ctx.workspace.id} order by created_at`;
+  const conexoes = await sql<Omit<Conexao, "contas">[]>`
+    select k.id, k.provider, k.label, k.status, k.last_error, k.perfil,
+      to_char(k.last_synced_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as last_synced_at,
+      to_char(k.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as created_at,
+      exists (select 1 from ads.jobs j where j.status in ('PENDING', 'RUNNING') and j.payload->>'connectionId' = k.id::text) as sincronizando
+    from ads.ad_connections k where k.workspace_id = ${ctx.workspace.id} order by k.created_at`;
   const contas = await sql<(Conexao["contas"][number] & { connection_id: string })[]>`
-    select a.id, a.connection_id, a.name, a.external_id, a.currency, count(c.id)::int as campanhas
+    select a.id, a.connection_id, a.name, a.external_id, a.currency, a.timezone, a.status, count(c.id)::int as campanhas,
+      count(c.id) filter (where c.status = 'ACTIVE')::int as ativas
     from ads.ad_accounts a left join ads.campaigns c on c.ad_account_id = a.id and c.status <> 'ARCHIVED'
     where a.workspace_id = ${ctx.workspace.id} group by a.id order by a.name`;
 
@@ -30,14 +26,15 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
         <div>
           <div className="eyebrow" data-enter>{ctx.workspace.name}</div>
           <h1 className="page-title" data-enter>Conexões</h1>
+          <p className="subtle small" data-enter>Contas de anúncio da Meta e do Google que a plataforma lê e gerencia. Tokens ficam cifrados no servidor.</p>
         </div>
       </div>
-      {sp.erro && <div className="badge badge-error" style={{ height: "auto", padding: "10px 14px" }}>{ERROS[sp.erro] ?? "Erro ao conectar"}{sp.msg ? `: ${sp.msg}` : ""}</div>}
-      {sp.ok === "google" && <div className="badge badge-brand" style={{ height: "auto", padding: "10px 14px" }}>Google Ads conectado: {sp.contas} conta(s). A sincronização está na fila do worker.</div>}
       <Connections
-        conexoes={conexoes.map((k) => ({ ...k, last_synced_at: k.last_synced_at?.toISOString() ?? null, contas: contas.filter((a) => a.connection_id === k.id) }))}
+        conexoes={conexoes.map((k) => ({ ...k, contas: contas.filter((a) => a.connection_id === k.id) }))}
         podeAdmin={can(ctx, "admin")}
+        podeEditar={can(ctx, "editor")}
         googleConfigurado={!!(process.env.GOOGLE_ADS_CLIENT_ID && process.env.GOOGLE_ADS_CLIENT_SECRET)}
+        aviso={sp.erro ? { tipo: "erro", codigo: sp.erro, msg: sp.msg ?? null } : sp.ok === "google" ? { tipo: "ok", contas: Number(sp.contas ?? 0) } : null}
       />
     </div>
   );
