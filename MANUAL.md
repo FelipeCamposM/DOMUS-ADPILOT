@@ -505,7 +505,7 @@ no Agendador de Tarefas (logon do seu usuário). O mesmo botão desliga.
 
 1. Importe o repositório. Em **Root Directory** use `apps/web`; o framework é Next.js.
 2. Copie as variáveis do `.env` para o projeto: as de Supabase, `TOKEN_ENCRYPTION_KEY`, `ADMIN_EMAILS` e as de
-   Meta/Google, **`DIRECT_URL`** (o pooler em modo sessão, porta 5432; a porta 6543 embaralha consultas paralelas) e as
+   Meta/Google, **`DATABASE_URL`** (o pooler em modo transação, porta 6543; o modo sessão tem só 15 clientes e esgota) e as
    do **R2** com **`STORAGE=r2`** (a web assina as URLs de vídeo e de upload). **Não** são necessárias na Vercel: as do
    worker (`WORKER_*`, `MEDIA_DIR`, `DRIVE_DIR`).
    Em produção: projeto `domus-adpilot`, domínio `adpilot.digitaldomus.com.br` (CNAME `adpilot` → `cname.vercel-dns.com`
