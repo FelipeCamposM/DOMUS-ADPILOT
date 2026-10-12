@@ -120,7 +120,8 @@ export function DraftEditor({ d, contas, moeda, podeEditar, podePublicar }: { d:
             <Campo label="URL final (página de destino)" valor={e.urlFinal} on={(v) => muda((x) => ({ ...x, urlFinal: v }))} max={2000} off={bloqueado} />
             <div className="field">
               <label className="label">Conta do Google Ads</label>
-              <select className="select" style={{ height: 44 }} value={conta} disabled={bloqueado} onChange={(ev) => { setConta(ev.target.value); setSujo(true); }}>{contas.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+              <select className="select" style={{ height: 44 }} value={conta} disabled={bloqueado} onChange={(ev) => { setConta(ev.target.value); setSujo(true); }}>{contas.length ? contas.map((c) => <option key={c.id} value={c.id}>{c.name}</option>) : <option value="">Nenhuma conta conectada</option>}</select>
+              {!contas.length && <a href="/connections" className="small" style={{ color: "rgb(var(--c-warning))", textDecoration: "underline" }}>Conecte o Google Ads em Conexões e clique em Sincronizar</a>}
             </div>
           </div>
           <div className="field">
