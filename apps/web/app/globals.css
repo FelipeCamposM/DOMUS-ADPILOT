@@ -632,3 +632,10 @@ input[type="color"]:hover { transform: scale(1.08); box-shadow: 0 0 14px rgb(var
 .conta-vazia b { font-weight: 620; font-size: 13px; }
 .conta-vazia small { font-size: 11.5px; color: rgb(var(--c-text-tertiary)); }
 .conta-vazia:hover { background: rgb(var(--c-warning) / 0.09); }
+
+/* Locais da campanha (estado + cidades do IBGE) */
+.local-picker { display: flex; flex-direction: column; gap: 10px; }
+.local-picker .chip svg { opacity: 0.7; }
+.local-busca { display: flex; gap: 8px; align-items: center; max-width: 560px; }
+.local-opcoes { top: calc(100% + 6px); left: 0; right: 0; max-height: 320px; overflow-y: auto; }
+.local-opcoes .menu-item:disabled { opacity: 0.5; cursor: default; }

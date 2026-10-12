@@ -17,7 +17,7 @@ Responda APENAS com um bloco \`\`\`json neste formato exato:
   "lances": "MAXIMIZE_CLICKS",
   "cpcMax": "3.50",
   "urlFinal": "https://…",
-  "localizacoes": ["Goiás"],
+  "localizacoes": ["Goiânia, Goiás"],
   "idiomas": ["pt"],
   "parceirosPesquisa": false,
   "negativas": [{ "texto": "vagas", "correspondencia": "AMPLA" }],
@@ -42,7 +42,8 @@ Regras (o Google rejeita o que passar dos limites; CONTE os caracteres, espaços
   mas NUNCA negative algo que a oferta tem (se há teste grátis, não negative "grátis").
 - Lances: "MAXIMIZE_CLICKS" (padrão, conta nova ou sem conversões medidas), com "cpcMax" opcional como teto;
   "MAXIMIZE_CONVERSIONS" só se o pedido disser que as conversões já são medidas; "MANUAL_CPC" só se pedirem.
-- localizacoes: nomes como o Google conhece ("Brasil", "Goiás", "São Paulo", "Goiânia"); idiomas: "pt", "en" ou "es".
+- localizacoes: "Brasil", o estado por extenso ("Goiás") ou cidade com o estado ("Senador Canedo, Goiás"), com a grafia oficial do IBGE;
+  idiomas: "pt", "en" ou "es".
 - orcamentoDiario: o valor pedido (ponto como separador). Se não pedirem valor, use "50.00".
 - URLs: só use URLs que estejam no pedido ou no conteúdo das páginas fornecidas; sitelinks só com URLs reais de lá (senão, "sitelinks": []).
   Frases de destaque: até 25 caracteres, 4 a 6.

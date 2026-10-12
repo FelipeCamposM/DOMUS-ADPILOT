@@ -8,6 +8,7 @@ import type { ContaGoogle } from "@/lib/contas";
 import { Escolha } from "../motion/Escolha";
 import { toast } from "../shell/toast";
 import { ContaSelect } from "./ContaSelect";
+import { LocalPicker } from "./LocalPicker";
 import { ajustarComIA, apagarRascunho, publicar, salvarRascunho, validar } from "./rascunhos";
 
 type Anuncio = { titulos: string[]; descricoes: string[]; caminho1: string; caminho2: string };
@@ -63,7 +64,6 @@ export function DraftEditor({ d, contas, moeda, podeEditar, podePublicar }: { d:
   const [sujo, setSujo] = useState(false);
   const [pend, start] = useTransition();
   const [pedido, setPedido] = useState("");
-  const [local, setLocal] = useState("");
   const [frase, setFrase] = useState("");
   const [grupoPrevia, setGrupoPrevia] = useState(0);
   const gerando = d.status === "GENERATING", publicado = d.status === "PUBLISHED", bloqueado = !podeEditar || gerando || publicado || d.status === "PUBLISHING";
@@ -137,11 +137,7 @@ export function DraftEditor({ d, contas, moeda, podeEditar, podePublicar }: { d:
           </div>
           <div className="field">
             <span className="label">Onde mostrar</span>
-            <div className="cluster" style={{ gap: 6 }}>
-              {e.localizacoes.map((l) => <span key={l} className="chip" data-active>{l}{!bloqueado && <button type="button" aria-label={`Remover ${l}`} onClick={() => muda((x) => ({ ...x, localizacoes: x.localizacoes.filter((y) => y !== l) }))} style={{ all: "unset", cursor: "pointer", display: "inline-flex" }}><X size={13} /></button>}</span>)}
-              {!bloqueado && <input className="input-sm" style={{ width: 200 }} placeholder="Adicionar (ex.: Goiânia) + Enter" value={local} onChange={(ev) => setLocal(ev.target.value)}
-                onKeyDown={(ev) => { if (ev.key === "Enter" && local.trim()) { ev.preventDefault(); const v = local.trim(); muda((x) => ({ ...x, localizacoes: [...new Set([...x.localizacoes, v])] })); setLocal(""); } }} />}
-            </div>
+            <LocalPicker valor={e.localizacoes} disabled={bloqueado} onChange={(v) => muda((x) => ({ ...x, localizacoes: v }))} />
           </div>
           <div className="cluster" style={{ gap: 16 }}>
             <div className="cluster" style={{ gap: 6 }}>
