@@ -1,14 +1,16 @@
 "use client";
 
-import { ClipboardCheck, Film, Loader2, TriangleAlert } from "lucide-react";
+import { ClipboardCheck, Copy, Film, Loader2, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { useRef } from "react";
 
 const RODANDO: Record<string, string> = { REVIEW: "Esperando aprovação", NEW: "Novo", QUEUED: "Na fila", SCRIPTING: "Roteiro", VOICE: "Narração", COMPOSING: "Animação", RENDERING: "Render", MIXING: "Mixagem", UPLOADING: "Enviando" };
 
 /** Cartão de vídeo: miniatura que vira prévia em movimento (sem som) ao passar o mouse. */
-export function VideoCard({ href, creativeId, thumb, titulo, sub, status, progress, formato, kind = "video" }: {
+export function VideoCard({ href, creativeId, thumb, titulo, sub, status, progress, formato, kind = "video", slides }: {
   href: string; creativeId: string | null; thumb: boolean; titulo: string; sub: string; status: string; progress: number | null; formato: string; kind?: "video" | "image";
+  /** carrossel: quantos slides o cartão representa (mostra o selo de várias imagens, como no Instagram) */
+  slides?: number;
 }) {
   const vid = useRef<HTMLVideoElement>(null);
   const pronto = status === "READY" && creativeId;
@@ -19,7 +21,10 @@ export function VideoCard({ href, creativeId, thumb, titulo, sub, status, progre
       onMouseLeave={() => vid.current?.pause()}>
       <div className="thumb-card" style={{ aspectRatio: ratio, maxHeight: 340, width: "100%" }}>
         {pronto && kind === "image" ? (
-          <img src={`/api/creatives/${creativeId}/file`} alt="" loading="lazy" />
+          <>
+            <img src={`/api/creatives/${creativeId}/file`} alt="" loading="lazy" />
+            {slides && slides > 1 && <span className="carrossel-selo" title={`Carrossel com ${slides} slides`}><Copy size={13} aria-hidden /> {slides}</span>}
+          </>
         ) : pronto ? (
           <video ref={vid} src={`/api/creatives/${creativeId}/file`} poster={thumb ? `/api/creatives/${creativeId}/file?kind=thumb` : undefined} muted loop playsInline preload="none" />
         ) : (

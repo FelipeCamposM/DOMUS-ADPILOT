@@ -11,6 +11,21 @@ import { VideoCard } from "@/modules/studio/VideoCard";
 export const metadata = { title: "Criativos" };
 
 const ABAS = [["todos", "Todos"], ["videos", "Vídeos"], ["imagens", "Imagens"], ["arquivos", "Arquivos"], ["musicas", "Músicas"], ["efeitos", "Efeitos sonoros"]] as const;
+/** Slides de um carrossel viram um cartão só (capa = slide 1); o resto passa como está. */
+function agrupar(itens: CriativoLinha[]) {
+  const grupos = new Map<string, { capa: CriativoLinha; n: number }>();
+  const out: { capa: CriativoLinha; n: number }[] = [];
+  for (const c of itens) {
+    if (!c.carrossel || !c.project_id) { out.push({ capa: c, n: 1 }); continue; }
+    const g = grupos.get(c.project_id);
+    if (g) { g.n++; if ((c.ordem ?? 99) < (g.capa.ordem ?? 99)) g.capa = c; continue; }
+    const novo = { capa: c, n: 1 };
+    grupos.set(c.project_id, novo);
+    out.push(novo);
+  }
+  return out;
+}
+
 const formatoDe = (w: number | null, h: number | null) =>
   !w || !h ? "9:16" : Math.abs(w / h - 1.91) < 0.05 ? "1.91:1" : w > h ? "16:9" : w === h ? "1:1" : h / w > 1.5 ? "9:16" : "4:5";
 
@@ -22,10 +37,11 @@ export default async function CreativesPage({ searchParams }: { searchParams: Pr
   const gerado = (t: string[]) => !t.includes("asset");
 
   const vazio = <div className="panel"><div className="empty">{q ? `Nada encontrado para “${q}”.` : "Nada ainda."}</div></div>;
-  const cartao = (c: CriativoLinha) => (
-    <VideoCard key={c.id} href={c.project_id ? `/studio/${c.project_id}` : `/api/creatives/${c.id}/file`} creativeId={c.id} thumb={c.thumb} titulo={c.name} status={c.status}
+  const cartao = ({ capa: c, n }: { capa: CriativoLinha; n: number }) => (
+    <VideoCard key={c.id} href={c.project_id ? `/studio/${c.project_id}` : `/api/creatives/${c.id}/file`} creativeId={c.id} thumb={c.thumb} status={c.status}
+      titulo={n > 1 ? c.name.split(" · slide ")[0]! : c.name} slides={n}
       progress={null} kind={c.type === "IMAGE" ? "image" : "video"} formato={formatoDe(c.width, c.height)}
-      sub={`${c.type === "IMAGE" ? "Imagem" : "Vídeo"}${gerado(c.tags) ? "" : " enviado"} · ${c.width}×${c.height}${c.duration_ms ? ` · ${(c.duration_ms / 1000).toFixed(1).replace(".", ",")} s` : ""} · ${ago(c.created_at)}`} />
+      sub={`${n > 1 ? `Carrossel · ${n} slides` : c.type === "IMAGE" ? "Imagem" : "Vídeo"}${gerado(c.tags) ? "" : " enviado"} · ${c.width}×${c.height}${c.duration_ms ? ` · ${(c.duration_ms / 1000).toFixed(1).replace(".", ",")} s` : ""} · ${ago(c.created_at)}`} />
   );
 
   let corpo: React.ReactNode;
@@ -36,7 +52,7 @@ export default async function CreativesPage({ searchParams }: { searchParams: Pr
     const audios = itens.filter((c) => c.type === "MUSIC" || c.type === "SFX");
     corpo = !itens.length ? vazio : (
       <>
-        {visuais.length > 0 && <div className="studio-grid">{visuais.map(cartao)}</div>}
+        {visuais.length > 0 && <div className="studio-grid">{agrupar(visuais).map(cartao)}</div>}
         {audios.length > 0 && (
           <div className="panel">
             <div className="panel-head"><div className="panel-title">Áudios ({audios.length})</div></div>
@@ -66,13 +82,7 @@ export default async function CreativesPage({ searchParams }: { searchParams: Pr
     corpo = itens.length === 0 && q ? vazio : itens.length === 0 ? (
       <div className="panel"><div className="empty">Nada ainda. Crie no <Link href={`/studio/novo${tipo === "IMAGE" ? "?tipo=imagem" : ""}`} style={{ textDecoration: "underline" }}>Studio</Link>.</div></div>
     ) : (
-      <div className="studio-grid">
-        {itens.map((c) => (
-          <VideoCard key={c.id} href={c.project_id ? `/studio/${c.project_id}` : `/api/creatives/${c.id}/file`} creativeId={c.id} thumb={c.thumb} titulo={c.name} status={c.status}
-            progress={null} kind={tipo === "IMAGE" ? "image" : "video"} formato={formatoDe(c.width, c.height)}
-            sub={`${c.width}×${c.height}${c.duration_ms ? ` · ${(c.duration_ms / 1000).toFixed(1).replace(".", ",")} s` : ""} · ${ago(c.created_at)}`} />
-        ))}
-      </div>
+      <div className="studio-grid">{agrupar(itens).map(cartao)}</div>
     );
   }
 
