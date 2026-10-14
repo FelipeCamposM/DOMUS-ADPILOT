@@ -271,3 +271,14 @@ export async function salvarEdicao(projectId: string, creativeId: string, html: 
     revalidatePath(`/studio/${p.id}`);
   });
 }
+
+/** Favorita (ou desfavorita) uma voz do ElevenLabs para quem está logado: as favoritas aparecem primeiro no Studio. */
+export async function favoritarVoz(vozId: string, favorita: boolean) {
+  return run(async () => {
+    const ctx = await requireCtx();
+    const id = z.string().regex(/^[A-Za-z0-9]{8,40}$/, "Voz inválida").parse(vozId);
+    await db()`update ads.workspace_members set vozes_favoritas = case when ${favorita}::boolean
+        then array_append(array_remove(vozes_favoritas, ${id}), ${id}) else array_remove(vozes_favoritas, ${id}) end
+      where workspace_id = ${ctx.workspace.id} and user_id = ${ctx.user.id}`;
+  });
+}

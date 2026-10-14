@@ -1,13 +1,13 @@
 "use client";
 
-import { ArrowRight, AudioLines, Loader2, MessageSquareText, Mic, MicOff, Music2, Play, Sparkles, Volume2, VolumeX } from "lucide-react";
+import { ArrowRight, AudioLines, Loader2, MessageSquareText, Mic, MicOff, Music2, Play, Sparkles, Star, Volume2, VolumeX } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Escolha, Revelar } from "../motion/Escolha";
 import { toast } from "../shell/toast";
 import { EstiloPicker, type Estilo } from "./EstiloPicker";
 import { Palco } from "./Palco";
-import { criarVideo } from "./actions";
+import { criarVideo, favoritarVoz } from "./actions";
 import { Anexos, paraEnvio, type AnexosValor, type ArquivoLib } from "./Anexos";
 import type { MarcaResumo } from "@/lib/marcas";
 import { comMarca, faltando, Identidade } from "./Identidade";
@@ -29,8 +29,8 @@ const MUSICAS: [string, string][] = [["auto", "Automática"], ["none", "Sem mús
 
 export interface VozEl { id: string; nome: string; categoria: string; preview: string | null }
 
-export function NewVideoForm({ produto, musicas, biblioteca, marcas, vozesEl }: {
-  produto: string; musicas: Record<string, number>; biblioteca: ArquivoLib[]; vozesEl: VozEl[];
+export function NewVideoForm({ produto, musicas, biblioteca, marcas, vozesEl, favoritas: favIniciais }: {
+  produto: string; musicas: Record<string, number>; biblioteca: ArquivoLib[]; vozesEl: VozEl[]; favoritas: string[];
   marcas: MarcaResumo[];
 }) {
   const [anexos, setAnexos] = useState<AnexosValor>({ assets: [], links: [] });
@@ -42,6 +42,15 @@ export function NewVideoForm({ produto, musicas, biblioteca, marcas, vozesEl }: 
     duracao: 15, formato: "9:16", voz: "pf_dora", vozNome: "", musica: "auto", efeitos: true, orientacao: "", estiloVisual: "hud" as Estilo, legendas: true,
   });
   const [marcaId, setMarcaId] = useState<string | null>(marcas[0]?.id ?? null);
+  const [favoritas, setFavoritas] = useState(favIniciais);
+  // favoritas primeiro (na ordem em que foram marcadas), depois o resto como veio do ElevenLabs
+  const vozesOrdem = [...vozesEl].sort((a, b) => (favoritas.includes(a.id) ? favoritas.indexOf(a.id) : 1e9) - (favoritas.includes(b.id) ? favoritas.indexOf(b.id) : 1e9));
+  const favoritar = async (id: string) => {
+    const on = !favoritas.includes(id);
+    setFavoritas((x) => (on ? [...x, id] : x.filter((v) => v !== id)));
+    const r = await favoritarVoz(id, on);
+    if (!r.ok) { toast.err(r.error); setFavoritas((x) => (on ? x.filter((v) => v !== id) : [...x, id])); }
+  };
   const falta = faltando(f);
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((x) => ({ ...x, [k]: v }));
   const [ouvindo, setOuvindo] = useState<HTMLAudioElement | null>(null);
@@ -129,8 +138,12 @@ export function NewVideoForm({ produto, musicas, biblioteca, marcas, vozesEl }: 
           {vozesEl.length > 0 && <>
             <div className="panel-title" style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}><AudioLines size={15} aria-hidden /> ElevenLabs</div>
             <Escolha valor={f.voz} raio={999} variante="pilula" className="cluster" style={{ gap: 6, maxHeight: 168, overflowY: "auto" }}>
-              {vozesEl.map((x) => (
-                <span key={x.id} data-opt={`el:${x.id}`} className="chip" data-active={f.voz === `el:${x.id}`} style={{ paddingRight: x.preview ? 4 : undefined }}>
+              {vozesOrdem.map((x) => (
+                <span key={x.id} data-opt={`el:${x.id}`} className="chip" data-active={f.voz === `el:${x.id}`} style={{ paddingLeft: 4, paddingRight: x.preview ? 4 : undefined }}>
+                  <button type="button" className="btn btn-ghost btn-xs" style={{ height: 22, padding: "0 4px" }} onClick={() => void favoritar(x.id)}
+                    aria-pressed={favoritas.includes(x.id)} aria-label={`${favoritas.includes(x.id) ? "Desfavoritar" : "Favoritar"} ${x.nome}`} title={favoritas.includes(x.id) ? "Favorita: aparece primeiro" : "Favoritar"}>
+                    <Star aria-hidden style={favoritas.includes(x.id) ? { fill: "#F5B70A", color: "#F5B70A" } : { opacity: 0.45 }} />
+                  </button>
                   <button type="button" onClick={() => setF((o) => ({ ...o, voz: `el:${x.id}`, vozNome: x.nome.slice(0, 80) }))} style={{ all: "unset", cursor: "pointer" }}
                     title={x.categoria === "cloned" ? "Voz clonada" : x.categoria}>{x.nome}</button>
                   {x.preview && <button type="button" className="btn btn-ghost btn-xs" style={{ height: 22, padding: "0 6px" }} onClick={() => ouvir(x.preview!)} aria-label={`Ouvir ${x.nome}`}><Play aria-hidden /></button>}
