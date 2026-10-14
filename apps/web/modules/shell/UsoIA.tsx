@@ -34,17 +34,25 @@ export function UsoIA({ contas, aberto, onToggle, onClose }: { contas: UsoContaI
   const limitada = (c: UsoContaIA) => !!c.limited_until && new Date(c.limited_until) > new Date();
   const ativas = contas.filter((c) => c.status === "ACTIVE");
   const livres = ativas.filter((c) => !limitada(c));
-  // número do botão: a conta livre mais folgada na janela de 5 h (é a que a IA usa primeiro quando a da frente lota)
-  const menor = livres.map((c) => c.usage?.five_hour?.pct).filter((x): x is number => typeof x === "number").sort((a, b) => a - b)[0];
-  const estado = !livres.length ? "cheio" : menor != null && menor >= 80 ? "alto" : "ok";
+  // um número por provedor: o da conta que a IA usa agora (a 1ª livre na ordem de prioridade; contas já vêm ordenadas)
+  const emUso = (["claude", "codex"] as const).map((pv) => ({ pv, c: livres.find((c) => c.provider === pv) ?? null, tem: ativas.some((c) => c.provider === pv) })).filter((x) => x.tem);
+  const pctDe = (c: UsoContaIA | null) => c?.usage?.five_hour?.pct;
+  const pior = Math.max(...emUso.map((x) => (x.c ? pctDe(x.c) ?? 0 : 100)), 0);
+  const estado = !livres.length ? "cheio" : pior >= 80 ? "alto" : "ok";
   const lida = contas.map((c) => c.usage?.observed_at).filter(Boolean).sort().at(-1);
-  const temGpt = contas.some((c) => c.provider === "codex");
 
   return (
     <div style={{ position: "relative" }}>
       <button className="chip ia-botao" data-nivel={estado} onClick={onToggle} aria-haspopup="menu" aria-expanded={aberto} title="Uso das contas de IA">
-        <span className="ia-logos"><ClaudeLogo size={16} />{temGpt && <OpenAILogo size={15} />}</span>
-        <span className="tabular">{!ativas.length ? "IA" : !livres.length ? "No limite" : menor != null ? `${Math.round(menor)}%` : "IA"}</span>
+        {!emUso.length ? <><ClaudeLogo size={16} /> IA</> : emUso.map(({ pv, c }) => {
+          const pct = pctDe(c);
+          return (
+            <span key={pv} className="ia-seg" data-nivel={!c ? "cheio" : nivel(pct ?? 0)} title={c ? `${pv === "codex" ? "ChatGPT" : "Claude"} em uso: ${c.name} · janela de 5 h` : "Todas as contas no limite"}>
+              {pv === "codex" ? <OpenAILogo size={15} /> : <ClaudeLogo size={16} />}
+              <span className="tabular">{!c ? "limite" : pct != null ? `${Math.round(pct)}%` : "—"}</span>
+            </span>
+          );
+        })}
       </button>
       <Popover open={aberto} onClose={onClose} align="right" width={400} className="ia-menu">
         <div className="ia-cabeca">
@@ -59,7 +67,7 @@ export function UsoIA({ contas, aberto, onToggle, onClose }: { contas: UsoContaI
         <div className="ia-lista">
           {contas.map((c) => {
             const cor = COR[c.provider as keyof typeof COR] ?? COR.claude;
-            const status = c.status !== "ACTIVE" ? ["off", "Desativada"] : limitada(c) ? ["cheio", `Volta ${ago(c.limited_until!)}`] : ["ok", "Disponível"];
+            const status = c.status !== "ACTIVE" ? ["off", "Desativada"] : limitada(c) ? ["cheio", `Volta ${ago(c.limited_until!)}`] : emUso.some((x) => x.c?.id === c.id) ? ["ok", "Em uso"] : ["livre", "Na reserva"];
             const [nome, apelido] = c.name.split(" · ");
             return (
               <div key={c.id} className="ia-conta" data-off={c.status !== "ACTIVE"}>
