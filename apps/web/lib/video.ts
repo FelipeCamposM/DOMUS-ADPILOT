@@ -6,14 +6,20 @@ export interface ProjetoLinha {
   brief: Brief; created_at: Date; updated_at: Date; progress: number | null; thumb: boolean;
 }
 
-/** Projetos do workspace com o progresso do job em andamento (sempre filtrado por workspace). */
-export async function projetos(ws: string): Promise<ProjetoLinha[]> {
+/** Busca de texto: %termo% com os curingas do LIKE escapados; vazio = sem filtro. */
+const like = (q?: string) => (q?.trim() ? `%${q.trim().slice(0, 100).replace(/[\\%_]/g, (c) => `\\${c}`)}%` : null);
+
+/** Projetos do workspace com o progresso do job em andamento (sempre filtrado por workspace). Busca: título, produto, marca. */
+export async function projetos(ws: string, q?: string): Promise<ProjetoLinha[]> {
+  const t = like(q);
   return db()<ProjetoLinha[]>`
     select p.id, p.kind, p.title, p.status, p.step_detail, p.error, p.creative_id, p.brief, p.created_at, p.updated_at,
       (select j.progress from ads.jobs j where j.type in ('GENERATE_VIDEO','GENERATE_IMAGE') and j.payload->>'projectId' = p.id::text and j.status in ('PENDING','RUNNING') order by j.created_at desc limit 1) as progress,
       (c.thumbnail_key is not null) as thumb
-    from ads.video_projects p left join ads.creatives c on c.id = p.creative_id
-    where p.workspace_id = ${ws} order by p.created_at desc limit 200`;
+    from ads.video_projects p left join ads.creatives c on c.id = p.creative_id left join ads.brands b on b.id = p.brand_id
+    where p.workspace_id = ${ws}
+      and (${t}::text is null or p.title ilike ${t} or p.brief->>'produto' ilike ${t} or p.brief->>'orientacao' ilike ${t} or b.nome ilike ${t})
+    order by p.created_at desc limit 200`;
 }
 
 export interface ProjetoDetalhe extends ProjetoLinha {
@@ -41,11 +47,15 @@ export interface CriativoLinha {
   duration_ms: number | null; tags: string[]; license: string | null; thumb: boolean; created_at: Date; project_id: string | null;
 }
 
-export async function criativos(ws: string, tipos: string[]): Promise<CriativoLinha[]> {
+/** Criativos do workspace dos tipos pedidos. Busca: nome, tags e título do projeto de origem. */
+export async function criativos(ws: string, tipos: string[], q?: string): Promise<CriativoLinha[]> {
+  const t = like(q);
   return db()<CriativoLinha[]>`
     select c.id, c.name, c.type, c.status, c.mime, c.size_bytes::text, c.width, c.height, c.duration_ms, c.tags, c.license,
       (c.thumbnail_key is not null) as thumb, c.created_at, c.metadata->>'projectId' as project_id
     from ads.creatives c where c.workspace_id = ${ws} and c.type = any(${tipos}) and c.status <> 'UPLOADING' and not ('referencia' = any(c.tags))
+      and (${t}::text is null or c.name ilike ${t} or array_to_string(c.tags, ' ') ilike ${t}
+        or exists (select 1 from ads.video_projects v where v.id::text = c.metadata->>'projectId' and v.workspace_id = c.workspace_id and v.title ilike ${t}))
     order by c.created_at desc limit 300`;
 }
 

@@ -3,14 +3,16 @@ import Link from "next/link";
 import { can, requireCtx } from "@/lib/ctx";
 import { ago } from "@/lib/format";
 import { projetos } from "@/lib/video";
+import { Busca } from "@/modules/shell/Busca";
 import { StudioRefresh } from "@/modules/studio/StudioRefresh";
 import { VideoCard } from "@/modules/studio/VideoCard";
 
 export const metadata = { title: "Studio" };
 
-export default async function StudioPage() {
+export default async function StudioPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const ctx = await requireCtx();
-  const lista = await projetos(ctx.workspace.id);
+  const { q } = await searchParams;
+  const lista = await projetos(ctx.workspace.id, q);
   const rodando = lista.some((p) => !["NEW", "REVIEW", "READY", "FAILED"].includes(p.status));
   return (
     <div className="page">
@@ -27,7 +29,10 @@ export default async function StudioPage() {
         )}
       </div>
       {rodando && <StudioRefresh />}
-      {lista.length === 0 ? (
+      <Busca placeholder="Buscar por título, produto ou marca" />
+      {lista.length === 0 && q ? (
+        <div className="panel"><div className="empty">Nada encontrado para “{q}”.</div></div>
+      ) : lista.length === 0 ? (
         <div className="panel" data-enter="scale">
           <div className="empty">
             <span className="icon-tile"><Clapperboard aria-hidden /></span>
