@@ -1,66 +1,92 @@
 "use client";
 
-import { Gauge, Settings2 } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import Link from "next/link";
+import type { CSSProperties } from "react";
 import { ago } from "@/lib/format";
 import type { UsoContaIA } from "@/lib/queries";
+import { ClaudeLogo, OpenAILogo } from "../connections/Logos";
 import { Popover } from "./Popover";
 
-const cls = (pct: number) => (pct >= 100 ? "err" : pct >= 80 ? "warn" : "");
+type Janela = { pct: number; resets_at: string | null };
+const COR = { claude: "#D97757", codex: "#10A37F" } as const;
+const hora = (iso: string) => new Date(iso).toLocaleString("pt-BR", { weekday: "short", hour: "2-digit", minute: "2-digit" });
+const nivel = (pct: number) => (pct >= 100 ? "cheio" : pct >= 80 ? "alto" : "ok");
 
-function Janela({ rotulo, w }: { rotulo: string; w?: { pct: number; resets_at: string | null } }) {
+function Medidor({ rotulo, w, cor }: { rotulo: string; w?: Janela; cor: string }) {
+  const pct = w ? Math.min(100, Math.max(0, w.pct)) : 0;
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "54px 1fr 92px", gap: 8, alignItems: "center" }}>
-      <span className="subtle caption">{rotulo}</span>
-      {w ? <div className={`bar ${cls(w.pct)}`}><i style={{ width: `${Math.min(100, w.pct)}%` }} /></div> : <span className="subtle caption">sem dado</span>}
-      <span className="caption tabular" style={{ textAlign: "right" }} suppressHydrationWarning>
-        {w ? <><b>{w.pct.toFixed(0)}%</b>{w.resets_at ? <span className="subtle"> · {ago(w.resets_at)}</span> : null}</> : ""}
+    <div className="ia-medidor" data-nivel={w ? nivel(w.pct) : "vazio"} style={{ "--cor": cor } as CSSProperties}>
+      <div className="ia-medidor-topo">
+        <span>{rotulo}</span>
+        <b className="tabular">{w ? `${Math.round(w.pct)}%` : "—"}</b>
+      </div>
+      <div className="ia-trilho"><i style={{ width: `${pct}%` }} /></div>
+      <span className="ia-reset" suppressHydrationWarning title={w?.resets_at ? hora(w.resets_at) : undefined}>
+        {w?.resets_at ? `renova ${ago(w.resets_at)}` : w ? "" : "sem leitura ainda"}
       </span>
     </div>
   );
 }
 
-/** Botão no topo com o uso das contas de IA (janelas de 5 h e 7 dias, como no Claude/ChatGPT) e o gasto em 24 h. */
+/** Botão no topo com o uso das assinaturas de IA (5 h e semana, lido no Claude/ChatGPT) e o gasto da plataforma em 24 h. */
 export function UsoIA({ contas, aberto, onToggle, onClose }: { contas: UsoContaIA[]; aberto: boolean; onToggle: () => void; onClose: () => void }) {
-  const ativas = contas.filter((c) => c.status === "ACTIVE");
   const limitada = (c: UsoContaIA) => !!c.limited_until && new Date(c.limited_until) > new Date();
-  const disponiveis = ativas.filter((c) => !limitada(c));
-  // o número do botão: a conta disponível mais folgada na janela de 5 h (é a que a IA vai usar)
-  const menor = disponiveis.map((c) => c.usage?.five_hour?.pct).filter((x): x is number => typeof x === "number").sort((a, b) => a - b)[0];
-  const ponto = !ativas.length || !disponiveis.length ? "err" : menor != null && menor >= 80 ? "warn" : "on";
+  const ativas = contas.filter((c) => c.status === "ACTIVE");
+  const livres = ativas.filter((c) => !limitada(c));
+  // número do botão: a conta livre mais folgada na janela de 5 h (é a que a IA usa primeiro quando a da frente lota)
+  const menor = livres.map((c) => c.usage?.five_hour?.pct).filter((x): x is number => typeof x === "number").sort((a, b) => a - b)[0];
+  const estado = !livres.length ? "cheio" : menor != null && menor >= 80 ? "alto" : "ok";
+  const lida = contas.map((c) => c.usage?.observed_at).filter(Boolean).sort().at(-1);
+  const temGpt = contas.some((c) => c.provider === "codex");
 
   return (
     <div style={{ position: "relative" }}>
-      <button className="chip" onClick={onToggle} aria-haspopup="menu" aria-expanded={aberto} title="Uso das contas de IA">
-        <Gauge aria-hidden />
-        <span className={`dot ${ponto}`} aria-hidden />
-        <span className="tabular">{!ativas.length ? "IA" : !disponiveis.length ? "IA no limite" : menor != null ? `IA ${menor.toFixed(0)}%` : "IA"}</span>
+      <button className="chip ia-botao" data-nivel={estado} onClick={onToggle} aria-haspopup="menu" aria-expanded={aberto} title="Uso das contas de IA">
+        <span className="ia-logos"><ClaudeLogo size={16} />{temGpt && <OpenAILogo size={15} />}</span>
+        <span className="tabular">{!ativas.length ? "IA" : !livres.length ? "No limite" : menor != null ? `${Math.round(menor)}%` : "IA"}</span>
       </button>
-      <Popover open={aberto} onClose={onClose} align="right" width={380}>
-        <div className="nav-group" style={{ margin: "6px 10px" }}>Contas de IA</div>
-        {!contas.length && <div className="empty" style={{ padding: 20 }}>Nenhuma conta conectada.</div>}
-        {contas.map((c) => (
-          <div key={c.id} className="menu-item" style={{ display: "block", cursor: "default", opacity: c.status === "ACTIVE" ? 1 : 0.55 }}>
-            <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
-              <span className={`dot ${c.status !== "ACTIVE" ? "" : limitada(c) ? "err" : "on"}`} aria-hidden />
-              <b style={{ fontWeight: 600, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</b>
-              <span className="subtle caption">{c.provider === "claude" ? "Claude" : "ChatGPT"}{c.plan ? ` ${c.plan}` : ""}</span>
-            </div>
-            {c.email && <div className="subtle caption" style={{ marginTop: -4, marginBottom: 6 }}>{c.email}</div>}
-            <div className="stack" style={{ gap: 5 }}>
-              <Janela rotulo="5 horas" w={c.usage?.five_hour} />
-              <Janela rotulo="Semana" w={c.usage?.seven_day} />
-            </div>
-            <div className="subtle caption" style={{ marginTop: 6 }} suppressHydrationWarning>
-              {c.status !== "ACTIVE" ? "Desativada" : limitada(c) ? `No limite · volta ${ago(c.limited_until!)}` : "Disponível"}
-              {" · "}24 h: {c.chamadas24h} chamada(s), {Number(c.tokens24h).toLocaleString("pt-BR")} tokens{c.custo24h ? ` ≈ US$ ${Number(c.custo24h).toFixed(2)}` : ""}
-              {c.usage?.observed_at ? ` · medido ${ago(c.usage.observed_at)}` : ""}
-            </div>
+      <Popover open={aberto} onClose={onClose} align="right" width={400} className="ia-menu">
+        <div className="ia-cabeca">
+          <div>
+            <b>Uso das assinaturas</b>
+            <span suppressHydrationWarning>{lida ? `Lido no Claude e no ChatGPT ${ago(lida)}` : "Aguardando a primeira leitura do worker"}</span>
           </div>
-        ))}
-        <Link href="/settings#ia" className="menu-item" onClick={onClose} style={{ borderTop: "1px solid rgb(var(--c-border))" }}>
-          <Settings2 aria-hidden /> Gerenciar contas de IA
-        </Link>
+          <span className="ia-resumo" data-nivel={estado}>{livres.length}/{ativas.length} livre{livres.length === 1 ? "" : "s"}</span>
+        </div>
+
+        {!contas.length && <div className="empty" style={{ padding: 24 }}>Nenhuma conta de IA conectada.</div>}
+        <div className="ia-lista">
+          {contas.map((c) => {
+            const cor = COR[c.provider as keyof typeof COR] ?? COR.claude;
+            const status = c.status !== "ACTIVE" ? ["off", "Desativada"] : limitada(c) ? ["cheio", `Volta ${ago(c.limited_until!)}`] : ["ok", "Disponível"];
+            const [nome, apelido] = c.name.split(" · ");
+            return (
+              <div key={c.id} className="ia-conta" data-off={c.status !== "ACTIVE"}>
+                <div className="ia-conta-topo">
+                  <span className="ia-tile" style={{ "--cor": cor } as CSSProperties}>{c.provider === "codex" ? <OpenAILogo size={20} /> : <ClaudeLogo size={20} />}</span>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div className="ia-nome">{apelido ?? (c.provider === "codex" ? "ChatGPT" : "Claude")}{c.plan && <em>{c.plan}</em>}</div>
+                    <div className="ia-email">{c.email ?? nome}</div>
+                  </div>
+                  <span className="ia-status" data-s={status[0]} suppressHydrationWarning>{status[1]}</span>
+                </div>
+                <div className="ia-medidores">
+                  <Medidor rotulo="5 horas" w={c.usage?.five_hour} cor={cor} />
+                  <Medidor rotulo="Semana" w={c.usage?.seven_day} cor={cor} />
+                </div>
+                {c.chamadas24h > 0 && (
+                  <div className="ia-24h">
+                    Plataforma em 24 h: <b className="tabular">{c.chamadas24h}</b> chamada{c.chamadas24h === 1 ? "" : "s"} · <b className="tabular">{Number(c.tokens24h).toLocaleString("pt-BR")}</b> tokens
+                    {c.custo24h ? <> · ≈ <b className="tabular">US$ {Number(c.custo24h).toFixed(2)}</b></> : null}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <Link href="/settings#ia" className="ia-rodape" onClick={onClose}>Gerenciar contas de IA <ArrowUpRight size={14} aria-hidden /></Link>
       </Popover>
     </div>
   );

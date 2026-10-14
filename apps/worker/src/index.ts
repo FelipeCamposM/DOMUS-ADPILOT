@@ -3,6 +3,7 @@ import { claimJob, completeJob, db, enqueueJob, failJob, jobDeSync, jobLog, migr
 import { createServer } from "node:net";
 import { hostname } from "node:os";
 import { runChatTurn } from "./ai/chat";
+import { atualizarUsoContas } from "./ai/uso";
 import { detectar, publicarDetectadas, runLogin } from "./ai/login";
 import { runImagem, type ImagemPayload } from "./video/imagem";
 import { runVideo, type VideoPayload } from "./video/pipeline";
@@ -168,6 +169,7 @@ console.log(`DOMUS Worker "${WORKER_ID}" no ar · ${CONCURRENCY} jobs simultâne
 repetir(heartbeat, 30_000);
 repetir(agendarSyncs, 5 * 60_000);
 repetir(publicarAgendados, 30_000);
+repetir(async function usoDasContas() { await atualizarUsoContas((m) => console.log(`[${agora()}] ${m}`)); }, 5 * 60_000);
 repetir(async function arquivarNoDrive() { await arquivarExcesso((m) => console.log(`[${agora()}] arquivo: ${m}`)); }, 30 * 60_000);
 repetir(async function detectarContas() { await publicarDetectadas(await detectar()); }, 10 * 60_000);
 await loop();
