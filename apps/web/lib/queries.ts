@@ -114,3 +114,20 @@ export async function workerOnline(): Promise<{ online: boolean; lastSeen: Date 
   const visto = w?.last_seen instanceof Date ? w.last_seen : null;
   return { online: !!visto && Date.now() - visto.getTime() < 90_000, lastSeen: visto, info: w?.info && typeof w.info === "object" ? w.info : {} };
 }
+
+export interface UsoContaIA {
+  id: string; provider: string; name: string; email: string | null; plan: string | null; status: string; limited_until: string | null;
+  usage: { five_hour?: { pct: number; resets_at: string | null }; seven_day?: { pct: number; resets_at: string | null }; observed_at?: string } | null;
+  chamadas24h: number; tokens24h: string; custo24h: string | null;
+}
+
+/** Contas de IA (globais) com a janela de uso de 5 h / 7 dias e o gasto das últimas 24 h, para o menu do topo. */
+export function usoContasIA() {
+  return db()<UsoContaIA[]>`
+    select a.id, a.provider, a.name, a.email, a.plan, a.status, to_char(a.limited_until at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as limited_until, a.usage,
+      coalesce(u.n, 0)::int as "chamadas24h", coalesce(u.tokens, 0)::text as "tokens24h", u.custo::text as "custo24h"
+    from ads.ai_accounts a
+    left join (select ai_account_id, count(*) n, sum(input_tokens + output_tokens) tokens, sum(cost_usd) custo
+               from ads.ai_usage where created_at > now() - interval '24 hours' group by ai_account_id) u on u.ai_account_id = a.id
+    order by a.priority, a.created_at`;
+}

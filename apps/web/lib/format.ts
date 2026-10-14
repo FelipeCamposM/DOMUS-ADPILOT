@@ -16,11 +16,12 @@ export const dateTime = (d: Date | string) =>
 
 export function ago(d: Date | string | null): string {
   if (!d) return "nunca";
-  const s = Math.round((Date.now() - new Date(d).getTime()) / 1000);
+  const s = Math.round((Date.now() - new Date(d).getTime()) / 1000); // negativo = futuro ("em 3 horas")
+  const a = Math.abs(s);
   const rtf = new Intl.RelativeTimeFormat("pt-BR", { numeric: "auto" });
-  if (s < 60) return rtf.format(-s, "second");
-  if (s < 3600) return rtf.format(-Math.round(s / 60), "minute");
-  if (s < 86400) return rtf.format(-Math.round(s / 3600), "hour");
+  if (a < 60) return rtf.format(-s, "second");
+  if (a < 3600) return rtf.format(-Math.round(s / 60), "minute");
+  if (a < 86400) return rtf.format(-Math.round(s / 3600), "hour");
   return rtf.format(-Math.round(s / 86400), "day");
 }
 

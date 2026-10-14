@@ -12,6 +12,8 @@ import { CommandPalette } from "./CommandPalette";
 import { Popover } from "./Popover";
 import { Sidebar } from "./Sidebar";
 import { Toaster, toast } from "./toast";
+import { UsoIA } from "./UsoIA";
+import type { UsoContaIA } from "@/lib/queries";
 
 export interface ShellProps {
   children: ReactNode;
@@ -24,12 +26,13 @@ export interface ShellProps {
     falhas: { id: string; type: string; error: string | null; finished_at: string }[];
   };
   worker: { online: boolean; lastSeen: string | null };
+  contasIA: UsoContaIA[];
 }
 
 export function Shell(p: ShellProps) {
   const router = useRouter();
   const [paleta, setPaleta] = useState(false);
-  const [menu, setMenu] = useState<"ws" | "bell" | "user" | null>(null);
+  const [menu, setMenu] = useState<"ws" | "bell" | "user" | "ia" | null>(null);
   const [mobile, setMobile] = useState(false);
   const [pend, start] = useTransition();
   const fechar = useCallback(() => setMenu(null), []);
@@ -94,6 +97,7 @@ export function Shell(p: ShellProps) {
           </button>
 
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+            <UsoIA contas={p.contasIA} aberto={menu === "ia"} onToggle={() => setMenu(menu === "ia" ? null : "ia")} onClose={fechar} />
             <Link href="/settings#worker" className="chip" suppressHydrationWarning title={p.worker.lastSeen ? `Último sinal ${ago(p.worker.lastSeen)}` : "O worker nunca se conectou"}>
               <span className={`dot ${p.worker.online ? "on" : "err"}`} aria-hidden />
               Worker {p.worker.online ? "online" : "offline"}
