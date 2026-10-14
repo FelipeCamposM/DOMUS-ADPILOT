@@ -18,7 +18,7 @@ import { publicarInstagram } from "./instagram/publicar";
  * FOR UPDATE SKIP LOCKED e grava progresso/resultado no banco; a web só lê. A web nunca manda comando de shell:
  * cada tipo de job tem um handler fixo aqui (allowlist).
  */
-const TIPOS: readonly JobType[] = ["SYNC_META", "SYNC_GOOGLE", "AI_CHAT", "AI_LOGIN", "AI_DETECT", "WORKER_STARTUP", "GENERATE_VIDEO", "GENERATE_IMAGE", "AI_CAMPAIGN", "RESTORE_MEDIA", "SYNC_INSTAGRAM", "PUBLISH_INSTAGRAM", "AI_INSTAGRAM_CAPTION"];
+const TIPOS: readonly JobType[] = ["SYNC_META", "SYNC_GOOGLE", "AI_CHAT", "AI_LOGIN", "AI_DETECT", "WORKER_STARTUP", "GENERATE_VIDEO", "GENERATE_IMAGE", "AI_CAMPAIGN", "RESTORE_MEDIA", "SYNC_INSTAGRAM", "PUBLISH_INSTAGRAM", "AI_INSTAGRAM_CAPTION", "AI_USAGE"];
 const sql = db();
 const ativos = new Map<string, AbortController>();
 let parando = false;
@@ -58,6 +58,10 @@ async function executar(job: Job) {
       result = await publicarInstagram(String(job.payload.postId), { signal: ctl.signal, log });
     } else if (job.type === "AI_INSTAGRAM_CAPTION") {
       result = await gerarLegenda(job.payload as unknown as LegendaPayload, { signal: ctl.signal, log });
+    } else if (job.type === "AI_USAGE") {
+      // "Atualizar" no menu de uso das assinaturas (topo)
+      await atualizarUsoContas((m) => void log(m));
+      result = { ok: true };
     } else if (job.type === "RESTORE_MEDIA") {
       result = await restaurar(String(job.payload.creativeId));
     } else if (job.type === "WORKER_STARTUP") {

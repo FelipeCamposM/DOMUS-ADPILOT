@@ -1,8 +1,11 @@
 "use client";
 
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, RefreshCw } from "lucide-react";
 import Link from "next/link";
-import type { CSSProperties } from "react";
+import { useRouter } from "next/navigation";
+import { useState, type CSSProperties } from "react";
+import { atualizarUsoIA, statusJob } from "./actions";
+import { toast } from "./toast";
 import { ago } from "@/lib/format";
 import type { UsoContaIA } from "@/lib/queries";
 import { ClaudeLogo, OpenAILogo } from "../connections/Logos";
@@ -31,6 +34,22 @@ function Medidor({ rotulo, w, cor }: { rotulo: string; w?: Janela; cor: string }
 
 /** Botão no topo com o uso das assinaturas de IA (5 h e semana, lido no Claude/ChatGPT) e o gasto da plataforma em 24 h. */
 export function UsoIA({ contas, aberto, onToggle, onClose }: { contas: UsoContaIA[]; aberto: boolean; onToggle: () => void; onClose: () => void }) {
+  const router = useRouter();
+  const [lendo, setLendo] = useState(false);
+  // pede a leitura ao worker e espera o job terminar (até ~40 s) para recarregar os números
+  const atualizar = async () => {
+    setLendo(true);
+    try {
+      const r = await atualizarUsoIA();
+      if (!r.ok) { toast.err(r.error); return; }
+      for (let i = 0; i < 27; i++) {
+        await new Promise((ok) => setTimeout(ok, 1500));
+        const st = await statusJob(r.id);
+        if (st === "COMPLETED" || st === "FAILED") { if (st === "FAILED") toast.err("Não consegui ler o uso agora"); break; }
+      }
+      router.refresh();
+    } finally { setLendo(false); }
+  };
   const limitada = (c: UsoContaIA) => !!c.limited_until && new Date(c.limited_until) > new Date();
   const ativas = contas.filter((c) => c.status === "ACTIVE");
   const livres = ativas.filter((c) => !limitada(c));
@@ -58,9 +77,12 @@ export function UsoIA({ contas, aberto, onToggle, onClose }: { contas: UsoContaI
         <div className="ia-cabeca">
           <div>
             <b>Uso das assinaturas</b>
-            <span suppressHydrationWarning>{lida ? `Lido no Claude e no ChatGPT ${ago(lida)}` : "Aguardando a primeira leitura do worker"}</span>
+            <span suppressHydrationWarning>{lendo ? "Lendo agora no Claude e no ChatGPT…" : lida ? `Lido no Claude e no ChatGPT ${ago(lida)}` : "Aguardando a primeira leitura do worker"}</span>
           </div>
           <span className="ia-resumo" data-nivel={estado}>{livres.length}/{ativas.length} livre{livres.length === 1 ? "" : "s"}</span>
+          <button type="button" className="ia-atualizar" onClick={() => void atualizar()} disabled={lendo} aria-label="Ler o uso agora" title="Ler o uso agora no Claude e no ChatGPT">
+            <RefreshCw size={14} className={lendo ? "animate-spin" : undefined} aria-hidden />
+          </button>
         </div>
 
         {!contas.length && <div className="empty" style={{ padding: 24 }}>Nenhuma conta de IA conectada.</div>}
