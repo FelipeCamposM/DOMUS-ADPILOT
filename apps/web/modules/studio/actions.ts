@@ -1,6 +1,6 @@
 "use server";
 
-import { anexosSchema, apagarArquivo, audit, briefImagemSchema, briefSchema, db, enqueueJob, MUSICA_TAGS, planoImagemSchema, storyboardSchema, violacoes, type Json } from "@domus-ads/core";
+import { anexosSchema, apagarArquivo, audit, briefImagemSchema, briefSchema, db, enqueueJob, MUSICA_TAGS, paletaSchema, planoImagemSchema, storyboardSchema, violacoes, type Json } from "@domus-ads/core";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { run } from "@/lib/action";
@@ -139,7 +139,7 @@ const edicaoSchema = z.array(z.object({
  * Aprova o roteiro (ou salva o texto editado) e gera o vídeo: voz, animação e render só rodam aqui.
  * Os tempos se ajustam à narração nova. musica: troca o clima da trilha ("none" = sem música).
  */
-export async function regerarComStoryboard(projectId: string, cenas: unknown, musica?: string) {
+export async function regerarComStoryboard(projectId: string, cenas: unknown, musica?: string, paleta?: unknown) {
   return run(async () => {
     const ctx = await requireCtx();
     requireRole(ctx, "editor");
@@ -153,7 +153,9 @@ export async function regerarComStoryboard(projectId: string, cenas: unknown, mu
     if (edit.length !== sb.scenes.length) throw new Error("O número de cenas mudou. Recarregue a página.");
     const m = musica === undefined ? undefined : z.enum(["none", ...MUSICA_TAGS], { message: "Música inválida" }).parse(musica);
     const novo = { ...sb, scenes: sb.scenes.map((s, i) => ({ ...s, ...edit[i] })), ...(m ? { music: m === "none" ? null : { tag: m, volume: sb.music?.volume ?? 0.25 } } : {}) };
-    await db()`update ads.video_projects set storyboard = ${db().json(novo as unknown as Json)} where id = ${p.id}`;
+    // paleta conferida na revisão: o worker usa exatamente estas cores e fontes
+    const pal = paleta == null ? null : paletaSchema.parse(paleta);
+    await db()`update ads.video_projects set storyboard = ${db().json(novo as unknown as Json)}, paleta = coalesce(${pal ? db().json(pal as unknown as Json) : null}::jsonb, paleta) where id = ${p.id}`;
     await enfileirar(ctx, p.id, { mode: "rerender" });
     revalidatePath(`/studio/${p.id}`);
   });

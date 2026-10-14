@@ -11,7 +11,7 @@ import { rodar, FFPROBE } from "./tools";
  * Identidade "workspace": manda a marca escolhida no projeto (ads.brands). "referencias" (ou projeto sem marca): a
  * paleta vem das referências (sites, Instagram, imagens enviadas), para criar artes de outra marca.
  */
-export interface ContextoCriativo { texto: string; imagens: string[]; brand: Brand }
+export interface ContextoCriativo { texto: string; imagens: string[]; brand: Brand; origem: "marca" | "referencias"; marca: string | null }
 
 interface Asset { id: string; name: string; type: string; storage: string; r2_key: string; arquivado: boolean; mime: string | null; uso: string; nota: string }
 
@@ -122,7 +122,7 @@ ${blocosLinks.join("\n\n")}
 
   // modelos de vídeo pintam com brand.cores [fundo, destaque, texto, destaque 2]
   const final = dasReferencias && extraida.length ? { ...brand, cores: papeis(extraida).map((hex) => ({ hex, nome: "" })) } : brand;
-  return { texto: partes.join("\n\n"), imagens, brand: final };
+  return { texto: partes.join("\n\n"), imagens, brand: final, origem: dasReferencias ? "referencias" : "marca", marca: dasReferencias ? null : (w?.name ?? null) };
 }
 
 /**

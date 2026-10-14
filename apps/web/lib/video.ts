@@ -1,5 +1,5 @@
 import "server-only";
-import { db, type Brief, type Storyboard } from "@domus-ads/core";
+import { db, type Brief, type PaletaProjeto, type Storyboard } from "@domus-ads/core";
 
 export interface ProjetoLinha {
   kind: "video" | "image"; id: string; title: string; status: string; step_detail: string | null; error: string | null; creative_id: string | null;
@@ -17,14 +17,14 @@ export async function projetos(ws: string): Promise<ProjetoLinha[]> {
 }
 
 export interface ProjetoDetalhe extends ProjetoLinha {
-  storyboard: Storyboard | null; job_status: string | null;
+  storyboard: Storyboard | null; job_status: string | null; paleta: PaletaProjeto | null;
   creative: { id: string; duration_ms: number | null; size_bytes: string | null; width: number | null; height: number | null; arquivado: boolean; metadata: { avisos?: string[]; music?: string | null } } | null;
 }
 
 export async function projeto(ws: string, id: string): Promise<ProjetoDetalhe | null> {
   const sql = db();
   const [p] = await sql<(ProjetoDetalhe & { c_id: string | null; c_dur: number | null; c_size: string | null; c_w: number | null; c_h: number | null; c_arq: boolean | null; c_meta: { avisos?: string[]; music?: string | null } | null })[]>`
-    select p.id, p.kind, p.title, p.status, p.step_detail, p.error, p.creative_id, p.brief, p.storyboard, p.assets, p.links, p.created_at, p.updated_at,
+    select p.id, p.kind, p.title, p.status, p.step_detail, p.error, p.creative_id, p.brief, p.storyboard, p.paleta, p.assets, p.links, p.created_at, p.updated_at,
       j.progress, j.status as job_status, (c.thumbnail_key is not null) as thumb,
       c.id as c_id, c.duration_ms as c_dur, c.size_bytes::text as c_size, c.width as c_w, c.height as c_h, c.arquivado as c_arq, c.metadata as c_meta
     from ads.video_projects p

@@ -29,3 +29,17 @@ export const anexosSchema = z.object({
   })).max(8, "No máximo 8 links por projeto").default([]),
 });
 export type Anexos = z.infer<typeof anexosSchema>;
+
+/**
+ * Paleta resolvida de um vídeo (salva na revisão do roteiro): de onde veio (marca salva, referências ou o padrão do
+ * estilo) e as cores por papel. O que o usuário aprovar aqui é o que a composição usa, sem a IA trocar.
+ */
+export const PAPEIS_COR = ["Fundo", "Destaque", "Texto", "Destaque 2"] as const;
+export const paletaSchema = z.object({
+  origem: z.enum(["marca", "referencias", "estilo", "usuario"]),
+  marca: z.string().max(60).nullable().default(null),
+  cores: z.array(z.string().trim().regex(/^#[0-9a-fA-F]{6}$/, "Cor no formato #RRGGBB")).min(1, "Informe ao menos a cor de fundo").max(4),
+  fonteTitulo: z.string().trim().max(60).regex(/^[\w\s-]*$/, "Nome de fonte inválido").default(""),
+  fonteTexto: z.string().trim().max(60).regex(/^[\w\s-]*$/, "Nome de fonte inválido").default(""),
+});
+export type PaletaProjeto = z.infer<typeof paletaSchema>;

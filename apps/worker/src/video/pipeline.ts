@@ -1,4 +1,4 @@
-import { apagarArquivo, briefSchema, db, FORMATOS, guardarArquivo, r2Key, retimeScenes, tempoLeitura, type Brief, type Json, type Storyboard } from "@domus-ads/core";
+import { apagarArquivo, briefSchema, db, FORMATOS, guardarArquivo, PAPEIS_COR, paletaSchema, r2Key, retimeScenes, tempoLeitura, type Brief, type Json, type Storyboard } from "@domus-ads/core";
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { DATA_DIR } from "../env";
@@ -7,7 +7,7 @@ import { lerStoryboard, promptAjuste, promptComposicao, promptCorrecao, promptRo
 import { contextoCriativo } from "./contexto";
 import { arquivoMusica, arquivoSfx } from "./sfx";
 import { duracao, ffmpeg, hyperframes } from "./tools";
-import { montarComposicao } from "./kit/cenas";
+import { montarComposicao, paletaCenas } from "./kit/cenas";
 import { CENAS_JS } from "./kit/cenas-runtime";
 import { MOTION_KIT_JS } from "./kit/motion-kit";
 import { revisarComposicao } from "./qa";
@@ -28,8 +28,8 @@ const PROGRESSO: Record<Etapa, number> = { SCRIPTING: 5, VOICE: 20, COMPOSING: 3
  */
 export async function runVideo(payload: VideoPayload, c: Ctx) {
   const sql = db();
-  const [p] = await sql<{ id: string; workspace_id: string; title: string; brief: Brief; storyboard: Storyboard | null; composition: string | null; creative_id: string | null }[]>`
-    select id, workspace_id, title, brief, storyboard, composition, creative_id from ads.video_projects where id = ${payload.projectId}`;
+  const [p] = await sql<{ id: string; workspace_id: string; title: string; brief: Brief; storyboard: Storyboard | null; composition: string | null; creative_id: string | null; paleta: unknown }[]>`
+    select id, workspace_id, title, brief, storyboard, composition, creative_id, paleta from ads.video_projects where id = ${payload.projectId}`;
   if (!p) throw new Error("Projeto de vídeo não encontrado");
   const brief = briefSchema.parse(p.brief);
   const [w, h] = FORMATOS[brief.formato];
@@ -42,6 +42,13 @@ export async function runVideo(payload: VideoPayload, c: Ctx) {
   };
   // identidade visual do workspace + anexos e links do projeto (a IA vê as imagens da pasta assets/)
   const ctxCriativo = await contextoCriativo(p.id, p.workspace_id, pasta, c.log);
+  // paleta aprovada na revisão do roteiro manda: a composição usa exatamente estas cores e fontes
+  const aprovada = paletaSchema.safeParse(p.paleta);
+  if ((payload.mode ?? "full") !== "full" && aprovada.success) {
+    const pa = aprovada.data;
+    ctxCriativo.brand = { ...ctxCriativo.brand, cores: pa.cores.map((hex, i) => ({ hex, nome: PAPEIS_COR[i] ?? "" })), fonteTitulo: pa.fonteTitulo || ctxCriativo.brand.fonteTitulo, fonteTexto: pa.fonteTexto || ctxCriativo.brand.fonteTexto };
+    ctxCriativo.texto += `\n\n<paleta_aprovada>\nO cliente aprovou estas cores e fontes antes do render. Use exatamente elas e não introduza outras cores de destaque.\n${pa.cores.map((hex, i) => `- ${PAPEIS_COR[i]}: ${hex}`).join("\n")}${pa.fonteTitulo ? `\n- Fonte dos títulos: ${pa.fonteTitulo}` : ""}${pa.fonteTexto ? `\n- Fonte dos textos: ${pa.fonteTexto}` : ""}\n</paleta_aprovada>`;
+  }
   const ia = (sistema: string, prompt: string) => perguntarIA({ workspaceId: p.workspace_id, sistema, prompt, cwd: pasta, signal: c.signal, log: c.log, imagens: ctxCriativo.imagens });
 
   try {
@@ -62,8 +69,11 @@ export async function runVideo(payload: VideoPayload, c: Ctx) {
       if (brief.musica === "none") sb.music = null;
       // tempo de leitura é regra (não pedido à IA): cada cena dura pelo menos o necessário para ler o texto fixo
       sb = retimeScenes(sb, sb.scenes.map(tempoLeitura));
+      // a paleta que o vídeo vai usar vai junto para a revisão: o usuário vê (e corrige) as cores antes de gastar com o render
+      const { P } = paletaCenas(brief, ctxCriativo.brand);
+      const paleta = { origem: ctxCriativo.brand.cores.length ? ctxCriativo.origem : "estilo", marca: ctxCriativo.marca, cores: [P.bg, P.a, P.tx, P.a2], fonteTitulo: P.ft, fonteTexto: P.fb };
       // pausa para aprovação: voz, animação e render (o que gasta créditos) só depois que o usuário aprovar o roteiro
-      await sql`update ads.video_projects set storyboard = ${sql.json(sb as unknown as Json)}, title = ${sb.title}, status = 'REVIEW',
+      await sql`update ads.video_projects set storyboard = ${sql.json(sb as unknown as Json)}, title = ${sb.title}, status = 'REVIEW', paleta = ${sql.json(paleta)},
         step_detail = 'Roteiro pronto: revise e aprove para gerar o vídeo', error = null, updated_at = now() where id = ${p.id}`;
       await c.progress(100);
       return { revisao: true, cenas: sb.scenes.length };

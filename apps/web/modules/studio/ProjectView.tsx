@@ -1,7 +1,7 @@
 "use client";
 
 import { gsap } from "gsap";
-import { AudioLines, Check, ClipboardCheck, Clapperboard, Download, FileCode2, Film, Loader2, PenLine, RefreshCw, Rocket, Square, Trash2, Upload, Wand2 } from "lucide-react";
+import { AudioLines, Check, ClipboardCheck, Palette, Clapperboard, Download, FileCode2, Film, Loader2, PenLine, RefreshCw, Rocket, Square, Trash2, Upload, Wand2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Escolha } from "../motion/Escolha";
@@ -18,7 +18,10 @@ export interface ProjetoView {
   storyboard: { scenes: Cena[]; duration: number; music: { tag: string } | null } | null;
   creative: { id: string; duration_ms: number | null; size_bytes: string | null; width: number | null; height: number | null; arquivado: boolean; avisos: string[]; music: string | null } | null;
   thumb: boolean;
+  paleta: Paleta | null;
 }
+interface Paleta { origem: "marca" | "referencias" | "estilo" | "usuario"; marca: string | null; cores: string[]; fonteTitulo: string; fonteTexto: string }
+const PAPEIS = ["Fundo", "Destaque", "Texto", "Destaque 2"];
 
 const ETAPAS = [
   { k: "SCRIPTING", l: "Roteiro e storyboard", i: PenLine },
@@ -41,6 +44,9 @@ export function ProjectView({ p, podeEditar }: { p: ProjetoView; podeEditar: boo
   const [pedido, setPedido] = useState("");
   const musicaOriginal = p.storyboard?.music?.tag ?? "none";
   const [musica, setMusica] = useState(musicaOriginal);
+  const [paleta, setPaleta] = useState(p.paleta);
+  const paletaMudou = JSON.stringify(paleta) !== JSON.stringify(p.paleta);
+  const paletaOk = !paleta || paleta.cores.every((c) => /^#[0-9a-fA-F]{6}$/.test(c));
   const rodando = !PARADO.includes(st.status);
   const revisao = st.status === "REVIEW";
   const alterado = JSON.stringify(cenas) !== JSON.stringify((p.storyboard?.scenes ?? []).map(editavel));
@@ -48,6 +54,7 @@ export function ProjectView({ p, podeEditar }: { p: ProjetoView; podeEditar: boo
   useEffect(() => setSt({ status: p.status, step: p.step_detail, error: p.error, progress: p.progress }), [p.status, p.step_detail, p.error, p.progress]);
   useEffect(() => setCenas((p.storyboard?.scenes ?? []).map(editavel)), [p.storyboard]);
   useEffect(() => setMusica(musicaOriginal), [musicaOriginal]);
+  useEffect(() => setPaleta(p.paleta), [p.paleta]);
 
   // Acompanha a geração ao vivo; ao terminar, recarrega os dados (player, storyboard novo).
   useEffect(() => {
@@ -155,8 +162,8 @@ export function ProjectView({ p, podeEditar }: { p: ProjetoView; podeEditar: boo
                 : `${p.storyboard.scenes.length} cenas · ${seg(p.storyboard.duration)}. Edite o texto e gere de novo: voz e tempos se ajustam sozinhos.`}</div>
             </div>
             {podeEditar && p.storyboard && (
-              <button className={revisao ? "btn btn-primary btn-sm" : "btn btn-primary btn-xs"} disabled={pend || rodando || (!revisao && !alterado && musica === musicaOriginal)}
-                onClick={() => acao(() => regerarComStoryboard(p.id, cenas, musica), revisao ? "Aprovado: gerando o vídeo" : "Gerando com o texto novo")}>
+              <button className={revisao ? "btn btn-primary btn-sm" : "btn btn-primary btn-xs"} disabled={pend || rodando || !paletaOk || (!revisao && !alterado && !paletaMudou && musica === musicaOriginal)}
+                onClick={() => acao(() => regerarComStoryboard(p.id, cenas, musica, paleta && (paletaMudou ? { ...paleta, origem: "usuario" } : paleta)), revisao ? "Aprovado: gerando o vídeo" : "Gerando com o texto novo")}>
                 {revisao ? <><Check aria-hidden /> Aprovar e gerar vídeo</> : <><Rocket aria-hidden /> Salvar e gerar</>}
               </button>
             )}
@@ -171,6 +178,7 @@ export function ProjectView({ p, podeEditar }: { p: ProjetoView; podeEditar: boo
               </Escolha>
             </div>
           )}
+          {p.storyboard && paleta && <PaletaRevisao valor={paleta} onChange={setPaleta} editavel={podeEditar && !rodando} destaque={revisao} />}
           <div className="stack" style={{ padding: 14, gap: 10 }}>
             {(p.storyboard?.scenes ?? []).map((s, i) => (
               <div key={i} className="panel surge" style={{ padding: 12, display: "grid", gap: 8, background: "rgb(var(--c-bg-elevated) / 0.5)", animationDelay: `${Math.min(i, 10) * 55}ms` }}>
@@ -235,6 +243,49 @@ function Progresso({ status, step, progress, error }: { status: string; step: st
       })}
       <div className="bar" style={{ marginTop: 10 }}><i style={{ width: `${progress ?? (status === "QUEUED" ? 2 : 0)}%`, background: "var(--gradient-btn)", boxShadow: "0 0 12px rgb(var(--c-brand))" }} /></div>
       <p className={falhou ? "error-text" : "subtle caption"} role={falhou ? "alert" : undefined}>{falhou ? error ?? "A geração falhou" : step ?? "Na fila do worker…"}</p>
+    </div>
+  );
+}
+
+const ORIGEM: Record<Paleta["origem"], string> = {
+  marca: "da marca", referencias: "tirada das referências (links e imagens)", estilo: "padrão do estilo visual (nenhuma marca com cores)", usuario: "ajustada por você",
+};
+
+/** Cores e fontes que o vídeo vai usar, conferidas ANTES do render: o que for aprovado aqui é o que entra no vídeo. */
+function PaletaRevisao({ valor, onChange, editavel, destaque }: { valor: Paleta; onChange: (p: Paleta) => void; editavel: boolean; destaque: boolean }) {
+  const [bg, a, tx] = [valor.cores[0] ?? "#000000", valor.cores[1] ?? "#A855FF", valor.cores[2] ?? "#FFFFFF"];
+  const cor = (i: number, hex: string) => onChange({ ...valor, cores: valor.cores.map((c, k) => (k === i ? hex : c)) });
+  const alerta = valor.origem !== "marca" && valor.origem !== "usuario";
+  const amarelo = "#F5B70A";
+  return (
+    <div className="panel" style={{ margin: "12px 14px 0", padding: 12, display: "grid", gridTemplateColumns: "minmax(0, 1fr) 120px", gap: 12, alignItems: "center", ...(destaque && alerta ? { borderColor: amarelo } : {}) }}>
+      <div className="stack" style={{ gap: 8, minWidth: 0 }}>
+        <div className="small" style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+          <Palette size={14} aria-hidden /> <b>Cores do vídeo</b>
+          <span className="subtle">· {ORIGEM[valor.origem]}{valor.marca && valor.origem === "marca" ? ` ${valor.marca}` : ""}</span>
+        </div>
+        {destaque && alerta && <span className="caption" style={{ color: amarelo }}>Não veio de uma marca salva. Confira as cores antes de aprovar.</span>}
+        <div className="cluster" style={{ gap: 6 }}>
+          {valor.cores.map((c, i) => (
+            <label key={i} className="chip" style={{ height: 30, gap: 6, paddingLeft: 4 }} title={PAPEIS[i]}>
+              <input type="color" value={/^#[0-9a-fA-F]{6}$/.test(c) ? c : "#000000"} disabled={!editavel} onChange={(e) => cor(i, e.target.value.toUpperCase())}
+                aria-label={`Cor: ${PAPEIS[i]}`} style={{ width: 22, height: 22, border: 0, padding: 0, background: "none", cursor: editavel ? "pointer" : "default" }} />
+              <span className="caption subtle">{PAPEIS[i]}</span>
+              <input className="mono caption" value={c} maxLength={7} disabled={!editavel} onChange={(e) => cor(i, e.target.value)} aria-label={`Código: ${PAPEIS[i]}`}
+                style={{ width: 62, border: 0, background: "none", color: "inherit", outline: "none" }} />
+            </label>
+          ))}
+        </div>
+        <div className="cluster caption subtle" style={{ gap: 6 }}>
+          Fontes:
+          <input className="input-sm" style={{ width: 150, height: 26 }} value={valor.fonteTitulo} maxLength={60} disabled={!editavel} onChange={(e) => onChange({ ...valor, fonteTitulo: e.target.value })} aria-label="Fonte dos títulos" />
+          <input className="input-sm" style={{ width: 150, height: 26 }} value={valor.fonteTexto} maxLength={60} disabled={!editavel} onChange={(e) => onChange({ ...valor, fonteTexto: e.target.value })} aria-label="Fonte dos textos" />
+        </div>
+      </div>
+      <div aria-label="Prévia das cores" style={{ aspectRatio: "9 / 12", borderRadius: 10, background: bg, color: tx, padding: 10, display: "flex", flexDirection: "column", justifyContent: "flex-end", gap: 6, border: "1px solid rgb(var(--c-border))" }}>
+        <b style={{ fontFamily: `'${valor.fonteTitulo}', system-ui`, fontSize: 13, lineHeight: 1.1 }}>Seu título <span style={{ color: a }}>em destaque</span></b>
+        <span style={{ alignSelf: "flex-start", background: a, color: bg, fontSize: 10, fontWeight: 700, padding: "4px 8px", borderRadius: 999 }}>CTA</span>
+      </div>
     </div>
   );
 }

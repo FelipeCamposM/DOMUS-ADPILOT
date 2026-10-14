@@ -45,6 +45,7 @@ export default async function ProjetoPage({ params }: { params: Promise<{ id: st
           id: p.id, title: p.title, status: p.status, step_detail: p.step_detail, error: p.error, progress: p.progress, thumb: p.thumb,
           brief: { formato: p.brief.formato, duracao: p.brief.duracao, voz: p.brief.voz, vozNome: p.brief.vozNome, musica: p.brief.musica, produto: p.brief.produto },
           storyboard: p.storyboard ? { duration: p.storyboard.duration, scenes: p.storyboard.scenes, music: p.storyboard.music } : null,
+          paleta: p.paleta,
           creative: p.creative ? { ...p.creative, avisos: p.creative.metadata.avisos ?? [], music: p.creative.metadata.music ?? null } : null,
         }}
       />

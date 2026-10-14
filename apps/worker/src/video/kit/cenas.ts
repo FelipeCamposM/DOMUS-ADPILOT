@@ -96,11 +96,17 @@ export function blocosLegenda(c: Cena): { s: number; e: number; txt: string[]; p
   });
 }
 
-export function montarComposicao(o: { sb: Storyboard; brief: Brief; brand: Brand; w: number; h: number; assets: string[]; rotulo: string }): string {
-  const est = (o.brief.estiloVisual === "livre" ? "hud" : o.brief.estiloVisual) as Estilo;
+/** Cores [fundo, destaque, texto, destaque 2] e fontes que as cenas prontas usam: as da marca, completadas pelo estilo. */
+export function paletaCenas(brief: Brief, brand: Brand) {
+  const est = (brief.estiloVisual === "livre" ? "hud" : brief.estiloVisual) as Estilo;
   const pad = PADRAO[est];
-  const cores = o.brand.cores.map((c) => c.hex);
-  const P: Paleta = { ...pad, bg: cores[0] ?? pad.bg, a: cores[1] ?? pad.a, tx: cores[2] ?? pad.tx, a2: cores[3] ?? pad.a2, ft: o.brand.fonteTitulo || pad.ft, fb: o.brand.fonteTexto || pad.fb };
+  const cores = brand.cores.map((c) => c.hex);
+  const P: Paleta = { ...pad, bg: cores[0] ?? pad.bg, a: cores[1] ?? pad.a, tx: cores[2] ?? pad.tx, a2: cores[3] ?? pad.a2, ft: brand.fonteTitulo || pad.ft, fb: brand.fonteTexto || pad.fb };
+  return { est, P };
+}
+
+export function montarComposicao(o: { sb: Storyboard; brief: Brief; brand: Brand; w: number; h: number; assets: string[]; rotulo: string }): string {
+  const { est, P } = paletaCenas(o.brief, o.brand);
   const { w, h, sb } = o;
   const vertical = h / w > 1.2, deitado = w / h > 1.2;
   const u = Math.min(w, h) / 100;
