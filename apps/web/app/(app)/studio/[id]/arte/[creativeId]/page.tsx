@@ -22,7 +22,7 @@ export default async function EditarArtePage({ params }: { params: Promise<{ id:
     where id = ${ids.data.creativeId} and workspace_id = ${ctx.workspace.id} and type = 'IMAGE' and metadata->>'projectId' = ${ids.data.id}`;
   if (!c?.metadata.composition) notFound();
   const [p] = await sql<{ title: string; assets: unknown; brand: unknown }[]>`
-    select p.title, p.assets, w.brand from ads.video_projects p join ads.workspaces w on w.id = p.workspace_id
+    select p.title, p.assets, b.brand from ads.video_projects p left join ads.brands b on b.id = p.brand_id
     where p.id = ${ids.data.id} and p.workspace_id = ${ctx.workspace.id}`;
   if (!p) notFound();
 

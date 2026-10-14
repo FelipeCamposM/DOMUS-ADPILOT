@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { enviarArquivo } from "../creatives/upload";
 import { toast } from "../shell/toast";
-import { salvarIdentidade } from "./actions";
+import { salvarMarca } from "./actions";
 
 export interface BrandValor {
   cores: { nome: string; hex: string }[]; fonteTitulo: string; fonteTexto: string; logoId: string | null;
@@ -14,13 +14,14 @@ export interface BrandValor {
 const FONTES = ["Plus Jakarta Sans", "Inter", "Poppins", "Montserrat", "Manrope", "DM Sans", "Space Grotesk", "Sora", "Outfit", "Urbanist", "Bricolage Grotesque", "Anton", "Bebas Neue", "Playfair Display", "Fraunces", "Instrument Serif", "Archivo Black", "Syne"];
 
 /**
- * Identidade visual do workspace. Tudo que a IA cria no Studio (vídeos e imagens) segue isto: cores, fontes, logo,
- * tom de voz e regras. A prévia ao lado carrega as fontes do Google Fonts para conferir.
+ * Identidade visual de uma marca. O que a IA cria com ela (vídeos, imagens, campanhas, legendas) segue isto: cores,
+ * fontes, logo, tom de voz e regras. A prévia ao lado carrega as fontes do Google Fonts para conferir.
  */
-export function BrandEditor({ inicial, imagens, podeEditar, nome }: {
-  inicial: BrandValor; imagens: { id: string; name: string }[]; podeEditar: boolean; nome: string;
+export function BrandEditor({ marcaId, nome: nomeInicial, inicial, imagens, podeEditar }: {
+  marcaId: string; nome: string; inicial: BrandValor; imagens: { id: string; name: string }[]; podeEditar: boolean;
 }) {
   const router = useRouter();
+  const [nome, setNome] = useState(nomeInicial);
   const [b, setB] = useState(inicial);
   const [refs, setRefs] = useState(inicial.referencias.join("\n"));
   const [pend, start] = useTransition();
@@ -39,9 +40,9 @@ export function BrandEditor({ inicial, imagens, podeEditar, nome }: {
   }, [b.fonteTitulo, b.fonteTexto]);
 
   const salvar = () => start(async () => {
-    const r = await salvarIdentidade({ ...b, referencias: refs.split("\n").map((x) => x.trim()).filter(Boolean) });
+    const r = await salvarMarca(marcaId, { nome, brand: { ...b, referencias: refs.split("\n").map((x) => x.trim()).filter(Boolean) } });
     if (!r.ok) return toast.err(r.error);
-    toast.ok("Identidade visual salva: vale para os próximos vídeos e imagens");
+    toast.ok(`Marca ${nome.trim()} salva: vale para o que for criado com ela daqui pra frente`);
     router.refresh();
   });
 
@@ -63,6 +64,8 @@ export function BrandEditor({ inicial, imagens, podeEditar, nome }: {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.2fr) minmax(260px, 0.8fr)", gap: 18, alignItems: "start" }} className="studio-form">
       <fieldset disabled={!podeEditar} className="stack" style={{ gap: 14, border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+        <div className="field"><label className="label" htmlFor="marca-nome">Nome da marca</label>
+          <input id="marca-nome" className="input-sm" style={{ maxWidth: 320 }} maxLength={60} value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex.: SIAPLUS" /></div>
         <div className="field">
           <span className="label">Cores (a 1ª é o fundo, a 2ª o destaque, a 3ª o texto)</span>
           <div className="cluster" style={{ gap: 8 }}>
@@ -110,7 +113,7 @@ export function BrandEditor({ inicial, imagens, podeEditar, nome }: {
         <div className="field"><label className="label" htmlFor="refs">Referências (um link por linha)</label>
           <textarea id="refs" className="input-sm mono" rows={2} style={{ height: "auto", paddingBlock: 8 }} value={refs} onChange={(e) => setRefs(e.target.value)} placeholder="https://…" /></div>
 
-        {podeEditar && <button className="btn btn-primary btn-sm" style={{ alignSelf: "flex-start" }} onClick={salvar} disabled={pend}>{pend ? <Loader2 className="animate-spin" aria-hidden /> : <Save aria-hidden />} Salvar identidade</button>}
+        {podeEditar && <button className="btn btn-primary btn-sm" style={{ alignSelf: "flex-start" }} onClick={salvar} disabled={pend}>{pend ? <Loader2 className="animate-spin" aria-hidden /> : <Save aria-hidden />} Salvar marca</button>}
       </fieldset>
 
       <div className="panel" aria-label="Prévia da identidade" style={{ padding: 0, overflow: "hidden", position: "sticky", top: 16 }}>

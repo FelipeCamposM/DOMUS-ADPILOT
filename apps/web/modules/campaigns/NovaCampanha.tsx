@@ -6,23 +6,24 @@ import { useState, useTransition } from "react";
 import { Escolha, Revelar } from "../motion/Escolha";
 import { toast } from "../shell/toast";
 import type { ContaGoogle } from "@/lib/contas";
+import type { MarcaResumo } from "@/lib/marcas";
 import { ContaSelect } from "./ContaSelect";
 import { criarRascunho } from "./rascunhos";
 
 
 /** Nova campanha de Pesquisa: a IA escreve a proposta a partir do pedido, ou começa um rascunho em branco. */
-export function NovaCampanha({ contas }: { contas: ContaGoogle[] }) {
+export function NovaCampanha({ contas, marcas }: { contas: ContaGoogle[]; marcas: MarcaResumo[] }) {
   const router = useRouter();
   const [pend, start] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
   const [modo, setModo] = useState<"ia" | "manual">("ia");
-  const [f, setF] = useState({ contaId: contas[0]?.id ?? "", pedido: "", orcamento: "70", url: "", nome: "" });
+  const [f, setF] = useState({ contaId: contas[0]?.id ?? "", marcaId: marcas[0]?.id ?? "", pedido: "", orcamento: "70", url: "", nome: "" });
   const set = <K extends keyof typeof f>(k: K, v: string) => setF((x) => ({ ...x, [k]: v }));
   const moeda = contas.find((c) => c.id === f.contaId)?.currency ?? "BRL";
 
   const enviar = () => start(async () => {
     setErro(null);
-    const r = await criarRascunho(modo === "ia" ? { modo, contaId: f.contaId, pedido: f.pedido, orcamento: f.orcamento, url: f.url } : { modo, contaId: f.contaId, nome: f.nome, orcamento: f.orcamento, url: f.url });
+    const r = await criarRascunho(modo === "ia" ? { modo, contaId: f.contaId, marcaId: f.marcaId, pedido: f.pedido, orcamento: f.orcamento, url: f.url } : { modo, contaId: f.contaId, marcaId: f.marcaId, nome: f.nome, orcamento: f.orcamento, url: f.url });
     if (!r.ok) return setErro(r.error);
     toast.ok(modo === "ia" ? "A IA está montando a proposta" : "Rascunho criado");
     router.push(`/campaigns/rascunhos/${r.data}`);
@@ -44,6 +45,14 @@ export function NovaCampanha({ contas }: { contas: ContaGoogle[] }) {
           <label className="label" htmlFor="orc">Orçamento diário ({moeda})</label>
           <input id="orc" className="input" inputMode="decimal" value={f.orcamento} onChange={(e) => set("orcamento", e.target.value)} placeholder="70" />
         </div>
+      </div>
+
+      <div className="field">
+        <label className="label" htmlFor="marca">Marca anunciada (a IA usa o “sobre”, o tom e as regras dela)</label>
+        <select id="marca" className="select" value={f.marcaId} onChange={(e) => set("marcaId", e.target.value)} style={{ maxWidth: 320 }}>
+          {marcas.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
+          <option value="">Nenhuma (só o pedido e o site)</option>
+        </select>
       </div>
 
       <Revelar aberto={modo === "ia"}>

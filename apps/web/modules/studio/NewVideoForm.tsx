@@ -9,7 +9,8 @@ import { EstiloPicker, type Estilo } from "./EstiloPicker";
 import { Palco } from "./Palco";
 import { criarVideo } from "./actions";
 import { Anexos, paraEnvio, type AnexosValor, type ArquivoLib } from "./Anexos";
-import { faltando, Identidade, type IdentidadeValor } from "./Identidade";
+import type { MarcaResumo } from "@/lib/marcas";
+import { comMarca, faltando, Identidade } from "./Identidade";
 
 const FORMATOS = [
   { v: "9:16", l: "Vertical", d: "Reels, Stories, Shorts", w: 18, h: 32 },
@@ -28,9 +29,9 @@ const MUSICAS: [string, string][] = [["auto", "Automática"], ["none", "Sem mús
 
 export interface VozEl { id: string; nome: string; categoria: string; preview: string | null }
 
-export function NewVideoForm({ produto, musicas, biblioteca, brand, vozesEl }: {
+export function NewVideoForm({ produto, musicas, biblioteca, marcas, vozesEl }: {
   produto: string; musicas: Record<string, number>; biblioteca: ArquivoLib[]; vozesEl: VozEl[];
-  brand: { cores: { hex: string; nome: string }[]; temLogo: boolean; preenchida: boolean };
+  marcas: MarcaResumo[];
 }) {
   const [anexos, setAnexos] = useState<AnexosValor>({ assets: [], links: [] });
   const router = useRouter();
@@ -39,8 +40,8 @@ export function NewVideoForm({ produto, musicas, biblioteca, brand, vozesEl }: {
   const [f, setF] = useState({
     produto, objetivo: "", descricao: "", publico: "", cta: "", estilo: "premium, moderno, tipografia forte", cores: "",
     duracao: 15, formato: "9:16", voz: "pf_dora", vozNome: "", musica: "auto", efeitos: true, orientacao: "", estiloVisual: "hud" as Estilo, legendas: true,
-    identidade: (brand.preenchida ? "workspace" : "referencias") as IdentidadeValor,
   });
+  const [marcaId, setMarcaId] = useState<string | null>(marcas[0]?.id ?? null);
   const falta = faltando(f);
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((x) => ({ ...x, [k]: v }));
   const [ouvindo, setOuvindo] = useState<HTMLAudioElement | null>(null);
@@ -48,7 +49,7 @@ export function NewVideoForm({ produto, musicas, biblioteca, brand, vozesEl }: {
 
   const enviar = () => start(async () => {
     setErro(null);
-    const r = await criarVideo({ brief: f, anexos: paraEnvio(anexos) });
+    const r = await criarVideo({ ...comMarca(f, marcaId), anexos: paraEnvio(anexos) });
     if (!r.ok) return setErro(r.error);
     toast.ok("Na fila: primeiro vem o roteiro para você aprovar");
     router.push(`/studio/${r.data}`);
@@ -82,10 +83,10 @@ export function NewVideoForm({ produto, musicas, biblioteca, brand, vozesEl }: {
         </div>
         <Campo id="estilo" label="Estilo" valor={f.estilo} on={(v) => set("estilo", v)} max={300} />
       </div>
-      <div className="studio-anexos"><Anexos valor={anexos} onChange={setAnexos} biblioteca={biblioteca} brand={brand} /></div>
+      <div className="studio-anexos"><Anexos valor={anexos} onChange={setAnexos} biblioteca={biblioteca} marca={marcas.find((m) => m.id === marcaId) ?? null} /></div>
 
       <div className="stack studio-lateral" style={{ gap: 16 }}>
-        <Identidade valor={f.identidade} onChange={(v) => set("identidade", v)} marcaPreenchida={brand.preenchida} nomeWorkspace={produto} />
+        <Identidade marcas={marcas} valor={marcaId} onChange={setMarcaId} />
         <div className="panel" data-enter style={{ padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
           <div className="panel-title">Estilo visual</div>
           <EstiloPicker valor={f.estiloVisual} onChange={(v) => set("estiloVisual", v)} />

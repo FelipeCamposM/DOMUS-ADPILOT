@@ -3,7 +3,7 @@
 Plataforma interna para gerenciar tráfego pago (Meta Ads e Google Ads) com uma IA analista que usa as suas assinaturas do
 Claude Code e do Codex. Este manual descreve **o que existe hoje**, como usar, como configurar e o que ficou para depois.
 
-Spec de origem: [`spec-bygpt.md`](spec-bygpt.md). Já existem: o **MVP 1** inteiro, o **núcleo de IA** do MVP 2 e o **MVP 3 (Studio de vídeos e imagens)**, com identidade visual por workspace e anexos.
+Spec de origem: [`spec-bygpt.md`](spec-bygpt.md). Já existem: o **MVP 1** inteiro, o **núcleo de IA** do MVP 2 e o **MVP 3 (Studio de vídeos e imagens)**, com marcas (várias por workspace, cada uma com sua identidade visual) e anexos.
 
 ---
 
@@ -175,8 +175,8 @@ Gera vídeos e imagens de anúncio a partir de um briefing. Tudo roda no PC do w
 contas de IA, a voz local e o render local. O seletor **Vídeo | Imagem** fica no topo de "Novo".
 
 **Em todo vídeo e imagem entram:**
-- **A identidade visual do workspace** (Configurações → Identidade visual): cores, fontes, logo, tom de voz, regras e
-  referências. A IA segue isso sem precisar repetir no briefing.
+- **A identidade da marca escolhida** (menu Marcas): cores, fontes, logo, tom de voz, regras e referências. A IA
+  segue isso sem precisar repetir no briefing.
 - **Arquivos** enviados na hora ou escolhidos da biblioteca, cada um marcado como:
   - **Colocar na arte**: logo, print do sistema, foto ou vídeo do produto. Entra no vídeo/imagem (prints viram mockup).
   - **Inspiração**: serve de referência de estilo e não entra.
@@ -193,11 +193,11 @@ contas de IA, a voz local e o render local. O seletor **Vídeo | Imagem** fica n
   - As fotos baixadas não aparecem na biblioteca; somem quando o projeto é apagado.
 - **Imagens enviadas:** além de a IA olhar, o worker extrai as cores predominantes de cada uma.
 
-**Identidade visual (vídeo e imagem):** escolha no topo da coluna da direita.
-- **Do workspace:** usa a marca de Configurações → Marca (cores, logo, fontes, tom).
-- **Das referências:** para criar peças de **outra marca** dentro do mesmo workspace (ex.: um carrossel para um
-  cliente). A marca do workspace e o logo dela não entram; a paleta vem dos links e imagens, e as cenas prontas dos
-  vídeos são pintadas com ela (fundo, destaque, texto). Workspace sem marca configurada já começa nesta opção.
+**Marca (vídeo e imagem):** escolha no topo da coluna da direita.
+- **Uma das marcas salvas** (ex.: DOMUS, SIAPLUS): usa a identidade dela (cores, logo, fontes, tom).
+- **Das referências:** para peças de uma marca que não está salva (ex.: um carrossel para um cliente). A paleta vem
+  dos links e imagens, e as cenas prontas dos vídeos são pintadas com ela (fundo, destaque, texto). Workspace sem
+  nenhuma marca já começa nesta opção.
 - Peça nas orientações o que quiser, ex.: "use as fotos do site https://… e as cores do Instagram deles".
 
 **Botão de gerar:** precisa do **produto** e do **objetivo ou das orientações** (o objetivo é opcional quando as
@@ -368,14 +368,16 @@ pausar/ativar, orçamento, conexões, membros, workspace e contas de IA.
 
 ### Configurações
 - **Workspace**: renomear (Admin) e criar um workspace novo para um cliente ou produto (quem cria vira owner).
-- **Identidade visual** (Admin):
+### Marcas
+Um workspace pode ter várias marcas (ex.: DOMUS e o produto SIAPLUS). Cada uma tem:
   - Cores com nome. A 1ª é o fundo, a 2ª o destaque e a 3ª o texto.
   - Fontes do Google Fonts para títulos e textos, com sugestões.
   - Logo, escolhida dos arquivos ou enviada na hora.
   - Sobre a marca, tom de voz, regras (faça/não faça) e links de referência.
 
-  Uma prévia ao lado mostra a marca aplicada. Tudo isso entra automaticamente em todo vídeo e imagem do Studio daquele
-  workspace.
+  Uma prévia ao lado mostra a marca aplicada. A marca é escolhida na hora de usar: no Studio (vídeo e imagem), em
+  Campanhas → Nova (a IA escreve com o “sobre”, o tom e as regras dela) e no Instagram, ao gerar a legenda (assim dá
+  para postar o SIAPLUS no perfil da DOMUS com o tom do SIAPLUS). Apagar uma marca não apaga o que foi criado com ela.
 - **Membros** (Admin): adicionar por e-mail com papel. Se a pessoa não tem conta, informe uma senha provisória e
   repasse a ela; nenhum e-mail é enviado, porque o Supabase é compartilhado com outros sites. Também dá para alterar o
   papel e remover.

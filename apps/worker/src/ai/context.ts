@@ -113,8 +113,7 @@ export async function snapshot(workspaceId: string): Promise<string> {
   const pendentes = await sql<{ summary: string }[]>`
     select summary from ads.ai_actions where workspace_id = ${workspaceId} and status = 'PENDING_APPROVAL' order by created_at limit 20`;
 
-  const [w] = await sql<{ brand: unknown }[]>`select brand from ads.workspaces where id = ${workspaceId}`;
-  const marca = brandSchema.safeParse(w?.brand ?? {});
+  const marcas = await sql<{ nome: string; brand: unknown }[]>`select nome, brand from ads.brands where workspace_id = ${workspaceId} order by nome`;
   const rascunhos = await sql<{ name: string; status: string; spec: { orcamentoDiario?: string; lances?: string; grupos?: unknown[] } }[]>`
     select name, status, spec from ads.campaign_drafts where workspace_id = ${workspaceId} and status <> 'PUBLISHED' order by updated_at desc limit 10`;
   const conexoes = await sql<{ provider: string; label: string; status: string; last_error: string | null; sinc: string | null }[]>`
@@ -134,7 +133,7 @@ export async function snapshot(workspaceId: string): Promise<string> {
     `<dados_do_workspace>`,
     `Workspace: ${ws?.name ?? "?"} · Hoje: ${hoje} · Fuso: America/Sao_Paulo`,
     linhas.length ? `Campanhas (${linhas.length}, ordenadas por gasto em 30 dias):\n${cab}\n${corpo.join("\n")}` : "Nenhuma campanha sincronizada ainda.",
-    marca.success && marca.data.sobre ? `Sobre a marca: ${marca.data.sobre}` : "",
+    marcas.length ? `Marcas do workspace (produtos/clientes):\n${marcas.map((m) => { const b = brandSchema.safeParse(m.brand ?? {}); return `- ${m.nome}${b.success && b.data.sobre ? `: ${b.data.sobre}` : ""}`; }).join("\n")}` : "",
     conexoes.length
       ? `Conexões: ${conexoes.map((k) => `${k.provider} “${k.label}” ${k.status}${k.sinc ? `, sincronizada ${k.sinc}` : ", nunca sincronizada"}${k.last_error ? ` (erro: ${k.last_error.slice(0, 120)})` : ""}`).join("; ")}`
       : "Conexões: nenhuma conta de anúncio conectada ainda.",

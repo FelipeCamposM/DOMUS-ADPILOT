@@ -7,6 +7,7 @@ import { createPortal } from "react-dom";
 import { enviarArquivo } from "../creatives/upload";
 import { Popover } from "../shell/Popover";
 import { toast } from "../shell/toast";
+import type { MarcaResumo } from "@/lib/marcas";
 
 export interface ArquivoLib { id: string; name: string; type: string }
 // preview: URL local (blob:) do arquivo recém-enviado, para mostrar na hora sem baixar de volta
@@ -21,13 +22,13 @@ interface Envio { key: string; name: string; url: string; video: boolean; size: 
 
 /**
  * Arquivos e links do projeto. "Colocar na arte" entra no vídeo/imagem (logo, print, foto, vídeo do produto);
- * "Inspiração" só orienta o estilo. A IA abre e olha as imagens antes de criar. A identidade visual do workspace já vai junto.
+ * "Inspiração" só orienta o estilo. A IA abre e olha as imagens antes de criar. A identidade da marca escolhida já vai junto.
  * Entrada: clicar, arrastar para o quadro ou para QUALQUER lugar da página (abre uma área de soltar em tela cheia),
  * ou colar (Ctrl+V) uma imagem. Os envios correm em paralelo, com prévia local e progresso real.
  */
-export function Anexos({ valor, onChange, biblioteca, brand }: {
+export function Anexos({ valor, onChange, biblioteca, marca }: {
   valor: AnexosValor; onChange: (v: AnexosValor) => void; biblioteca: ArquivoLib[];
-  brand: { cores: { hex: string; nome: string }[]; temLogo: boolean; preenchida: boolean };
+  marca: MarcaResumo | null;
 }) {
   const raiz = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -159,15 +160,15 @@ export function Anexos({ valor, onChange, biblioteca, brand }: {
 
       <div className="panel" style={{ padding: "10px 12px", display: "flex", alignItems: "center", gap: 10, background: "rgb(var(--c-brand) / 0.06)", borderColor: "rgb(var(--c-brand) / 0.25)" }}>
         <Sparkles size={15} aria-hidden style={{ color: "rgb(var(--c-glow))" }} />
-        {brand.preenchida ? (
+        {marca ? (
           <span className="small" style={{ flex: 1 }}>
-            Identidade visual do workspace aplicada automaticamente{brand.temLogo ? " (com logo)" : ""}
+            Identidade de <b>{marca.nome}</b> aplicada automaticamente{marca.temLogo ? " (com logo)" : ""}
             <span style={{ display: "inline-flex", gap: 4, marginLeft: 8, verticalAlign: "middle" }}>
-              {brand.cores.slice(0, 6).map((c) => <i key={c.hex} title={c.nome || c.hex} style={{ width: 14, height: 14, borderRadius: 4, background: c.hex, border: "1px solid rgb(255 255 255 / 0.2)" }} />)}
+              {marca.cores.slice(0, 6).map((c) => <i key={c.hex} title={c.nome || c.hex} style={{ width: 14, height: 14, borderRadius: 4, background: c.hex, border: "1px solid rgb(255 255 255 / 0.2)" }} />)}
             </span>
           </span>
         ) : (
-          <span className="small" style={{ flex: 1 }}>Este workspace ainda não tem identidade visual. <Link href="/settings#marca" style={{ textDecoration: "underline" }}>Definir cores, fontes e logo</Link></span>
+          <span className="small" style={{ flex: 1 }}>Sem marca: a identidade sai das referências (links e imagens). <Link href="/marcas" style={{ textDecoration: "underline" }}>Gerenciar marcas</Link></span>
         )}
       </div>
 

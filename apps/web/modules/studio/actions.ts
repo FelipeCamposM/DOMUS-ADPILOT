@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { run } from "@/lib/action";
 import { requireCtx, requireRole, type Ctx } from "@/lib/ctx";
+import { marcaDoWorkspace } from "@/lib/marcas";
 
 const uuid = z.string().uuid("Projeto inválido");
 
@@ -42,17 +43,18 @@ async function validarAnexos(ctx: Ctx, input: unknown) {
 }
 
 /** Nova imagem (1–4 variações para teste A/B), com identidade visual e anexos. */
-export async function criarImagem(input: { brief: unknown; anexos?: unknown }) {
+export async function criarImagem(input: { brief: unknown; anexos?: unknown; marcaId?: string | null }) {
   return run(async () => {
     const ctx = await requireCtx();
     requireRole(ctx, "editor");
     const brief = briefImagemSchema.parse(input.brief);
     const anexos = await validarAnexos(ctx, input.anexos);
+    const marca = brief.identidade === "workspace" ? await marcaDoWorkspace(ctx.workspace.id, input.marcaId) : null;
     await workerOnline();
     const sql = db();
     const [p] = await sql<{ id: string }[]>`
-      insert into ads.video_projects (workspace_id, kind, title, brief, status, assets, links, created_by)
-      values (${ctx.workspace.id}, 'image', ${brief.produto}, ${sql.json(brief as unknown as Json)}, 'NEW', ${sql.json(anexos.assets as unknown as Json)}, ${sql.json(anexos.links as unknown as Json)}, ${ctx.user.id})
+      insert into ads.video_projects (workspace_id, brand_id, kind, title, brief, status, assets, links, created_by)
+      values (${ctx.workspace.id}, ${marca}, 'image', ${brief.produto}, ${sql.json(brief as unknown as Json)}, 'NEW', ${sql.json(anexos.assets as unknown as Json)}, ${sql.json(anexos.links as unknown as Json)}, ${ctx.user.id})
       returning id`;
     await enfileirar(ctx, p!.id, { mode: "full" });
     await audit(sql, { workspaceId: ctx.workspace.id, actor: ctx.actor, action: "Gerar imagens", entityType: "video_project", entityId: p!.id, entityName: brief.produto, after: { formato: brief.formato, variacoes: brief.variacoes } });
@@ -107,17 +109,18 @@ export async function apagarVariacao(projectId: string, creativeId: string) {
 }
 
 /** Novo vídeo a partir do briefing (spec §15). O worker gera roteiro → voz → animação → render → R2. */
-export async function criarVideo(input: { brief: unknown; anexos?: unknown }) {
+export async function criarVideo(input: { brief: unknown; anexos?: unknown; marcaId?: string | null }) {
   return run(async () => {
     const ctx = await requireCtx();
     requireRole(ctx, "editor");
     const brief = briefSchema.parse(input.brief);
     const anexos = await validarAnexos(ctx, input.anexos);
+    const marca = brief.identidade === "workspace" ? await marcaDoWorkspace(ctx.workspace.id, input.marcaId) : null;
     await workerOnline();
     const sql = db();
     const [p] = await sql<{ id: string }[]>`
-      insert into ads.video_projects (workspace_id, title, brief, status, assets, links, created_by)
-      values (${ctx.workspace.id}, ${brief.produto}, ${sql.json(brief as unknown as Json)}, 'NEW', ${sql.json(anexos.assets as unknown as Json)}, ${sql.json(anexos.links as unknown as Json)}, ${ctx.user.id}) returning id`;
+      insert into ads.video_projects (workspace_id, brand_id, title, brief, status, assets, links, created_by)
+      values (${ctx.workspace.id}, ${marca}, ${brief.produto}, ${sql.json(brief as unknown as Json)}, 'NEW', ${sql.json(anexos.assets as unknown as Json)}, ${sql.json(anexos.links as unknown as Json)}, ${ctx.user.id}) returning id`;
     await enfileirar(ctx, p!.id, { mode: "full" });
     await audit(db(), { workspaceId: ctx.workspace.id, actor: ctx.actor, action: "Gerar vídeo", entityType: "video_project", entityId: p!.id, entityName: brief.produto, after: { duracao: brief.duracao, formato: brief.formato } });
     revalidatePath("/studio");

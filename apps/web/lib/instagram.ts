@@ -9,7 +9,7 @@ export interface PostIG {
   id: string; ig_account_id: string; tipo: "FEED" | "CARROSSEL" | "REELS" | "STORY"; legenda: string; midias: { creativeId: string }[]; opcoes: { compartilharNoFeed?: boolean; capaMs?: number };
   status: string; agendado_para: string | null; publicado_em: string | null; permalink: string | null; erro: string | null;
   sugestao: { gerando?: boolean; legenda?: string; hashtags?: string[]; erro?: string } | null; updated_at: string;
-  capa: { id: string; type: string } | null;
+  capa: { id: string; type: string } | null; brand_id: string | null;
 }
 
 const ISO = (c: string) => `to_char(${c} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')`;
@@ -25,7 +25,7 @@ export function contasInstagram(workspaceId: string) {
 export function postsInstagram(workspaceId: string, contaId: string | null, id?: string) {
   const sql = db();
   return sql<PostIG[]>`
-    select p.id, p.ig_account_id, p.tipo, p.legenda, p.midias, p.opcoes, p.status, p.permalink, p.erro, p.sugestao,
+    select p.id, p.ig_account_id, p.tipo, p.legenda, p.midias, p.opcoes, p.status, p.permalink, p.erro, p.sugestao, p.brand_id,
       ${sql.unsafe(ISO("p.agendado_para"))} as agendado_para, ${sql.unsafe(ISO("p.publicado_em"))} as publicado_em, ${sql.unsafe(ISO("p.updated_at"))} as updated_at,
       (select jsonb_build_object('id', c.id, 'type', c.type) from ads.creatives c where c.id = (p.midias->0->>'creativeId')::uuid and c.workspace_id = p.workspace_id) as capa
     from ads.instagram_posts p

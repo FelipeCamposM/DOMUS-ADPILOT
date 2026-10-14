@@ -23,8 +23,8 @@ function padraoAgendamento() {
   return `${d.getFullYear()}-${doisDigitos(d.getMonth() + 1)}-${doisDigitos(d.getDate())}T${doisDigitos(d.getHours())}:${doisDigitos(d.getMinutes())}`;
 }
 
-export function Composer({ post, conta, biblioteca, feed, podeEditar }: {
-  post: PostIG; conta: ContaIG; biblioteca: ItemBiblioteca[]; feed: string[]; podeEditar: boolean;
+export function Composer({ post, conta, biblioteca, feed, marcas, podeEditar }: {
+  post: PostIG; conta: ContaIG; biblioteca: ItemBiblioteca[]; feed: string[]; marcas: { id: string; nome: string }[]; podeEditar: boolean;
 }) {
   const router = useRouter();
   const [tipo, setTipo] = useState<TipoPost>(post.tipo);
@@ -43,6 +43,7 @@ export function Composer({ post, conta, biblioteca, feed, podeEditar }: {
   const [permalink, setPermalink] = useState(post.permalink);
   const [sugestao, setSugestao] = useState(post.sugestao);
   const [dica, setDica] = useState("");
+  const [marcaId, setMarcaId] = useState(post.brand_id ?? marcas[0]?.id ?? "");
   const [tags, setTags] = useState<string[]>([]);
   const [picker, setPicker] = useState(false);
   const [confirmar, setConfirmar] = useState(false);
@@ -111,7 +112,7 @@ export function Composer({ post, conta, biblioteca, feed, podeEditar }: {
 
   const gerar = () => start(async () => {
     if (sujo && !(await salvar(true))) return;
-    const r = await pedirLegenda(post.id, dica);
+    const r = await pedirLegenda(post.id, dica, marcaId || null);
     if (!r.ok) return toast.err(r.error);
     setSugestao({ gerando: true });
   });
@@ -200,6 +201,12 @@ export function Composer({ post, conta, biblioteca, feed, podeEditar }: {
                 <div className="ig-ia">
                   <div className="ig-ia-linha">
                     <Sparkles size={16} aria-hidden style={{ color: "rgb(var(--c-brand))", flexShrink: 0 }} />
+                    {marcas.length > 0 && (
+                      <select className="select" value={marcaId} onChange={(e) => setMarcaId(e.target.value)} aria-label="Marca (tom de voz e regras da legenda)" title="Marca: a IA segue o tom e as regras dela" style={{ width: 130, height: 32 }}>
+                        {marcas.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
+                        <option value="">Sem marca</option>
+                      </select>
+                    )}
                     <input className="input-sm" style={{ flex: 1 }} value={dica} onChange={(e) => setDica(e.target.value)} maxLength={1000}
                       placeholder="Opcional: o que destacar (ex.: teste grátis, tom descontraído, CTA para o link da bio)" onKeyDown={(e) => e.key === "Enter" && gerar()} />
                     <button type="button" className="btn btn-primary btn-sm" onClick={gerar} disabled={pend || gerando || !midias.length} title={!midias.length ? "Escolha a mídia primeiro" : undefined}>

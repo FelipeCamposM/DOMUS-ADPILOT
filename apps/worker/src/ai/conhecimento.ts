@@ -92,8 +92,9 @@ export const CONHECIMENTO = `
   baixo: peça explicitamente "1 grupo só". Rascunho é revisado e publicado só por aprovação humana.
 - Ainda não dá para editar palavras-chave, anúncios ou segmentação de campanha já publicada pela plataforma: oriente a
   fazer no Google Ads/Gerenciador de Anúncios.
-- Studio: gera vídeos e artes (posts, carrosséis) com a marca do workspace ou com identidade tirada de referências
-  (site, Instagram, imagens enviadas).
+- Marcas: um workspace tem várias (ex.: DOMUS e o produto SIAPLUS), cada uma com cores, fontes, logo, tom e regras.
+- Studio: gera vídeos e artes (posts, carrosséis) com uma das marcas salvas ou com identidade tirada de referências
+  (site, Instagram, imagens enviadas). Campanhas e legendas do Instagram também escolhem a marca.
 - Instagram (menu Instagram): perfil igual ao Instagram web, publicar post, carrossel, Reels e story, agendar, legenda e
   hashtags pela IA, prévia do celular e da grade. Precisa conta Profissional ligada a uma Página e a conexão Instagram.
 - Conexões: Meta por token de usuário do sistema; Google pelo botão Conectar Google Ads (OAuth da MCC) + Sincronizar.

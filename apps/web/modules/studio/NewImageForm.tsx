@@ -9,7 +9,8 @@ import { EstiloPicker, type Estilo } from "./EstiloPicker";
 import { Palco } from "./Palco";
 import { criarImagem } from "./actions";
 import { Anexos, paraEnvio, type AnexosValor, type ArquivoLib } from "./Anexos";
-import { faltando, Identidade, type IdentidadeValor } from "./Identidade";
+import type { MarcaResumo } from "@/lib/marcas";
+import { comMarca, faltando, Identidade } from "./Identidade";
 
 const FORMATOS = [
   { v: "1:1", l: "Quadrado", d: "Feed", w: 28, h: 28 },
@@ -19,14 +20,15 @@ const FORMATOS = [
 ] as const;
 const MAX_SLIDES = 20; // limite atual do Instagram
 
-export function NewImageForm({ produto, biblioteca, brand }: {
-  produto: string; biblioteca: ArquivoLib[]; brand: { cores: { hex: string; nome: string }[]; temLogo: boolean; preenchida: boolean };
+export function NewImageForm({ produto, biblioteca, marcas }: {
+  produto: string; biblioteca: ArquivoLib[]; marcas: MarcaResumo[];
 }) {
   const router = useRouter();
   const [pend, start] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
   const [anexos, setAnexos] = useState<AnexosValor>({ assets: [], links: [] });
-  const [f, setF] = useState({ produto, objetivo: "", descricao: "", publico: "", cta: "", cores: "", estilo: "premium, moderno, tipografia forte", texto: "", formato: "1:1", variacoes: 3, orientacao: "", tipo: "avulsa" as "avulsa" | "carrossel", slides: 5, estiloVisual: "livre" as Estilo, identidade: (brand.preenchida ? "workspace" : "referencias") as IdentidadeValor });
+  const [f, setF] = useState({ produto, objetivo: "", descricao: "", publico: "", cta: "", cores: "", estilo: "premium, moderno, tipografia forte", texto: "", formato: "1:1", variacoes: 3, orientacao: "", tipo: "avulsa" as "avulsa" | "carrossel", slides: 5, estiloVisual: "livre" as Estilo });
+  const [marcaId, setMarcaId] = useState<string | null>(marcas[0]?.id ?? null);
   const falta = faltando(f);
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((x) => ({ ...x, [k]: v }));
 
@@ -35,7 +37,7 @@ export function NewImageForm({ produto, biblioteca, brand }: {
 
   const enviar = () => start(async () => {
     setErro(null);
-    const r = await criarImagem({ brief: f, anexos: paraEnvio(anexos) });
+    const r = await criarImagem({ ...comMarca(f, marcaId), anexos: paraEnvio(anexos) });
     if (!r.ok) return setErro(r.error);
     toast.ok(carrossel ? "Carrossel na fila: primeiro vêm os slides para você aprovar" : "Na fila: primeiro vêm os conceitos para você aprovar");
     router.push(`/studio/${r.data}`);
@@ -69,10 +71,10 @@ export function NewImageForm({ produto, biblioteca, brand }: {
         </div>
         <Campo id="estilo" label="Estilo" valor={f.estilo} on={(v) => set("estilo", v)} max={300} />
       </div>
-      <div className="studio-anexos"><Anexos valor={anexos} onChange={setAnexos} biblioteca={biblioteca} brand={brand} /></div>
+      <div className="studio-anexos"><Anexos valor={anexos} onChange={setAnexos} biblioteca={biblioteca} marca={marcas.find((m) => m.id === marcaId) ?? null} /></div>
 
       <div className="stack studio-lateral" style={{ gap: 16 }}>
-        <Identidade valor={f.identidade} onChange={(v) => set("identidade", v)} marcaPreenchida={brand.preenchida} nomeWorkspace={produto} />
+        <Identidade marcas={marcas} valor={marcaId} onChange={setMarcaId} />
         <div className="panel" data-enter style={{ padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
           <div className="panel-title">Estilo visual</div>
           <EstiloPicker valor={f.estiloVisual} onChange={(v) => set("estiloVisual", v)} />

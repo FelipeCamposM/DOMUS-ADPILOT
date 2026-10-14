@@ -1,4 +1,4 @@
-import { brandSchema, chaveElevenLabs, creditosElevenLabs, db, vozesElevenLabs, type CreditosElevenLabs } from "@domus-ads/core";
+import { chaveElevenLabs, creditosElevenLabs, db, vozesElevenLabs, type CreditosElevenLabs } from "@domus-ads/core";
 import { isPlatformAdmin, requireCtx } from "@/lib/ctx";
 import { workerOnline } from "@/lib/queries";
 import type { Detectada } from "@/modules/settings/AiAccounts";
@@ -20,9 +20,6 @@ export default async function SettingsPage() {
                from ads.ai_usage where created_at > now() - interval '30 days' group by ai_account_id) u on u.ai_account_id = a.id
     order by a.priority, a.created_at`;
   const w = await workerOnline();
-  const [ws] = await sql<{ brand: unknown }[]>`select brand from ads.workspaces where id = ${ctx.workspace.id}`;
-  const imagens = await sql<{ id: string; name: string }[]>`
-    select id, name from ads.creatives where workspace_id = ${ctx.workspace.id} and type = 'IMAGE' and status = 'READY' and 'asset' = any(tags) order by created_at desc limit 60`;
   const chaveEl = await chaveElevenLabs();
   const elevenlabs = {
     configurada: !!chaveEl, vozes: null as number | null, erro: null as string | null,
@@ -56,8 +53,6 @@ export default async function SettingsPage() {
         eu={ctx.user.id}
         contas={contas.map(({ config_dir: _, ...c }) => ({ ...c, limited_until: iso(c.limited_until), last_used_at: iso(c.last_used_at) }))}
         detectadas={achadas}
-        brand={brandSchema.parse(ws?.brand ?? {})}
-        imagens={imagens}
         elevenlabs={elevenlabs}
         usoVoz={usoVoz.map((u) => ({ ...u, created_at: u.created_at.toISOString() }))}
         podeOwnerIA={isPlatformAdmin(ctx)}

@@ -23,9 +23,10 @@ Regras:
 /** Gera legenda + hashtags para uma publicação (vendo as próprias imagens) e grava em instagram_posts.sugestao. */
 export async function gerarLegenda(payload: LegendaPayload, c: { signal: AbortSignal; log: (m: string) => Promise<void> }) {
   const sql = db();
-  const [p] = await sql<{ id: string; workspace_id: string; tipo: string; legenda: string; midias: { creativeId: string }[]; username: string; nome: string | null; bio: string | null; brand: unknown }[]>`
-    select p.id, p.workspace_id, p.tipo, p.legenda, p.midias, a.username, a.nome, a.bio, w.brand
-    from ads.instagram_posts p join ads.instagram_accounts a on a.id = p.ig_account_id join ads.workspaces w on w.id = p.workspace_id
+  const [p] = await sql<{ id: string; workspace_id: string; tipo: string; legenda: string; midias: { creativeId: string }[]; username: string; nome: string | null; bio: string | null; brand: unknown; marca: string | null }[]>`
+    select p.id, p.workspace_id, p.tipo, p.legenda, p.midias, a.username, a.nome, a.bio, b.brand, b.nome as marca
+    from ads.instagram_posts p join ads.instagram_accounts a on a.id = p.ig_account_id
+    left join ads.brands b on b.id = p.brand_id and b.workspace_id = p.workspace_id
     where p.id = ${payload.postId}`;
   if (!p) throw new Error("Publicação não encontrada");
   const pasta = join(DATA_DIR, "instagram", `legenda-${p.id}`);
@@ -50,6 +51,7 @@ export async function gerarLegenda(payload: LegendaPayload, c: { signal: AbortSi
     const b = brand.success ? brand.data : null;
     const contexto = [
       `Perfil: @${p.username}${p.nome ? ` (${p.nome})` : ""}${p.bio ? `\nBio: ${p.bio}` : ""}`,
+      p.marca && `Marca do post: ${p.marca} (o perfil pode ser da empresa-mãe; escreva sobre esta marca)`,
       b?.sobre && `Sobre a marca: ${b.sobre}`, b?.tom && `Tom de voz: ${b.tom}`, b?.regras && `Regras da marca: ${b.regras}`,
       `Tipo de publicação: ${p.tipo}`,
       `<midias>\n${midias.map((m) => `- ${m.type} “${m.name}”${m.metadata?.brief ? ` · briefing: ${JSON.stringify(m.metadata.brief).slice(0, 800)}` : ""}${m.metadata?.conceito ? ` · conceito: ${String(m.metadata.conceito).slice(0, 400)}` : ""}`).join("\n")}\n</midias>`,

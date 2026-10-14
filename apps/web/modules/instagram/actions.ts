@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { run } from "@/lib/action";
 import { requireCtx, requireRole, type Ctx } from "@/lib/ctx";
+import { marcaDoWorkspace } from "@/lib/marcas";
 
 const uuid = z.string().uuid("Identificador inválido");
 
@@ -52,14 +53,15 @@ export async function salvarPublicacao(id: string, input: unknown) {
   });
 }
 
-/** Legenda + hashtags pela IA (worker). O editor acompanha por polling até a sugestão chegar. */
-export async function pedirLegenda(id: string, dica: string) {
+/** Legenda + hashtags pela IA (worker), no tom da marca escolhida. O editor acompanha por polling até a sugestão chegar. */
+export async function pedirLegenda(id: string, dica: string, marcaId: string | null) {
   return run(async () => {
     const ctx = await requireCtx();
     requireRole(ctx, "editor");
     const p = await postDoWorkspace(ctx, id);
+    const marca = await marcaDoWorkspace(ctx.workspace.id, marcaId);
     const sql = db();
-    await sql`update ads.instagram_posts set sugestao = ${sql.json({ gerando: true })}, updated_at = now() where id = ${p.id}`;
+    await sql`update ads.instagram_posts set sugestao = ${sql.json({ gerando: true })}, brand_id = ${marca}, updated_at = now() where id = ${p.id}`;
     await enqueueJob(sql, { workspaceId: ctx.workspace.id, type: "AI_INSTAGRAM_CAPTION", payload: { postId: p.id, dica: z.string().max(1000, "Pedido muito longo").parse(dica) }, createdBy: ctx.user.id, maxAttempts: 1 });
   });
 }

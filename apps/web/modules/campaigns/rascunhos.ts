@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { run } from "@/lib/action";
 import { requireCtx, requireRole, type Ctx } from "@/lib/ctx";
+import { marcaDoWorkspace } from "@/lib/marcas";
 
 const uuid = z.string().uuid("Rascunho inválido");
 
@@ -31,6 +32,7 @@ const novoSchema = z.discriminatedUnion("modo", [
   z.object({
     modo: z.literal("ia"),
     contaId: z.string(),
+    marcaId: z.string().optional(),
     pedido: z.string().trim().min(15, "Conte em pelo menos uma frase o que quer anunciar").max(4000, "Pedido muito longo"),
     orcamento: z.string().trim().regex(/^\d{1,9}([.,]\d{1,2})?$/, "Use um valor como 70 ou 70,50"),
     url: z.string().trim().url("URL inválida").or(z.literal("")),
@@ -38,6 +40,7 @@ const novoSchema = z.discriminatedUnion("modo", [
   z.object({
     modo: z.literal("manual"),
     contaId: z.string(),
+    marcaId: z.string().optional(),
     nome: z.string().trim().min(3, "Nome muito curto").max(120),
     orcamento: z.string().trim().regex(/^\d{1,9}([.,]\d{1,2})?$/, "Use um valor como 70 ou 70,50"),
     url: z.string().trim().url("URL inválida (use https://…)"),
@@ -51,14 +54,15 @@ export async function criarRascunho(input: unknown) {
     requireRole(ctx, "editor");
     const v = novoSchema.parse(input);
     const conta = await contaGoogle(ctx, v.contaId);
+    const marca = await marcaDoWorkspace(ctx.workspace.id, v.marcaId);
     const sql = db();
     const orcamento = v.orcamento.replace(",", ".");
     if (v.modo === "ia") {
       await workerOnline();
       const pedido = `${v.pedido}\n\nOrçamento diário: ${orcamento} ${conta.currency}${v.url ? `\nSite: ${v.url}` : ""}`;
       const [d] = await sql<{ id: string }[]>`
-        insert into ads.campaign_drafts (workspace_id, ad_account_id, name, status, source, prompt, spec, created_by)
-        values (${ctx.workspace.id}, ${conta.id}, 'Campanha em criação…', 'GENERATING', 'AI', ${pedido}, ${sql.json({ orcamentoDiario: orcamento, urlFinal: v.url || undefined } as unknown as Json)}, ${ctx.user.id})
+        insert into ads.campaign_drafts (workspace_id, ad_account_id, brand_id, name, status, source, prompt, spec, created_by)
+        values (${ctx.workspace.id}, ${conta.id}, ${marca}, 'Campanha em criação…', 'GENERATING', 'AI', ${pedido}, ${sql.json({ orcamentoDiario: orcamento, urlFinal: v.url || undefined } as unknown as Json)}, ${ctx.user.id})
         returning id`;
       await enqueueJob(sql, { workspaceId: ctx.workspace.id, type: "AI_CAMPAIGN", payload: { draftId: d!.id }, createdBy: ctx.user.id, maxAttempts: 1 });
       await audit(sql, { workspaceId: ctx.workspace.id, actor: ctx.actor, action: "Pedir campanha à IA", entityType: "campaign_draft", entityId: d!.id });
@@ -71,8 +75,8 @@ export async function criarRascunho(input: unknown) {
       grupos: [{ nome: "Grupo 1", palavras: [], negativas: [], anuncios: [{ titulos: ["", "", ""], descricoes: ["", ""], caminho1: "", caminho2: "" }] }],
     };
     const [d] = await sql<{ id: string }[]>`
-      insert into ads.campaign_drafts (workspace_id, ad_account_id, name, status, source, spec, created_by)
-      values (${ctx.workspace.id}, ${conta.id}, ${v.nome}, 'DRAFT', 'MANUAL', ${sql.json(spec as unknown as Json)}, ${ctx.user.id}) returning id`;
+      insert into ads.campaign_drafts (workspace_id, ad_account_id, brand_id, name, status, source, spec, created_by)
+      values (${ctx.workspace.id}, ${conta.id}, ${marca}, ${v.nome}, 'DRAFT', 'MANUAL', ${sql.json(spec as unknown as Json)}, ${ctx.user.id}) returning id`;
     revalidatePath("/campaigns");
     return d!.id;
   });

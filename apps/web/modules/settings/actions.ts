@@ -1,6 +1,6 @@
 "use server";
 
-import { audit, brandSchema, db, gravarSegredo, vozesElevenLabs, type Json } from "@domus-ads/core";
+import { audit, db, gravarSegredo, vozesElevenLabs } from "@domus-ads/core";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
@@ -123,24 +123,6 @@ export async function atualizarContaIA(id: string, patch: { status?: string; pri
     if (patch.priority != null) await sql`update ads.ai_accounts set priority = ${z.number().int().min(0).max(999).parse(patch.priority)} where id = ${aid}`;
     if (patch.liberar) await sql`update ads.ai_accounts set limited_until = null, last_error = null where id = ${aid}`;
     await audit(sql, { workspaceId: null, actor: ctx.actor, action: "Alterar conta de IA", entityType: "ai_account", entityId: aid, after: patch });
-    revalidatePath("/settings");
-  });
-}
-
-/** Identidade visual do workspace (cores, fontes, logo, tom, regras): vale para tudo que a IA cria no Studio. */
-export async function salvarIdentidade(input: unknown) {
-  return run(async () => {
-    const ctx = await requireCtx();
-    requireRole(ctx, "admin");
-    const brand = brandSchema.parse(input);
-    const sql = db();
-    if (brand.logoId) {
-      const [l] = await sql`select 1 from ads.creatives where id = ${brand.logoId} and workspace_id = ${ctx.workspace.id} and type = 'IMAGE' and status = 'READY'`;
-      if (!l) throw new Error("A logo escolhida não é uma imagem deste workspace");
-    }
-    const [antes] = await sql<{ brand: unknown }[]>`select brand from ads.workspaces where id = ${ctx.workspace.id}`;
-    await sql`update ads.workspaces set brand = ${sql.json(brand as unknown as Json)} where id = ${ctx.workspace.id}`;
-    await audit(sql, { workspaceId: ctx.workspace.id, actor: ctx.actor, action: "Alterar identidade visual", entityType: "workspace", entityId: ctx.workspace.id, entityName: ctx.workspace.name, before: antes?.brand ?? null, after: brand });
     revalidatePath("/settings");
   });
 }

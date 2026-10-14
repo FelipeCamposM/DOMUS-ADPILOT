@@ -8,8 +8,8 @@ import { rodar, FFPROBE } from "./tools";
  * Contexto criativo de um projeto do Studio: identidade visual + arquivos anexados + links.
  * Arquivos vão para <pasta>/assets/ (a composição referencia "assets/arquivo" e a IA pode olhar as imagens).
  * Links (os do campo Links e os escritos nas orientações) são lidos aqui no worker: texto, fotos e cores.
- * Identidade "workspace": manda a marca de Configurações. "referencias" (ou workspace sem marca): a paleta vem das
- * referências (sites, Instagram, imagens enviadas), para criar artes de outra marca dentro do mesmo workspace.
+ * Identidade "workspace": manda a marca escolhida no projeto (ads.brands). "referencias" (ou projeto sem marca): a
+ * paleta vem das referências (sites, Instagram, imagens enviadas), para criar artes de outra marca.
  */
 export interface ContextoCriativo { texto: string; imagens: string[]; brand: Brand }
 
@@ -19,7 +19,8 @@ const MAX_IMAGENS_IA = 12; // imagens que a IA abre e olha (anexos primeiro, dep
 
 export async function contextoCriativo(projectId: string, workspaceId: string, pasta: string, log: (m: string) => Promise<void>): Promise<ContextoCriativo> {
   const sql = db();
-  const [w] = await sql<{ name: string; brand: unknown }[]>`select name, brand from ads.workspaces where id = ${workspaceId}`;
+  const [w] = await sql<{ name: string; brand: unknown }[]>`
+    select b.nome as name, b.brand from ads.video_projects p join ads.brands b on b.id = p.brand_id where p.id = ${projectId} and b.workspace_id = ${workspaceId}`;
   const marca = brandSchema.parse(w?.brand ?? {});
   const [p] = await sql<{ assets: unknown; links: unknown; orientacao: string | null; identidade: string | null }[]>`
     select assets, links, brief->>'orientacao' as orientacao, brief->>'identidade' as identidade from ads.video_projects where id = ${projectId}`;
@@ -104,9 +105,9 @@ O que o cliente quer com esta peça, nas palavras dele. Siga com prioridade (só
 Se ele pedir para usar fotos ou cores de um site, perfil ou imagem, use o que está em <referencias_visuais> e <arquivos>.
 ${p.orientacao.trim()}
 </orientacoes_do_cliente>` : "",
-    b.length ? `<identidade_visual workspace="${w?.name ?? ""}">\n${b.join("\n")}\n</identidade_visual>` : "",
+    b.length ? `<identidade_visual marca="${w?.name ?? ""}">\n${b.join("\n")}\n</identidade_visual>` : "",
     dasReferencias ? `<identidade_visual origem="referencias">
-Esta peça NÃO usa a identidade do workspace “${w?.name ?? ""}”: pode ser de outra marca. Monte a identidade a partir das
+Esta peça NÃO usa uma marca salva: é de outra marca. Monte a identidade a partir das
 referências (site, Instagram, imagens enviadas) e das orientações.${extraida.length ? `
 Paleta extraída das referências (base para fundo, texto e destaques; ajuste o contraste para ficar legível): ${extraida.join(" ")}` : `
 Nenhuma cor foi extraída: escolha uma paleta coerente com o produto e as orientações.`}

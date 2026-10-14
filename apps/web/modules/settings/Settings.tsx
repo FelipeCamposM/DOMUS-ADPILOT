@@ -1,6 +1,6 @@
 "use client";
 
-import { AudioLines, KeyRound, Loader2, Palette, Plus, Power, Server, Terminal, Trash2, Users } from "lucide-react";
+import { AudioLines, KeyRound, Loader2, Plus, Power, Server, Terminal, Trash2, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
@@ -9,7 +9,6 @@ import { toast } from "../shell/toast";
 import { adicionarMembro, alterarPapel, criarWorkspace, removerMembro, renomearWorkspace, salvarChaveElevenLabs, trocarSenha } from "./actions";
 import { AiAccounts, type ContaIA, type Detectada } from "./AiAccounts";
 import { inicializacaoWorker } from "./ai-accounts";
-import { BrandEditor, type BrandValor } from "./BrandEditor";
 
 export type { ContaIA };
 
@@ -42,7 +41,6 @@ function Secao({ id, icon, titulo, desc, children }: { id: string; icon: ReactNo
 
 export function Settings(p: {
   ws: { name: string; role: string }; membros: Membro[]; eu: string; contas: ContaIA[]; detectadas: Detectada[]; podeOwnerIA: boolean;
-  brand: BrandValor; imagens: { id: string; name: string }[];
   elevenlabs: {
     configurada: boolean; vozes: number | null; erro: string | null;
     creditos: { plano: string; usados: number; limite: number; renovaEm: string | null } | null; erroCreditos: string | null;
@@ -68,10 +66,6 @@ export function Settings(p: {
           <input className="input-sm" style={{ width: 220 }} placeholder="Ex.: Cliente A" value={novoWs} onChange={(e) => setNovoWs(e.target.value)} aria-label="Nome do novo workspace" />
           <button className="btn btn-secondary btn-xs" disabled={pend || novoWs.trim().length < 2} onClick={() => rodar(() => criarWorkspace(novoWs), "Workspace criado", () => setNovoWs(""))}><Plus aria-hidden /> Criar workspace</button>
         </div>
-      </Secao>
-
-      <Secao id="marca" icon={<Palette size={16} aria-hidden />} titulo="Identidade visual" desc="Cores, fontes, logo, tom e regras deste workspace. A IA segue isto em todo vídeo e imagem do Studio.">
-        <BrandEditor inicial={p.brand} imagens={p.imagens} podeEditar={admin} nome={p.ws.name} />
       </Secao>
 
       <Secao id="membros" icon={<Users size={16} aria-hidden />} titulo="Membros" desc="Owner e Admin gerenciam conexões e membros · Editor opera campanhas e a IA · Leitura só consulta.">

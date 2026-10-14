@@ -1,7 +1,7 @@
 "use client";
 
 import { gsap } from "gsap";
-import { Activity, Bot, Cable, Clapperboard, Images, LayoutDashboard, Megaphone, ScrollText, Settings } from "lucide-react";
+import { Activity, Bot, Cable, Clapperboard, Images, LayoutDashboard, Megaphone, Palette, ScrollText, Settings } from "lucide-react";
 import Link from "next/link";
 import { InstagramIcon } from "../connections/Logos";
 import { usePathname } from "next/navigation";
@@ -10,6 +10,7 @@ import { useLayoutEffect, useRef } from "react";
 export const NAV = [
   { href: "/", label: "Visão geral", icon: LayoutDashboard, group: "Tráfego" },
   { href: "/campaigns", label: "Campanhas", icon: Megaphone, group: "Tráfego" },
+  { href: "/marcas", label: "Marcas", icon: Palette, group: "Criação" },
   { href: "/studio", label: "Studio", icon: Clapperboard, group: "Criação" },
   { href: "/creatives", label: "Criativos", icon: Images, group: "Criação" },
   { href: "/instagram", label: "Instagram", icon: InstagramIcon, group: "Criação" },
