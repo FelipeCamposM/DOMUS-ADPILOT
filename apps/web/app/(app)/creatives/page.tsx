@@ -13,17 +13,18 @@ export const metadata = { title: "Criativos" };
 const ABAS = [["todos", "Todos"], ["videos", "Vídeos"], ["imagens", "Imagens"], ["arquivos", "Arquivos"], ["musicas", "Músicas"], ["efeitos", "Efeitos sonoros"]] as const;
 /** Slides de um carrossel viram um cartão só (capa = slide 1); o resto passa como está. */
 function agrupar(itens: CriativoLinha[]) {
-  const grupos = new Map<string, { capa: CriativoLinha; n: number }>();
-  const out: { capa: CriativoLinha; n: number }[] = [];
+  const grupos = new Map<string, { capa: CriativoLinha; slides: CriativoLinha[] }>();
+  const out: { capa: CriativoLinha; slides: CriativoLinha[] }[] = [];
   for (const c of itens) {
-    if (!c.carrossel || !c.project_id) { out.push({ capa: c, n: 1 }); continue; }
+    if (!c.carrossel || !c.project_id) { out.push({ capa: c, slides: [c] }); continue; }
     const g = grupos.get(c.project_id);
-    if (g) { g.n++; if ((c.ordem ?? 99) < (g.capa.ordem ?? 99)) g.capa = c; continue; }
-    const novo = { capa: c, n: 1 };
+    if (g) { g.slides.push(c); continue; }
+    const novo = { capa: c, slides: [c] };
     grupos.set(c.project_id, novo);
     out.push(novo);
   }
-  return out;
+  for (const g of grupos.values()) { g.slides.sort((a, b) => (a.ordem ?? 99) - (b.ordem ?? 99)); g.capa = g.slides[0]!; }
+  return out.map(({ capa, slides }) => ({ capa, n: slides.length, ids: slides.map((s) => s.id) }));
 }
 
 const formatoDe = (w: number | null, h: number | null) =>
@@ -37,9 +38,9 @@ export default async function CreativesPage({ searchParams }: { searchParams: Pr
   const gerado = (t: string[]) => !t.includes("asset");
 
   const vazio = <div className="panel"><div className="empty">{q ? `Nada encontrado para “${q}”.` : "Nada ainda."}</div></div>;
-  const cartao = ({ capa: c, n }: { capa: CriativoLinha; n: number }) => (
+  const cartao = ({ capa: c, n, ids }: { capa: CriativoLinha; n: number; ids: string[] }) => (
     <VideoCard key={c.id} href={c.project_id ? `/studio/${c.project_id}` : `/api/creatives/${c.id}/file`} creativeId={c.id} thumb={c.thumb} status={c.status}
-      titulo={n > 1 ? c.name.split(" · slide ")[0]! : c.name} slides={n}
+      titulo={n > 1 ? c.name.split(" · slide ")[0]! : c.name} slides={n > 1 ? ids : undefined}
       progress={null} kind={c.type === "IMAGE" ? "image" : "video"} formato={formatoDe(c.width, c.height)}
       sub={`${n > 1 ? `Carrossel · ${n} slides` : c.type === "IMAGE" ? "Imagem" : "Vídeo"}${gerado(c.tags) ? "" : " enviado"} · ${c.width}×${c.height}${c.duration_ms ? ` · ${(c.duration_ms / 1000).toFixed(1).replace(".", ",")} s` : ""} · ${ago(c.created_at)}`} />
   );

@@ -1035,5 +1035,18 @@ input[type="color"]:hover { transform: scale(1.08); box-shadow: 0 0 14px rgb(var
 .igp-confirma-botoes { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 @media (max-width: 900px) { .igp { grid-template-columns: minmax(0, 1fr); } .igp-lado { position: static; order: -1; } .igp-agenda { display: none; } }
 
-/* selo de carrossel nos cartões de criativo (várias imagens, como no Instagram) */
-.carrossel-selo { position: absolute; top: 8px; right: 8px; display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700; color: #fff; background: rgb(0 0 0 / 0.55); backdrop-filter: blur(6px); }
+/* carrossel nos cartões de criativo: pilha de folhas, selo grande e faixa com os slides */
+.pilha { margin: 0 10px 10px 0; }
+.pilha::before, .pilha::after { content: ""; position: absolute; inset: 0; border-radius: var(--radius-lg); background: rgb(var(--c-bg-elevated)); border: 1px solid rgb(var(--c-border-strong)); }
+.pilha::before { transform: translate(10px, 10px); opacity: .55; }
+.pilha::after { transform: translate(5px, 5px); opacity: .85; }
+.pilha > .thumb-card { z-index: 1; box-shadow: 0 6px 18px -8px rgb(0 0 0 / 0.6); }
+.card-carrossel { border-color: rgb(var(--c-brand) / 0.45); }
+.card-carrossel:hover .pilha::before { transform: translate(14px, 12px) rotate(2deg); }
+.card-carrossel:hover .pilha::after { transform: translate(7px, 6px) rotate(1deg); }
+.pilha::before, .pilha::after { transition: transform .35s cubic-bezier(.2,.8,.2,1); }
+.carrossel-selo { position: absolute; top: 10px; left: 10px; z-index: 2; display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 999px; font-size: 13px; font-weight: 750; color: rgb(var(--c-brand-ink)); background: rgb(var(--c-brand)); box-shadow: 0 4px 14px -4px rgb(var(--c-brand) / 0.8); }
+.carrossel-faixa { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin-top: -4px; }
+.carrossel-faixa span { position: relative; aspect-ratio: 1; border-radius: 6px; overflow: hidden; background: rgb(var(--c-bg-inset)); }
+.carrossel-faixa img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.carrossel-faixa b { position: absolute; inset: 0; display: grid; place-items: center; font-size: 12px; color: #fff; background: rgb(0 0 0 / 0.55); }
