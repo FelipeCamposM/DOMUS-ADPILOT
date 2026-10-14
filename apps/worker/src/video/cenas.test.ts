@@ -27,3 +27,12 @@ test("composição de cenas prontas passa na barreira de segurança, nos 3 estil
     expect(html).not.toContain("<script>x</script>"); // texto do roteiro é escapado
   }
 });
+
+test("marca escura com 3 cores: só cores da marca e contraste certo no clay", () => {
+  const brand = brandSchema.parse({ cores: [{ hex: "#0A0A0E", nome: "Fundo" }, { hex: "#D1FE17", nome: "Verde" }, { hex: "#FAFAFC", nome: "Texto" }] });
+  const sb: Storyboard = { title: "t", duration: 4, fps: 30, sfx: [], music: null, scenes: [cena({ tipo: "cta" })] };
+  const html = montarComposicao({ sb, brief: briefSchema.parse({ produto: "SIAPLUS", objetivo: "vender", duracao: 10, formato: "9:16", estiloVisual: "clay" }), brand, w: 1080, h: 1920, assets: [], rotulo: "X" });
+  expect(html).toContain("--a2:#D1FE17"); // cor que falta repete o destaque da marca, não o rosa do estilo
+  expect(html).toContain("--on:#0A0A0E"); // texto escuro sobre o verde claro
+  expect(html).not.toMatch(/#FF9EC4|#7DD3FC|#8B5CF6/);
+});

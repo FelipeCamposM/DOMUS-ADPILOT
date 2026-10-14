@@ -101,12 +101,37 @@ export function paletaCenas(brief: Brief, brand: Brand) {
   const est = (brief.estiloVisual === "livre" ? "hud" : brief.estiloVisual) as Estilo;
   const pad = PADRAO[est];
   const cores = brand.cores.map((c) => c.hex);
-  const P: Paleta = { ...pad, bg: cores[0] ?? pad.bg, a: cores[1] ?? pad.a, tx: cores[2] ?? pad.tx, a2: cores[3] ?? pad.a2, ft: brand.fonteTitulo || pad.ft, fb: brand.fonteTexto || pad.fb };
+  // marca com cores: o que falta sai da própria marca (destaque repetido), não do padrão do estilo (rosa/azul do clay)
+  const destaque = cores[1] ?? cores[0];
+  const P: Paleta = cores.length
+    ? { ...pad, bg: cores[0] ?? pad.bg, a: destaque ?? pad.a, tx: cores[2] ?? (luz(cores[0]!) < 0.4 ? "#FAFAFC" : "#161412"), a2: cores[3] ?? destaque ?? pad.a2, a3: cores[3] ?? destaque ?? pad.a3, ft: brand.fonteTitulo || pad.ft, fb: brand.fonteTexto || pad.fb }
+    : { ...pad, ft: brand.fonteTitulo || pad.ft, fb: brand.fonteTexto || pad.fb };
   return { est, P };
+}
+
+/** Luminância relativa (0 escuro, 1 claro) de #RRGGBB. */
+export function luz(hex: string): number {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+}
+
+/**
+ * Cores de apoio que dependem da paleta: superfície dos cartões (--sf), brilho do fundo (--hi), texto sobre o
+ * destaque (--on) e sombra (--sh). Assim estilos pensados para fundo claro (clay, editorial) funcionam em marca escura.
+ */
+function apoio(P: Paleta) {
+  const escuro = luz(P.bg) < 0.35;
+  return {
+    sf: escuro ? "color-mix(in srgb,var(--tx) 9%,var(--bg))" : "var(--sf)",
+    hi: escuro ? "color-mix(in srgb,var(--bg) 88%,var(--tx))" : "color-mix(in srgb,var(--bg) 70%,#fff)",
+    on: luz(P.a) > 0.45 ? (escuro ? P.bg : "#111111") : "#FFFFFF",
+    sh: escuro ? "rgba(0,0,0,.45)" : "rgba(40,30,60,.18)",
+  };
 }
 
 export function montarComposicao(o: { sb: Storyboard; brief: Brief; brand: Brand; w: number; h: number; assets: string[]; rotulo: string }): string {
   const { est, P } = paletaCenas(o.brief, o.brand);
+  const A = apoio(P);
   const { w, h, sb } = o;
   const vertical = h / w > 1.2, deitado = w / h > 1.2;
   const u = Math.min(w, h) / 100;
@@ -139,7 +164,7 @@ export function montarComposicao(o: { sb: Storyboard; brief: Brief; brand: Brand
 <link href="https://fonts.googleapis.com/css2?${familias}&display=block" rel="stylesheet">
 <style>
 html,body,#root{width:${w}px;height:${h}px}
-:root{--bg:${P.bg};--a:${P.a};--a2:${P.a2};--a3:${P.a3};--tx:${P.tx};--ft:'${P.ft}';--fb:'${P.fb}';--fm:'${P.fm}';--u:${u}px;--sx:${seg.x}px;--st:${seg.t}px;--sb:${seg.b}px}
+:root{--bg:${P.bg};--a:${P.a};--sf:${A.sf};--hi:${A.hi};--on:${A.on};--sh:${A.sh};--a2:${P.a2};--a3:${P.a3};--tx:${P.tx};--ft:'${P.ft}';--fb:'${P.fb}';--fm:'${P.fm}';--u:${u}px;--sx:${seg.x}px;--st:${seg.t}px;--sb:${seg.b}px}
 ${CSS_BASE}
 ${CSS_ESTILO[est]}
 </style>
@@ -238,33 +263,33 @@ const CSS_ESTILO: Record<Estilo, string> = {
 .estilo-hud .bom .card-rot{color:var(--a2)}.estilo-hud .bom .card-rot i{background:color-mix(in srgb,var(--a2) 25%,transparent)}
 .estilo-hud .mock{background:linear-gradient(160deg,#1c1c26,#0b0b10);border:1px solid color-mix(in srgb,var(--a) 50%,transparent);box-shadow:0 0 calc(var(--u)*6) color-mix(in srgb,var(--a) 35%,transparent),0 calc(var(--u)*4) calc(var(--u)*8) rgba(0,0,0,.6)}
 .estilo-hud .mock-tela{background:#0d0d14}.estilo-hud .esqueleto i{background:var(--a)}.estilo-hud .esqueleto b{background:linear-gradient(160deg,var(--a),var(--a2))}
-.estilo-hud .botao{background:var(--a);color:#fff;box-shadow:0 0 calc(var(--u)*6) color-mix(in srgb,var(--a) 70%,transparent),inset 0 1px 0 rgba(255,255,255,.3)}
+.estilo-hud .botao{background:var(--a);color:var(--on);box-shadow:0 0 calc(var(--u)*6) color-mix(in srgb,var(--a) 70%,transparent),inset 0 1px 0 rgba(255,255,255,.3)}
 .estilo-hud .leg{padding:calc(var(--u)*1.2) calc(var(--u)*2.6);border-radius:calc(var(--u)*1.6);background:rgba(8,8,12,.62);border:1px solid rgba(255,255,255,.08);color:#fff}
 .estilo-hud .varre{position:absolute;top:-20%;bottom:-20%;left:0;width:40%;z-index:30;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--a) 40%,transparent),rgba(255,255,255,.35),color-mix(in srgb,var(--a) 40%,transparent),transparent);transform:skewX(-16deg);mix-blend-mode:screen;opacity:0}
 `,
   clay: `
-.bolha{position:absolute;border-radius:50%;background:radial-gradient(circle at 32% 28%,rgba(255,255,255,.95) 0 5%,transparent 26%),radial-gradient(circle at 38% 34%,color-mix(in srgb,var(--cor) 55%,#fff),var(--cor) 62%,color-mix(in srgb,var(--cor) 80%,#000) 100%);box-shadow:inset calc(var(--u)*-.9) calc(var(--u)*-1.3) calc(var(--u)*2.2) rgba(0,0,0,.16),inset calc(var(--u)*.7) calc(var(--u)*.9) calc(var(--u)*1.6) rgba(255,255,255,.65),0 calc(var(--u)*2.4) calc(var(--u)*4.4) rgba(70,40,140,.22)}
-#root{background:radial-gradient(120% 90% at 30% 10%,color-mix(in srgb,var(--bg) 70%,#fff),var(--bg) 55%,color-mix(in srgb,var(--bg) 85%,var(--a)))}
+.bolha{position:absolute;border-radius:50%;background:radial-gradient(circle at 32% 28%,rgba(255,255,255,.95) 0 5%,transparent 26%),radial-gradient(circle at 38% 34%,color-mix(in srgb,var(--cor) 55%,#fff),var(--cor) 62%,color-mix(in srgb,var(--cor) 80%,#000) 100%);box-shadow:inset calc(var(--u)*-.9) calc(var(--u)*-1.3) calc(var(--u)*2.2) rgba(0,0,0,.16),inset calc(var(--u)*.7) calc(var(--u)*.9) calc(var(--u)*1.6) rgba(255,255,255,.65),0 calc(var(--u)*2.4) calc(var(--u)*4.4) var(--sh)}
+#root{background:radial-gradient(120% 90% at 30% 10%,var(--hi),var(--bg) 55%,color-mix(in srgb,var(--bg) 85%,var(--a)))}
 .estilo-clay .t-display,.estilo-clay .t-h1,.estilo-clay .t-h2,.estilo-clay .t-quote{font-weight:700;letter-spacing:-.01em;text-shadow:0 .035em 0 color-mix(in srgb,var(--tx) 14%,transparent),0 .09em .12em color-mix(in srgb,var(--a) 25%,transparent)}
 .estilo-clay .hl{color:var(--tx);background:color-mix(in srgb,var(--a2) calc(var(--hl,1)*70%),transparent);border-radius:.32em;padding:0 .14em;box-shadow:inset 0 -.06em .1em rgba(0,0,0,.08),inset 0 .06em .1em rgba(255,255,255,.6)}
-.estilo-clay .kicker{font-family:var(--ft);letter-spacing:.08em;color:var(--a);background:color-mix(in srgb,#fff 70%,var(--bg));padding:calc(var(--u)*1) calc(var(--u)*2.6);border-radius:999px;box-shadow:calc(var(--u)*.6) calc(var(--u)*.9) calc(var(--u)*1.8) rgba(80,50,160,.18),inset 0 calc(var(--u)*.3) calc(var(--u)*.6) rgba(255,255,255,.9)}
-.estilo-clay .massa{right:-8%;top:8%;width:calc(var(--u)*46);height:calc(var(--u)*46);border-radius:42% 58% 55% 45%/48% 42% 58% 52%;background:radial-gradient(circle at 34% 30%,color-mix(in srgb,var(--a) 45%,#fff),var(--a) 60%,color-mix(in srgb,var(--a) 75%,#000));box-shadow:inset calc(var(--u)*-1.6) calc(var(--u)*-2) calc(var(--u)*3.4) rgba(0,0,0,.2),inset calc(var(--u)*1.2) calc(var(--u)*1.4) calc(var(--u)*2.4) rgba(255,255,255,.55),0 calc(var(--u)*3) calc(var(--u)*6) rgba(70,40,140,.25);z-index:-1;opacity:.9}
+.estilo-clay .kicker{font-family:var(--ft);letter-spacing:.08em;color:var(--a);background:var(--sf);padding:calc(var(--u)*1) calc(var(--u)*2.6);border-radius:999px;box-shadow:calc(var(--u)*.6) calc(var(--u)*.9) calc(var(--u)*1.8) var(--sh),inset 0 calc(var(--u)*.3) calc(var(--u)*.6) rgba(255,255,255,.9)}
+.estilo-clay .massa{right:-8%;top:8%;width:calc(var(--u)*46);height:calc(var(--u)*46);border-radius:42% 58% 55% 45%/48% 42% 58% 52%;background:radial-gradient(circle at 34% 30%,color-mix(in srgb,var(--a) 45%,#fff),var(--a) 60%,color-mix(in srgb,var(--a) 75%,#000));box-shadow:inset calc(var(--u)*-1.6) calc(var(--u)*-2) calc(var(--u)*3.4) rgba(0,0,0,.2),inset calc(var(--u)*1.2) calc(var(--u)*1.4) calc(var(--u)*2.4) rgba(255,255,255,.55),0 calc(var(--u)*3) calc(var(--u)*6) var(--sh);z-index:-1;opacity:.9}
 .estilo-clay .massa2{left:-10%;right:auto;top:auto;bottom:6%;width:calc(var(--u)*34);height:calc(var(--u)*34);border-radius:55% 45% 40% 60%/50% 55% 45% 50%;background:radial-gradient(circle at 34% 30%,color-mix(in srgb,var(--a3) 45%,#fff),var(--a3) 60%,color-mix(in srgb,var(--a3) 75%,#000))}
-.estilo-clay .lista li,.estilo-clay .card,.estilo-clay .mock{background:color-mix(in srgb,#fff 62%,var(--bg));border-radius:calc(var(--u)*4);box-shadow:calc(var(--u)*1.2) calc(var(--u)*1.8) calc(var(--u)*3.2) rgba(80,50,160,.2),inset calc(var(--u)*-.6) calc(var(--u)*-.9) calc(var(--u)*1.4) rgba(60,30,120,.08),inset calc(var(--u)*.6) calc(var(--u)*.9) calc(var(--u)*1.4) rgba(255,255,255,.95)}
+.estilo-clay .lista li,.estilo-clay .card,.estilo-clay .mock{background:var(--sf);border-radius:calc(var(--u)*4);box-shadow:calc(var(--u)*1.2) calc(var(--u)*1.8) calc(var(--u)*3.2) var(--sh),inset calc(var(--u)*-.6) calc(var(--u)*-.9) calc(var(--u)*1.4) var(--sh),inset calc(var(--u)*.6) calc(var(--u)*.9) calc(var(--u)*1.4) rgba(255,255,255,.95)}
 .estilo-clay .lista li{padding:calc(var(--u)*2.2*var(--k)) calc(var(--u)*2.8*var(--k))}
-.estilo-clay .marca{border-radius:50%;color:#fff;background:radial-gradient(circle at 35% 30%,color-mix(in srgb,var(--a) 50%,#fff),var(--a) 65%);box-shadow:inset calc(var(--u)*-.4) calc(var(--u)*-.6) calc(var(--u)*1) rgba(0,0,0,.2),inset calc(var(--u)*.3) calc(var(--u)*.4) calc(var(--u)*.8) rgba(255,255,255,.6)}
-.estilo-clay .numero{color:var(--a);text-shadow:0 .04em 0 color-mix(in srgb,var(--a) 60%,#000),0 .1em .14em rgba(70,40,140,.3)}
+.estilo-clay .marca{border-radius:50%;background:radial-gradient(circle at 35% 30%,color-mix(in srgb,var(--a) 50%,#fff),var(--a) 65%);color:var(--on);box-shadow:inset calc(var(--u)*-.4) calc(var(--u)*-.6) calc(var(--u)*1) rgba(0,0,0,.2),inset calc(var(--u)*.3) calc(var(--u)*.4) calc(var(--u)*.8) rgba(255,255,255,.6)}
+.estilo-clay .numero{color:var(--a);text-shadow:0 .04em 0 color-mix(in srgb,var(--a) 60%,#000),0 .1em .14em var(--sh)}
 .estilo-clay .ruim .card-rot{color:color-mix(in srgb,var(--tx) 60%,transparent)}.estilo-clay .ruim .card-rot i{background:rgba(0,0,0,.08)}.estilo-clay .card.ruim p{opacity:.7}
-.estilo-clay .bom .card-rot{color:var(--a)}.estilo-clay .bom .card-rot i{color:#fff;background:var(--a)}
-.estilo-clay .mock{padding:calc(var(--u)*2)}.estilo-clay .mock-tela{background:color-mix(in srgb,var(--bg) 80%,#fff);box-shadow:inset 0 calc(var(--u)*.6) calc(var(--u)*1.4) rgba(60,30,120,.15)}
+.estilo-clay .bom .card-rot{color:var(--a)}.estilo-clay .bom .card-rot i{color:var(--on);background:var(--a)}
+.estilo-clay .mock{padding:calc(var(--u)*2)}.estilo-clay .mock-tela{background:color-mix(in srgb,var(--bg) 80%,var(--tx));box-shadow:inset 0 calc(var(--u)*.6) calc(var(--u)*1.4) var(--sh)}
 .estilo-clay .esqueleto i{background:var(--a)}.estilo-clay .esqueleto b{background:linear-gradient(160deg,var(--a2),var(--a3));opacity:.6}
-.estilo-clay .botao{background:radial-gradient(120% 140% at 30% 20%,color-mix(in srgb,var(--a) 55%,#fff),var(--a) 60%);color:#fff;box-shadow:calc(var(--u)*.8) calc(var(--u)*1.4) calc(var(--u)*3) rgba(80,50,160,.35),inset calc(var(--u)*-.5) calc(var(--u)*-.8) calc(var(--u)*1.2) rgba(0,0,0,.2),inset calc(var(--u)*.5) calc(var(--u)*.8) calc(var(--u)*1.2) rgba(255,255,255,.55)}
+.estilo-clay .botao{background:radial-gradient(120% 140% at 30% 20%,color-mix(in srgb,var(--a) 55%,#fff),var(--a) 60%);color:var(--on);box-shadow:calc(var(--u)*.8) calc(var(--u)*1.4) calc(var(--u)*3) var(--sh),inset calc(var(--u)*-.5) calc(var(--u)*-.8) calc(var(--u)*1.2) rgba(0,0,0,.2),inset calc(var(--u)*.5) calc(var(--u)*.8) calc(var(--u)*1.2) rgba(255,255,255,.55)}
 .estilo-clay .aspas{color:var(--a2);text-shadow:0 .04em 0 rgba(0,0,0,.1)}
-.estilo-clay .leg{padding:calc(var(--u)*1.3) calc(var(--u)*3);border-radius:999px;background:color-mix(in srgb,#fff 80%,var(--bg));color:var(--tx);box-shadow:calc(var(--u)*.5) calc(var(--u)*.9) calc(var(--u)*2) rgba(80,50,160,.22),inset 0 calc(var(--u)*.3) calc(var(--u)*.6) rgba(255,255,255,.9)}
+.estilo-clay .leg{padding:calc(var(--u)*1.3) calc(var(--u)*3);border-radius:999px;background:var(--sf);color:var(--tx);box-shadow:calc(var(--u)*.5) calc(var(--u)*.9) calc(var(--u)*2) var(--sh),inset 0 calc(var(--u)*.3) calc(var(--u)*.6) rgba(255,255,255,.9)}
 .estilo-clay .bolhao{position:absolute;left:50%;top:50%;width:calc(var(--u)*240);height:calc(var(--u)*240);margin:calc(var(--u)*-120) 0 0 calc(var(--u)*-120);border-radius:50%;z-index:30;background:radial-gradient(circle at 40% 35%,color-mix(in srgb,var(--a) 40%,#fff),var(--a) 60%);transform:scale(0)}
 `,
   editorial: `
-.papel{position:absolute;inset:0;background:radial-gradient(120% 90% at 50% 0%,color-mix(in srgb,var(--bg) 60%,#fff),var(--bg) 60%),var(--bg)}
+.papel{position:absolute;inset:0;background:radial-gradient(120% 90% at 50% 0%,var(--hi),var(--bg) 60%),var(--bg)}
 .fio{position:absolute;left:var(--sx);right:var(--sx);height:1px;background:color-mix(in srgb,var(--tx) 35%,transparent);transform-origin:left}
 .fio-topo{top:calc(var(--st) - var(--u)*4)}.fio-base{bottom:calc(var(--sb) - var(--u)*3)}
 .cabecalho{position:absolute;left:var(--sx);right:var(--sx);top:calc(var(--st) - var(--u)*7.6);display:flex;justify-content:space-between;font-family:var(--fm),monospace;font-size:calc(var(--u)*1.9);letter-spacing:.18em;text-transform:uppercase;color:color-mix(in srgb,var(--tx) 70%,transparent)}
@@ -286,7 +311,7 @@ const CSS_ESTILO: Record<Estilo, string> = {
 .estilo-editorial .ruim{opacity:.6}.estilo-editorial .ruim .card-rot i{border:1px solid currentColor}
 .estilo-editorial .bom{border-color:var(--a)}.estilo-editorial .bom .card-rot{color:var(--a)}.estilo-editorial .bom .card-rot i{background:var(--a);color:var(--bg)}
 .estilo-editorial .mock{background:var(--tx);box-shadow:0 calc(var(--u)*3) calc(var(--u)*6) rgba(0,0,0,.18)}
-.estilo-editorial .mock-tela{background:color-mix(in srgb,var(--bg) 92%,#fff)}.estilo-editorial .esqueleto i{background:var(--tx)}.estilo-editorial .esqueleto b{background:var(--a);opacity:.25}
+.estilo-editorial .mock-tela{background:color-mix(in srgb,var(--bg) 92%,var(--tx))}.estilo-editorial .esqueleto i{background:var(--tx)}.estilo-editorial .esqueleto b{background:var(--a);opacity:.25}
 .estilo-editorial .botao{background:var(--tx);color:var(--bg);border-radius:0;letter-spacing:.06em;text-transform:uppercase;font-weight:600;font-size:calc(var(--u)*3.6*var(--k))}
 .estilo-editorial .brilho{display:none}
 .estilo-editorial .aspas{font-style:italic}

@@ -50,3 +50,14 @@ export async function vozesElevenLabs(chave: string): Promise<VozElevenLabs[]> {
   const j = (await r.json()) as { voices?: { voice_id: string; name: string; category?: string; preview_url?: string; labels?: Record<string, string> }[] };
   return (j.voices ?? []).map((v) => ({ id: v.voice_id, nome: v.name, categoria: v.category ?? "", preview: v.preview_url ?? null, idioma: v.labels?.language ?? v.labels?.accent ?? null }));
 }
+
+/**
+ * Preço por 1.000 créditos do ElevenLabs (US$, mensalidade ÷ créditos do plano), para estimar o custo de cada vídeo.
+ * ponytail: tabela de preços de tabela do site (out/2026); ELEVENLABS_USD_POR_1K no .env sobrepõe se o plano mudar.
+ */
+const USD_POR_1K: Record<string, number> = { free: 0, starter: 5 / 30, creator: 22 / 100, pro: 99 / 500, scale: 330 / 2000, business: 1320 / 11000 };
+export function usdPorMilCreditos(plano: string | null): number {
+  const env = Number(process.env.ELEVENLABS_USD_POR_1K);
+  if (env > 0) return env;
+  return USD_POR_1K[(plano ?? "").toLowerCase().replace(/_.*$/, "")] ?? USD_POR_1K.creator!;
+}

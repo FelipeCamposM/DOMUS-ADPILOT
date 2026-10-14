@@ -7,6 +7,7 @@ import { can, requireCtx } from "@/lib/ctx";
 import { projeto, variacoes } from "@/lib/video";
 import { ImageProjectView } from "@/modules/studio/ImageProjectView";
 import { ProjectView } from "@/modules/studio/ProjectView";
+import { Consumo } from "@/modules/studio/Consumo";
 
 export default async function ProjetoPage({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireCtx();
@@ -27,6 +28,7 @@ export default async function ProjetoPage({ params }: { params: Promise<{ id: st
         </div>
         <ImageProjectView id={p.id} status={p.status} step={p.step_detail} error={p.error} progress={p.progress} formato={b.formato}
           variacoes={await variacoes(ctx.workspace.id, p.id)} conceitos={planoImagemSchema.safeParse(p.storyboard).data?.conceitos ?? []} carrossel={b.tipo === "carrossel"} maxSlides={MAX_SLIDES} podeEditar={can(ctx, "editor")} />
+        <Consumo workspaceId={ctx.workspace.id} projetoId={p.id} />
       </div>
     );
   }
@@ -49,6 +51,7 @@ export default async function ProjetoPage({ params }: { params: Promise<{ id: st
           creative: p.creative ? { ...p.creative, avisos: p.creative.metadata.avisos ?? [], music: p.creative.metadata.music ?? null } : null,
         }}
       />
+      <Consumo workspaceId={ctx.workspace.id} projetoId={p.id} />
     </div>
   );
 }

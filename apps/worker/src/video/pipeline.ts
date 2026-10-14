@@ -49,7 +49,7 @@ export async function runVideo(payload: VideoPayload, c: Ctx) {
     ctxCriativo.brand = { ...ctxCriativo.brand, cores: pa.cores.map((hex, i) => ({ hex, nome: PAPEIS_COR[i] ?? "" })), fonteTitulo: pa.fonteTitulo || ctxCriativo.brand.fonteTitulo, fonteTexto: pa.fonteTexto || ctxCriativo.brand.fonteTexto };
     ctxCriativo.texto += `\n\n<paleta_aprovada>\nO cliente aprovou estas cores e fontes antes do render. Use exatamente elas e não introduza outras cores de destaque.\n${pa.cores.map((hex, i) => `- ${PAPEIS_COR[i]}: ${hex}`).join("\n")}${pa.fonteTitulo ? `\n- Fonte dos títulos: ${pa.fonteTitulo}` : ""}${pa.fonteTexto ? `\n- Fonte dos textos: ${pa.fonteTexto}` : ""}\n</paleta_aprovada>`;
   }
-  const ia = (sistema: string, prompt: string) => perguntarIA({ workspaceId: p.workspace_id, sistema, prompt, cwd: pasta, signal: c.signal, log: c.log, imagens: ctxCriativo.imagens });
+  const ia = (sistema: string, prompt: string) => perguntarIA({ workspaceId: p.workspace_id, projetoId: p.id, sistema, prompt, cwd: pasta, signal: c.signal, log: c.log, imagens: ctxCriativo.imagens });
 
   try {
     // 1. Roteiro → storyboard estruturado

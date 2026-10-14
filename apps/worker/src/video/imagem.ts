@@ -117,7 +117,7 @@ export async function runImagem(payload: ImagemPayload, c: Ctx) {
   try {
     const ctx = await contextoCriativo(p.id, p.workspace_id, pasta, c.log);
     const sistema = sistemaImagem(b);
-    const ia = (prompt: string) => perguntarIA({ workspaceId: p.workspace_id, sistema, prompt, cwd: pasta, signal: c.signal, log: c.log, imagens: ctx.imagens });
+    const ia = (prompt: string) => perguntarIA({ workspaceId: p.workspace_id, projetoId: p.id, sistema, prompt, cwd: pasta, signal: c.signal, log: c.log, imagens: ctx.imagens });
     const modo = payload.mode ?? "full";
 
     if (modo === "full" || modo === "mais") {

@@ -14,6 +14,8 @@ export async function perguntarIA(p: {
   log: (m: string) => Promise<void>; onText?: (t: string) => void;
   /** imagens (caminhos dentro de cwd) que a IA pode ver: logo, prints, inspirações */
   imagens?: string[];
+  /** projeto do Studio que está gastando (consumo por vídeo/imagem) */
+  projetoId?: string;
 }): Promise<{ text: string; conta: string; provider: AiProvider }> {
   const sql = db();
   const sysFile = join(p.cwd, "instrucoes.md");
@@ -34,8 +36,8 @@ export async function perguntarIA(p: {
       onUsage: (u: Usage) => void sql`update ads.ai_accounts set usage = ${sql.json(u as unknown as Json)} where id = ${conta.id}`,
     });
     await sql`
-      insert into ads.ai_usage (ai_account_id, workspace_id, provider, model, input_tokens, output_tokens, cost_usd, duration_ms, ok)
-      values (${conta.id}, ${p.workspaceId}, ${conta.provider}, ${r.model}, ${r.inputTokens}, ${r.outputTokens}, ${r.costUsd}, ${r.durationMs}, ${r.ok})`;
+      insert into ads.ai_usage (ai_account_id, workspace_id, video_project_id, provider, model, input_tokens, output_tokens, cost_usd, duration_ms, ok)
+      values (${conta.id}, ${p.workspaceId}, ${p.projetoId ?? null}, ${conta.provider}, ${r.model}, ${r.inputTokens}, ${r.outputTokens}, ${r.costUsd}, ${r.durationMs}, ${r.ok})`;
     if (r.ok) {
       await sql`update ads.ai_accounts set last_used_at = now(), last_error = null where id = ${conta.id}`;
       return { text: r.text, conta: conta.name, provider: conta.provider };
