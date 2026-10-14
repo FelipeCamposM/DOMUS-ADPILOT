@@ -1,17 +1,15 @@
 "use client";
 
 import type { MidiaIG } from "@domus-ads/core";
-import { STATUS_POST, TIPOS_POST } from "@domus-ads/core/instagram-regras";
-import { AlertTriangle, CalendarClock, ChevronLeft, ChevronRight, Clapperboard, Copy, ExternalLink, Grid3x3, Heart, Loader2, MessageCircle, Pencil, Plus, Trash2, Undo2 } from "lucide-react";
+import { STATUS_POST } from "@domus-ads/core/instagram-regras";
+import { AlertTriangle, CalendarClock, ChevronLeft, ChevronRight, Clapperboard, Copy, ExternalLink, Grid3x3, Heart, MessageCircle, Plus } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import type { ContaIG, PostIG } from "@/lib/instagram";
 import { Dialog } from "../shell/Dialog";
-import { toast } from "../shell/toast";
-import { apagarPublicacao, voltarParaRascunho } from "./actions";
 import { arquivo, Avatar, Legenda } from "./Mockups";
 import { ICONE_TIPO, NovaPublicacao } from "./NovaPublicacao";
+import { Planejados } from "./Planejados";
 
 const num = (n: number | null | undefined) => (n == null ? "–" : new Intl.NumberFormat("pt-BR", { notation: n >= 10_000 ? "compact" : "standard", maximumFractionDigits: 1 }).format(n));
 const quando = (iso: string | null) => (iso ? new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "");
@@ -75,7 +73,7 @@ export function PerfilInstagram({ conta, contas, midias, posts, erroApi, podeEdi
         )}
       </div>
 
-      {aba === "planejados" ? <Planejados posts={posts} podeEditar={podeEditar} onNova={() => setNova(true)} /> : (
+      {aba === "planejados" ? <Planejados posts={posts} perfil={perfil} podeEditar={podeEditar} onNova={() => setNova(true)} /> : (
         <div className="ig-grade grande">
           {aba === "posts" && verPlanejados && naGrade.map((p) => <CelulaPlanejada key={p.id} p={p} />)}
           {(aba === "reels" ? reels : midias).map((m) => (
@@ -103,58 +101,6 @@ function CelulaPlanejada({ p }: { p: PostIG }) {
       <I className="ig-celula-tipo" size={18} />
       <span className="ig-selo" data-status={p.status}>{p.status === "AGENDADO" ? quando(p.agendado_para) : STATUS_POST[p.status]}</span>
     </Link>
-  );
-}
-
-function Planejados({ posts, podeEditar, onNova }: { posts: PostIG[]; podeEditar: boolean; onNova: () => void }) {
-  const router = useRouter();
-  const [pend, start] = useTransition();
-  const [apagar, setApagar] = useState<PostIG | null>(null);
-  const acao = (fn: () => Promise<{ ok: boolean; error?: string }>, ok: string) => start(async () => {
-    const r = await fn();
-    if (r.ok) toast.ok(ok); else toast.err(r.error ?? "Erro");
-    setApagar(null);
-    router.refresh();
-  });
-  if (!posts.length) return (
-    <div className="cn-vazio panel"><CalendarClock size={28} aria-hidden style={{ color: "rgb(var(--c-brand))" }} /><h2>Nada planejado</h2>
-      <p className="muted small">Crie uma publicação e agende: ela aparece aqui e na prévia do feed.</p>
-      {podeEditar && <button className="btn btn-primary btn-sm" onClick={onNova}><Plus aria-hidden /> Nova publicação</button>}</div>
-  );
-  return (
-    <div className="ig-lista">
-      {posts.map((p) => {
-        const I = ICONE_TIPO[p.tipo];
-        return (
-          <div key={p.id} className="ig-item" data-status={p.status}>
-            <Link href={`/instagram/publicar/${p.id}`} className="ig-item-capa">{p.capa ? <img src={arquivo(p.capa.id, p.capa.type === "VIDEO")} alt="" /> : <I size={20} />}</Link>
-            <div className="ig-item-txt">
-              <div className="cluster" style={{ gap: 8 }}>
-                <span className="ig-item-tipo"><I size={13} aria-hidden /> {TIPOS_POST[p.tipo].nome}</span>
-                <span className="ig-selo inline" data-status={p.status}>{p.status === "PUBLICANDO" && <Loader2 size={11} className="animate-spin" />}{STATUS_POST[p.status]}</span>
-                {p.status === "AGENDADO" && <span className="subtle small">{quando(p.agendado_para)}</span>}
-                {p.status === "PUBLICADO" && <span className="subtle small">{quando(p.publicado_em)}</span>}
-              </div>
-              <p className="ig-item-legenda">{p.tipo === "STORY" ? "Story (sem legenda)" : p.legenda.trim() || <span className="subtle">Sem legenda</span>}</p>
-              {p.erro && <p className="error-text small">{p.erro}</p>}
-            </div>
-            <div className="cluster" style={{ gap: 4, flexWrap: "nowrap" }}>
-              {p.permalink && <a className="btn btn-ghost btn-xs" href={p.permalink} target="_blank" rel="noreferrer"><ExternalLink aria-hidden /> Ver</a>}
-              {podeEditar && p.status !== "PUBLICADO" && p.status !== "PUBLICANDO" && <Link className="btn btn-secondary btn-xs" href={`/instagram/publicar/${p.id}`}><Pencil aria-hidden /> Editar</Link>}
-              {podeEditar && p.status === "AGENDADO" && <button className="btn btn-ghost btn-xs" disabled={pend} onClick={() => acao(() => voltarParaRascunho(p.id), "Agendamento cancelado")}><Undo2 aria-hidden /> Cancelar</button>}
-              {podeEditar && p.status !== "PUBLICANDO" && <button className="btn btn-ghost btn-xs cn-del" onClick={() => setApagar(p)} aria-label="Apagar"><Trash2 aria-hidden /></button>}
-            </div>
-          </div>
-        );
-      })}
-      <Dialog open={!!apagar} onClose={() => setApagar(null)} title="Apagar publicação">
-        <p className="muted small">{apagar?.status === "PUBLICADO" ? "Sai só da plataforma; o post continua no Instagram." : "O rascunho/agendamento some e nada é publicado."}</p>
-        <div className="cluster" style={{ justifyContent: "flex-end" }}>
-          <button className="btn btn-ghost btn-sm" onClick={() => setApagar(null)}>Cancelar</button>
-          <button className="btn btn-danger btn-sm" disabled={pend} onClick={() => apagar && acao(() => apagarPublicacao(apagar.id), "Publicação apagada")}><Trash2 aria-hidden /> Apagar</button>
-        </div>
-      </Dialog>
-    </div>
   );
 }
 
