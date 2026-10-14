@@ -16,7 +16,8 @@ if ($Remover) {
   exit 0
 }
 
-$pnpm = (Get-Command pnpm -ErrorAction Stop).Source
+# pnpm.cmd (não o pnpm.ps1: pelo cmd.exe, o .ps1 abre no Bloco de Notas em vez de rodar)
+$pnpm = (Get-Command pnpm.cmd -ErrorAction Stop).Source
 New-Item -ItemType Directory -Force (Join-Path $raiz ".worker-data") | Out-Null
 $log = Join-Path $raiz ".worker-data\worker.log"
 # cmd /c mantém o código de saída: se o worker cair, a tarefa "falha" e o Agendador reinicia.
