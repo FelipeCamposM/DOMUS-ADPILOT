@@ -23,6 +23,9 @@ $log = Join-Path $raiz ".worker-data\worker.log"
 # cmd /c mantém o código de saída: se o worker cair, a tarefa "falha" e o Agendador reinicia.
 $acao = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c `"`"$pnpm`" worker >> `"$log`" 2>&1`"" -WorkingDirectory $raiz
 $gatilho = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
+# O "reiniciar se falhar" do Agendador só cobre falha ao abrir, não worker que sai com erro (ex.: Ctrl+C no console).
+# Então a tarefa também dispara a cada 5 min; com IgnoreNew, se o worker já está no ar, o disparo é ignorado.
+$gatilho.Repetition = (New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 5)).Repetition
 $config = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable `
   -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero) -MultipleInstances IgnoreNew -Hidden
 Register-ScheduledTask -TaskName $nome -Action $acao -Trigger $gatilho -Settings $config -Description "Fila de jobs e IA do DOMUS AdPilot" -Force | Out-Null
