@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmar } from "../shell/confirmar";
 import { Check, Cloud, ExternalLink, Film, Folder, FolderInput, FolderOpen, FolderPlus, Images, Loader2, Pencil, Search, Trash2, Upload, X, Zap } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { apagarCriativo } from "../creatives/actions";
@@ -119,7 +120,7 @@ export function Biblioteca({ modo, tipos = ["IMAGE", "VIDEO"], max = 12, jaTem =
               <span className="bib-pasta-acoes">
                 <button type="button" className="btn btn-ghost btn-xs" aria-label={`Renomear ${p.nome}`} onClick={() => setEditando({ id: p.id, nome: p.nome })}><Pencil aria-hidden /></button>
                 <button type="button" className="btn btn-ghost btn-xs" aria-label={`Apagar a pasta ${p.nome}`} disabled={ocupado}
-                  onClick={() => confirm(`Apagar a pasta “${p.nome}”? Os ${p.n} arquivo(s) dela continuam na biblioteca, sem pasta.`) && void acao(() => apagarPasta(p.id), "Pasta apagada").then((ok) => ok && pasta === p.id && setPasta("todas"))}><Trash2 aria-hidden /></button>
+                  onClick={async () => (await confirmar(`Apagar a pasta “${p.nome}”? Os ${p.n} arquivo(s) dela continuam na biblioteca, sem pasta.`)) && void acao(() => apagarPasta(p.id), "Pasta apagada").then((ok) => ok && pasta === p.id && setPasta("todas"))}><Trash2 aria-hidden /></button>
               </span>
             )}
           </div>
@@ -188,7 +189,7 @@ export function Biblioteca({ modo, tipos = ["IMAGE", "VIDEO"], max = 12, jaTem =
                 </select>
               </label>
               <button type="button" className="btn btn-ghost btn-xs" disabled={ocupado || !soEnviados} title={soEnviados ? undefined : "Só arquivos enviados são apagados aqui; os gerados pela IA são apagados no projeto do Studio"}
-                onClick={() => confirm(`Apagar ${sel.length} arquivo(s)? Projetos que já usaram continuam como estão.`) && void (async () => {
+                onClick={async () => (await confirmar(`Apagar ${sel.length} arquivo(s)? Projetos que já usaram continuam como estão.`)) && void (async () => {
                   setOcupado(true);
                   for (const id of sel) { const r = await apagarCriativo(id); if (!r.ok) toast.err(r.error); }
                   setOcupado(false); setSel([]); toast.ok("Apagado"); recarregar();

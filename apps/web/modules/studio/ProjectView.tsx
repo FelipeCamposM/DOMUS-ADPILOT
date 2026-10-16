@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmar } from "../shell/confirmar";
 import { gsap } from "gsap";
 import { AudioLines, Check, ClipboardCheck, Palette, Clapperboard, Download, FileCode2, Film, Loader2, PenLine, RefreshCw, Rocket, Square, Trash2, Upload, Wand2 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -123,9 +124,9 @@ export function ProjectView({ p, podeEditar }: { p: ProjetoView; podeEditar: boo
             {rodando ? (
               <button className="btn btn-secondary btn-sm" disabled={pend} onClick={() => acao(() => cancelarVideo(p.id), "Geração cancelada")}><Square aria-hidden /> Cancelar</button>
             ) : (
-              <button className="btn btn-secondary btn-sm" disabled={pend} onClick={() => confirm("Gerar tudo de novo (roteiro novo)?") && acao(() => gerarDeNovo(p.id), "Gerando um roteiro novo")}><RefreshCw aria-hidden /> Roteiro novo</button>
+              <button className="btn btn-secondary btn-sm" disabled={pend} onClick={async () => (await confirmar("Gerar tudo de novo (roteiro novo)?")) && acao(() => gerarDeNovo(p.id), "Gerando um roteiro novo")}><RefreshCw aria-hidden /> Roteiro novo</button>
             )}
-            <button className="btn btn-ghost btn-sm" disabled={pend || rodando} onClick={() => confirm("Apagar este vídeo e o arquivo final?") && start(async () => {
+            <button className="btn btn-ghost btn-sm" disabled={pend || rodando} onClick={async () => (await confirmar("Apagar este vídeo e o arquivo final?")) && start(async () => {
               const r = await apagarVideo(p.id);
               if (!r.ok) return toast.err(r.error);
               toast.ok("Vídeo apagado");

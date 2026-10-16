@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmar } from "../shell/confirmar";
 import { ArrowDownToLine, ArrowUpToLine, BoxSelect, Copy, Loader2, Redo2, RotateCcw, Save, Trash2, Type, Undo2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
@@ -82,7 +83,7 @@ export function ArtEditor({ projectId, creativeId, html, assets, w, h }: { proje
           <button className="btn btn-secondary btn-xs" onClick={() => cmd("texto")}><Type aria-hidden /> Adicionar texto</button>
           <span style={{ flex: 1 }} />
           <span className="subtle caption tabular">{w}×{h} · {Math.round(k * 100)}%</span>
-          <button className="btn btn-ghost btn-xs" onClick={() => (!sujo || confirm("Sair sem salvar as mudanças?")) && router.push(`/studio/${projectId}`)}><X aria-hidden /> Cancelar</button>
+          <button className="btn btn-ghost btn-xs" onClick={async () => (!sujo || (await confirmar("Sair sem salvar as mudanças?"))) && router.push(`/studio/${projectId}`)}><X aria-hidden /> Cancelar</button>
           <button className="btn btn-primary btn-sm" disabled={pend || !sujo} onClick={() => cmd("exportar")}>
             {pend ? <Loader2 className="animate-spin" aria-hidden /> : <><Save aria-hidden /> Salvar e gerar PNG</>}
           </button>

@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmar } from "../shell/confirmar";
 import { BellRing, Loader2, LogOut, QrCode, Send } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
@@ -72,7 +73,7 @@ export function Whatsapp({ estado, qr, erro, avisos, podeAdmin, workerOnline }: 
         <span style={{ flex: 1 }} />
         {podeAdmin && estado && estado.state !== "off" && (conectado ? (<>
           <button className="btn btn-secondary btn-xs" disabled={pend || !workerOnline || !avisos} onClick={() => acao("teste")}><Send aria-hidden /> Enviar teste</button>
-          <button className="btn btn-ghost btn-xs" disabled={pend || !workerOnline} onClick={() => confirm("Desconectar este número? Os avisos param até conectar de novo.") && acao("desconectar")}><LogOut aria-hidden /> Desconectar</button>
+          <button className="btn btn-ghost btn-xs" disabled={pend || !workerOnline} onClick={async () => (await confirmar("Desconectar este número? Os avisos param até conectar de novo.")) && acao("desconectar")}><LogOut aria-hidden /> Desconectar</button>
         </>) : (
           <button className="btn btn-primary btn-xs" disabled={pend || aguardando || !workerOnline} onClick={() => acao("conectar")}>
             {pend || (aguardando && !qr) ? <Loader2 className="animate-spin" aria-hidden /> : <QrCode aria-hidden />} Conectar com QR code

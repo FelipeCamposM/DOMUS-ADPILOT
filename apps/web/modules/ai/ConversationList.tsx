@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmar } from "../shell/confirmar";
 import { MessageSquarePlus, Search, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -19,8 +20,8 @@ export function ConversationList({ itens }: { itens: Item[] }) {
   const t = q.trim().toLowerCase();
   const filtrados = t ? itens.filter((c) => c.title.toLowerCase().includes(t)) : itens;
 
-  const apagar = (c: Item) => {
-    if (!confirm(`Apagar a conversa “${c.title}”? O histórico some para todos do workspace.`)) return;
+  const apagar = async (c: Item) => {
+    if (!(await confirmar(`Apagar a conversa “${c.title}”? O histórico some para todos do workspace.`))) return;
     start(async () => {
       const r = await apagarConversa(c.id);
       if (!r.ok) return toast.err(r.error);

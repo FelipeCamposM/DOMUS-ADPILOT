@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmar } from "../shell/confirmar";
 import { faltasItem, FORMATOS_CAL, type FormatoCal, type Roteiro } from "@domus-ads/core/calendario";
 import { LIMITES_IG } from "@domus-ads/core/instagram-regras";
 import { AlertTriangle, ArrowDown, ArrowUp, CalendarRange, Check, CheckCheck, ChevronLeft, CircleDot, ChevronRight, Clapperboard, ExternalLink, GalleryHorizontal, ImageIcon, Loader2, Minus, Plus, RefreshCw, Sparkles, Trash2, Undo2, Wand2, X } from "lucide-react";
@@ -167,8 +168,8 @@ export function Calendario({ conta, contas, marcas, mes, itens, avulsos, planos,
                   <td className="small">{p.itens} post(s){p.sugeridos ? ` · ${p.sugeridos} sugestão(ões)` : ""}</td>
                   <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
                     {podeEditar && <>
-                      <button className="btn btn-ghost btn-xs" disabled={pend || p.status === "GERANDO"} title="Troca as sugestões não aprovadas por novas" onClick={() => confirm("Planejar de novo? As sugestões não aprovadas deste período são trocadas; as aprovadas ficam.") && acao(() => replanejar(p.id), "Planejando de novo")}><RefreshCw aria-hidden /> Refazer sugestões</button>
-                      <button className="btn btn-ghost btn-xs" disabled={pend} aria-label="Apagar planejamento" onClick={() => confirm("Apagar este planejamento e as sugestões dele? O que já foi agendado continua em Planejados.") && acao(() => apagarPlanejamento(p.id), "Planejamento apagado")}><Trash2 aria-hidden /></button>
+                      <button className="btn btn-ghost btn-xs" disabled={pend || p.status === "GERANDO"} title="Troca as sugestões não aprovadas por novas" onClick={async () => (await confirmar("Planejar de novo? As sugestões não aprovadas deste período são trocadas; as aprovadas ficam.")) && acao(() => replanejar(p.id), "Planejando de novo")}><RefreshCw aria-hidden /> Refazer sugestões</button>
+                      <button className="btn btn-ghost btn-xs" disabled={pend} aria-label="Apagar planejamento" onClick={async () => (await confirmar("Apagar este planejamento e as sugestões dele? O que já foi agendado continua em Planejados.")) && acao(() => apagarPlanejamento(p.id), "Planejamento apagado")}><Trash2 aria-hidden /></button>
                     </>}
                   </td>
                 </tr>
@@ -368,7 +369,7 @@ function Editor({ item, podeEditar, onFechar }: { item: ItemTela; podeEditar: bo
 
       <div className="cal-rodape">
         {podeEditar && ["SUGERIDO", "APROVADO", "FALHOU"].includes(item.status) && (
-          <button className="btn btn-ghost btn-sm" disabled={pend} onClick={() => confirm("Descartar este post do calendário?") && start(async () => { const x = await descartarItem(item.id); if (!x.ok) return toast.err(x.error); toast.ok("Post descartado"); onFechar(); router.refresh(); })}><Trash2 aria-hidden /> Descartar</button>
+          <button className="btn btn-ghost btn-sm" disabled={pend} onClick={async () => (await confirmar("Descartar este post do calendário?")) && start(async () => { const x = await descartarItem(item.id); if (!x.ok) return toast.err(x.error); toast.ok("Post descartado"); onFechar(); router.refresh(); })}><Trash2 aria-hidden /> Descartar</button>
         )}
         {podeEditar && (item.status === "APROVADO" || item.status === "FALHOU") && (
           <button className="btn btn-ghost btn-sm" disabled={pend} onClick={() => start(async () => { const x = await voltarParaSugestao(item.id); if (!x.ok) toast.err(x.error); router.refresh(); })}><Undo2 aria-hidden /> Voltar para sugestão</button>

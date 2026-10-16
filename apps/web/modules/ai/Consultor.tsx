@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmar } from "../shell/confirmar";
 import { ArrowLeft, ArrowUp, ArrowUpRight, History, Loader2, Plus, Square, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import type { ChatMsg, ChatState } from "@/lib/ai";
@@ -113,8 +114,8 @@ export function Consultor({ podeEditar }: { podeEditar: boolean }) {
   const abrir = (id: string) => { salvar(id); setVista("conversa"); void carregar(id); };
   const verHistorico = () => { setVista("historico"); void carregarHistorico(); };
   const parar = () => st && start(async () => { const r = await cancelarResposta(st.conversation.id); if (!r.ok) toast.err(r.error); await carregar(st.conversation.id); });
-  const apagar = (c: Item) => {
-    if (!confirm(`Apagar a conversa “${c.title}”?`)) return;
+  const apagar = async (c: Item) => {
+    if (!(await confirmar(`Apagar a conversa “${c.title}”?`))) return;
     start(async () => {
       const r = await apagarConversa(c.id);
       if (!r.ok) return toast.err(r.error);

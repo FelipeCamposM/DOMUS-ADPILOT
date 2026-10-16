@@ -1282,3 +1282,10 @@ fieldset:disabled .chave { opacity: 0.6; cursor: default; }
 .dp-atalhos { display: flex; flex-wrap: wrap; gap: 4px; width: 100%; }
 .dp-atalhos .chip { height: 26px; padding: 0 9px; font-size: 12px; font-variant-numeric: tabular-nums; }
 .dp-ok { align-self: flex-end; }
+
+/* Modal de confirmação (confirmar) */
+.confirma { display: flex; gap: 14px; align-items: flex-start; }
+.confirma p { margin: 0; padding-top: 6px; font-size: 14.5px; line-height: 1.5; color: rgb(var(--c-text-primary)); }
+.confirma-icone { flex: none; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; background: rgb(var(--c-brand) / 0.15); color: rgb(var(--c-glow)); }
+.confirma-icone[data-perigo="true"] { background: rgb(var(--c-error) / 0.13); color: rgb(var(--c-error)); }
+.confirma-icone svg { width: 19px; height: 19px; }

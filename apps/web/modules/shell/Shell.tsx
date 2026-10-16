@@ -11,6 +11,7 @@ import { sair, trocarWorkspace } from "./actions";
 import { CommandPalette } from "./CommandPalette";
 import { Popover } from "./Popover";
 import { Sidebar } from "./Sidebar";
+import { Confirmador } from "./confirmar";
 import { Toaster, toast } from "./toast";
 import { UsoIA } from "./UsoIA";
 import type { UsoContaIA } from "@/lib/queries";
@@ -143,6 +144,7 @@ export function Shell(p: ShellProps) {
       <CommandPalette open={paleta} onClose={fecharPaleta} campanhas={p.campanhas} />
       <Consultor key={p.workspaceId} podeEditar={["editor", "admin", "owner"].includes(p.workspaces.find((w) => w.id === p.workspaceId)?.role ?? "")} />
       <Toaster />
+      <Confirmador />
       <Motion />
     </div>
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmar } from "../shell/confirmar";
 import { ArrowLeft, ArrowRight, Check, ClipboardCheck, Download, Loader2, MousePointer2, Plus, RefreshCw, Square, Trash2, Wand2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -83,8 +84,8 @@ export function ImageProjectView({ id, status, step, error, progress, formato, v
                 {variacoes.length > 1 && <button className="btn btn-secondary btn-xs" onClick={() => void baixarTodos()}><Download aria-hidden /> Baixar {carrossel ? "carrossel" : "todas"}</button>}
                 {carrossel && !revisao && variacoes.length > 1 && <BotaoPublicar tipo="CARROSSEL" midias={variacoes.slice(0, 10).map((v) => v.id)} rotulo="Publicar carrossel" />}
                 {!revisao && !carrossel && <button className="btn btn-primary btn-xs" disabled={pend} onClick={() => acao(() => maisVariacoes(id, 2), "Pensando em mais 2 conceitos")}><Plus aria-hidden /> Mais 2 variações</button>}
-                {!revisao && carrossel && <button className="btn btn-primary btn-xs" disabled={pend} onClick={() => confirm("Planejar um carrossel novo? O atual continua até você aprovar o novo.") && acao(() => gerarDeNovo(id), "Planejando outro carrossel")}><RefreshCw aria-hidden /> Outro carrossel</button>}
-                <button className="btn btn-ghost btn-xs" disabled={pend} onClick={() => confirm("Apagar o projeto e todas as imagens?") && start(async () => {
+                {!revisao && carrossel && <button className="btn btn-primary btn-xs" disabled={pend} onClick={async () => (await confirmar("Planejar um carrossel novo? O atual continua até você aprovar o novo.")) && acao(() => gerarDeNovo(id), "Planejando outro carrossel")}><RefreshCw aria-hidden /> Outro carrossel</button>}
+                <button className="btn btn-ghost btn-xs" disabled={pend} onClick={async () => (await confirmar("Apagar o projeto e todas as imagens?")) && start(async () => {
                   const r = await apagarVideo(id);
                   if (!r.ok) return toast.err(r.error);
                   router.push("/studio");
@@ -171,7 +172,7 @@ export function ImageProjectView({ id, status, step, error, progress, formato, v
                 {podeEditar && !rodando && <Link className="btn btn-ghost btn-xs" href={`/studio/${id}/arte/${v.id}`} title="Arrastar, redimensionar e editar os textos (sem IA)"><MousePointer2 aria-hidden /> Editar</Link>}
                 {podeEditar && <button className="btn btn-ghost btn-xs" disabled={rodando} onClick={() => { setAjustando(v.id); setPedido(""); }}><Wand2 aria-hidden /> Ajustar com IA</button>}
                 <span style={{ flex: 1 }} />
-                {podeEditar && <button className="btn btn-ghost btn-xs" aria-label={carrossel ? "Apagar slide" : "Apagar variação"} disabled={rodando || pend} onClick={() => confirm(carrossel ? "Apagar este slide do carrossel?" : "Apagar esta variação?") && acao(() => apagarVariacao(id, v.id), carrossel ? "Slide apagado" : "Variação apagada", false)}><Trash2 aria-hidden /></button>}
+                {podeEditar && <button className="btn btn-ghost btn-xs" aria-label={carrossel ? "Apagar slide" : "Apagar variação"} disabled={rodando || pend} onClick={async () => (await confirmar(carrossel ? "Apagar este slide do carrossel?" : "Apagar esta variação?")) && acao(() => apagarVariacao(id, v.id), carrossel ? "Slide apagado" : "Variação apagada", false)}><Trash2 aria-hidden /></button>}
               </div>
             )}
           </div>

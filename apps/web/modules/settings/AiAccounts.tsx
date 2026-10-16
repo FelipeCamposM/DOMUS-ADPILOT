@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmar } from "../shell/confirmar";
 import { Download, KeyRound, Loader2, Plus, ScanSearch, Trash2, Unlock } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -110,7 +111,7 @@ export function AiAccounts({ contas, detectadas, podeAdmin, workerOnline }: { co
                           <button className="btn btn-secondary btn-xs" onClick={() => rodar(() => atualizarContaIA(c.id, { status: c.status === "ACTIVE" ? "DISABLED" : "ACTIVE" }), c.status === "ACTIVE" ? "Conta desativada" : "Conta ativada")}>
                             {c.status === "ACTIVE" ? "Desativar" : "Ativar"}
                           </button>
-                          <button className="btn btn-ghost btn-xs" title="Remover" onClick={() => confirm(`Remover a conta “${c.name}” da plataforma?`) && rodar(() => removerContaIA(c.id), "Conta removida")}><Trash2 aria-hidden /><span className="sr-only">Remover</span></button>
+                          <button className="btn btn-ghost btn-xs" title="Remover" onClick={async () => (await confirmar(`Remover a conta “${c.name}” da plataforma?`)) && rodar(() => removerContaIA(c.id), "Conta removida")}><Trash2 aria-hidden /><span className="sr-only">Remover</span></button>
                         </div>
                       )}
                     </td>

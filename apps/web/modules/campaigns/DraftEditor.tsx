@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmar } from "../shell/confirmar";
 import { googleSearchSchema, IDIOMAS, LANCES, LIMITES_RSA, palavraParaTexto, textoParaPalavras, type PalavraChave } from "@domus-ads/core/google-search";
 import { AlertTriangle, CheckCircle2, ChevronDown, Loader2, Plus, Rocket, Save, ShieldCheck, Sparkles, Trash2, Wand2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -194,7 +195,7 @@ export function DraftEditor({ d, contas, moeda, podeEditar, podePublicar }: { d:
                     <Contado valor={a.caminho2} max={LIMITES_RSA.caminho} off={bloqueado} on={(v) => anuncio(i, (x) => ({ ...x, caminho2: v }))} ph="caminho2" largura={170} />
                     <span style={{ flex: 1 }} />
                     <button type="button" className="btn btn-ghost btn-xs" onClick={() => setGrupoPrevia(i)}>Ver na prévia</button>
-                    {!bloqueado && e.grupos.length > 1 && <button type="button" className="btn btn-ghost btn-xs" onClick={() => confirm(`Remover o grupo “${g.nome}”?`) && muda((x) => ({ ...x, grupos: x.grupos.filter((_, j) => j !== i) }))}><Trash2 aria-hidden /> Remover grupo</button>}
+                    {!bloqueado && e.grupos.length > 1 && <button type="button" className="btn btn-ghost btn-xs" onClick={async () => (await confirmar(`Remover o grupo “${g.nome}”?`)) && muda((x) => ({ ...x, grupos: x.grupos.filter((_, j) => j !== i) }))}><Trash2 aria-hidden /> Remover grupo</button>}
                   </div>
                 </div>
               )}
@@ -248,7 +249,7 @@ export function DraftEditor({ d, contas, moeda, podeEditar, podePublicar }: { d:
               <button className="btn btn-secondary btn-sm" disabled={pend || !val.success} onClick={() => acao(() => validar(d.id), "O Google conferiu tudo: pode publicar")} title="O Google confere a campanha inteira sem criar nada">
                 {pend ? <Loader2 className="animate-spin" aria-hidden /> : <><ShieldCheck aria-hidden /> Validar no Google</>}
               </button>
-              {podePublicar && <button className="btn btn-primary btn-sm" disabled={pend || !val.success} onClick={() => confirm("Criar esta campanha no Google Ads? Ela nasce PAUSADA: nada é gasto até você ativar em Campanhas.") && acao(() => publicar(d.id), "Campanha criada no Google (pausada)", () => router.push("/campaigns"))}>
+              {podePublicar && <button className="btn btn-primary btn-sm" disabled={pend || !val.success} onClick={async () => (await confirmar("Criar esta campanha no Google Ads? Ela nasce PAUSADA: nada é gasto até você ativar em Campanhas.")) && acao(() => publicar(d.id), "Campanha criada no Google (pausada)", () => router.push("/campaigns"))}>
                 <Rocket aria-hidden /> Publicar (pausada)
               </button>}
               {!podePublicar && <span className="subtle caption">Só Admin/Owner publica.</span>}
@@ -276,7 +277,7 @@ export function DraftEditor({ d, contas, moeda, podeEditar, podePublicar }: { d:
           </div>
         )}
         {podeEditar && !publicado && d.status !== "PUBLISHING" && (
-          <button className="btn btn-ghost btn-xs" style={{ alignSelf: "flex-start" }} onClick={() => confirm("Apagar este rascunho?") && start(async () => { const r = await apagarRascunho(d.id); if (!r.ok) return toast.err(r.error); router.push("/campaigns"); })}><Trash2 aria-hidden /> Apagar rascunho</button>
+          <button className="btn btn-ghost btn-xs" style={{ alignSelf: "flex-start" }} onClick={async () => (await confirmar("Apagar este rascunho?")) && start(async () => { const r = await apagarRascunho(d.id); if (!r.ok) return toast.err(r.error); router.push("/campaigns"); })}><Trash2 aria-hidden /> Apagar rascunho</button>
         )}
       </div>
     </div>

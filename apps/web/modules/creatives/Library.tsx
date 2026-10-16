@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmar } from "../shell/confirmar";
 import { Loader2, Music2, Trash2, Upload, Waves } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
@@ -80,7 +81,7 @@ export function Library({ tipo, itens, podeEditar }: { tipo: "MUSIC" | "SFX"; it
                   <td>{i.tags.map((t) => <span key={t} className="badge badge-brand" style={{ marginRight: 4 }}>{t}</span>)}</td>
                   <td><audio controls preload="none" src={`/api/creatives/${i.id}/file`} style={{ height: 30, maxWidth: 220 }} /></td>
                   <td className="subtle" style={{ maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis" }} title={i.license ?? ""}>{i.license}</td>
-                  <td>{podeEditar && <button className="btn btn-ghost btn-xs" disabled={pend} onClick={() => confirm(`Apagar “${i.name}”?`) && start(async () => {
+                  <td>{podeEditar && <button className="btn btn-ghost btn-xs" disabled={pend} onClick={async () => (await confirmar(`Apagar “${i.name}”?`)) && start(async () => {
                     const r = await apagarCriativo(i.id);
                     if (r.ok) toast.ok("Apagado"); else toast.err(r.error);
                     router.refresh();

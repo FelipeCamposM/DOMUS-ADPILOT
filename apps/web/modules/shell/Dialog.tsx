@@ -16,7 +16,8 @@ export function Dialog({ open, onClose, title, children, largo }: { open: boolea
     if (!open) return;
     gsap.fromTo(bg.current, { opacity: 0 }, { opacity: 1, duration: 0.2 });
     gsap.fromTo(box.current, { opacity: 0, y: 18, scale: 0.96 }, { opacity: 1, y: 0, scale: 1, duration: 0.5, ease: "back.out(1.4)", clearProps: "transform" }); // sem transform: painéis "fixed" dentro (datas) usam a tela
-    const esc = (e: KeyboardEvent) => e.key === "Escape" && fechar.current();
+    // só o modal de cima (ex.: confirmar aberto sobre o editor) fecha com Esc
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && [...document.querySelectorAll(".overlay")].at(-1) === bg.current && fechar.current();
     window.addEventListener("keydown", esc);
     return () => window.removeEventListener("keydown", esc);
   }, [open]);

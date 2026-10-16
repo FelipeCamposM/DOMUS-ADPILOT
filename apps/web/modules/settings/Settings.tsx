@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmar } from "../shell/confirmar";
 import { AudioLines, CalendarClock, HardDrive, KeyRound, Loader2, MessageCircle, Plus, Power, Server, Terminal, Trash2, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition, type ReactNode } from "react";
@@ -119,7 +120,7 @@ export function Settings(p: {
                 </td>
                 <td style={{ textAlign: "right" }}>
                   {admin && x.user_id !== p.eu && (
-                    <button className="btn btn-ghost btn-xs" onClick={() => confirm(`Remover ${x.email} deste workspace?`) && rodar(() => removerMembro(x.user_id), "Membro removido")}><Trash2 aria-hidden /></button>
+                    <button className="btn btn-ghost btn-xs" onClick={async () => (await confirmar(`Remover ${x.email} deste workspace?`)) && rodar(() => removerMembro(x.user_id), "Membro removido")}><Trash2 aria-hidden /></button>
                   )}
                 </td>
               </tr>
@@ -150,7 +151,7 @@ export function Settings(p: {
           <div className="cluster">
             <input className="input-sm" type="password" autoComplete="off" placeholder="Chave da API (elevenlabs.io → Developers → API Keys)" value={chaveEl} onChange={(e) => setChaveEl(e.target.value)} style={{ width: 380 }} aria-label="Chave do ElevenLabs" />
             <button className="btn btn-primary btn-xs" disabled={pend || chaveEl.trim().length < 20} onClick={() => rodar(() => salvarChaveElevenLabs(chaveEl), "Chave validada e salva", () => setChaveEl(""))}>Salvar chave</button>
-            {p.elevenlabs.configurada && <button className="btn btn-ghost btn-xs" disabled={pend} onClick={() => confirm("Remover a chave do ElevenLabs? Vídeos novos voltam a usar só a voz local.") && rodar(() => salvarChaveElevenLabs(null), "Chave removida")}><Trash2 aria-hidden /> Remover</button>}
+            {p.elevenlabs.configurada && <button className="btn btn-ghost btn-xs" disabled={pend} onClick={async () => (await confirmar("Remover a chave do ElevenLabs? Vídeos novos voltam a usar só a voz local.")) && rodar(() => salvarChaveElevenLabs(null), "Chave removida")}><Trash2 aria-hidden /> Remover</button>}
           </div>
         ) : <p className="subtle small">Só administradores da plataforma configuram a chave.</p>}
         {p.elevenlabs.creditos ? (() => {
