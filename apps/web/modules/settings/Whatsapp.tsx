@@ -1,6 +1,6 @@
 "use client";
 
-import { BellRing, Loader2, LogOut, QrCode } from "lucide-react";
+import { BellRing, Loader2, LogOut, QrCode, Send } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { toast } from "../shell/toast";
@@ -36,10 +36,11 @@ export function Whatsapp({ estado, qr, erro, avisos, podeAdmin, workerOnline }: 
     return () => { clearInterval(t); clearTimeout(fim); };
   }, [aguardando, conectado, erro, router]);
 
-  const acao = (a: "conectar" | "desconectar") => start(async () => {
+  const acao = (a: "conectar" | "desconectar" | "teste") => start(async () => {
     const r = await whatsappAcao(a);
     if (!r.ok) { toast.err(r.error ?? "Erro"); return; }
-    if (a === "conectar") setAguardando(true); else toast.ok("Pedido enviado: o número vai ser desconectado");
+    if (a === "conectar") setAguardando(true);
+    else toast.ok(a === "teste" ? "Teste enviado: chega em alguns segundos" : "Pedido enviado: o número vai ser desconectado");
     router.refresh();
   });
 
@@ -69,9 +70,10 @@ export function Whatsapp({ estado, qr, erro, avisos, podeAdmin, workerOnline }: 
           {!estado ? "Wuzapi não configurada no worker" : conectado ? ["Conectado", estado.nome, estado.numero && fone(estado.numero)].filter(Boolean).join(" · ") : estado.state === "off" ? estado.erro : "Desconectado"}
         </span>
         <span style={{ flex: 1 }} />
-        {podeAdmin && estado && estado.state !== "off" && (conectado ? (
+        {podeAdmin && estado && estado.state !== "off" && (conectado ? (<>
+          <button className="btn btn-secondary btn-xs" disabled={pend || !workerOnline || !avisos} onClick={() => acao("teste")}><Send aria-hidden /> Enviar teste</button>
           <button className="btn btn-ghost btn-xs" disabled={pend || !workerOnline} onClick={() => confirm("Desconectar este número? Os avisos param até conectar de novo.") && acao("desconectar")}><LogOut aria-hidden /> Desconectar</button>
-        ) : (
+        </>) : (
           <button className="btn btn-primary btn-xs" disabled={pend || aguardando || !workerOnline} onClick={() => acao("conectar")}>
             {pend || (aguardando && !qr) ? <Loader2 className="animate-spin" aria-hidden /> : <QrCode aria-hidden />} Conectar com QR code
           </button>

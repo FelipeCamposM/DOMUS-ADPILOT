@@ -100,16 +100,16 @@ export async function removerContaIA(id: string) {
 }
 
 /** Liga/desliga o início do worker com o Windows (Agendador de Tarefas). Só acontece com este clique. */
-/** Conectar (gera QR na tela) ou desconectar o WhatsApp dos avisos. Quem fala com a Wuzapi é o worker. */
-export async function whatsappAcao(acao: "conectar" | "desconectar") {
+/** Conectar (gera QR na tela), desconectar ou mandar um aviso de teste no WhatsApp. Quem fala com a Wuzapi é o worker. */
+export async function whatsappAcao(acao: "conectar" | "desconectar" | "teste") {
   return run(async () => {
     const ctx = await admin();
     const sql = db();
-    const a = z.enum(["conectar", "desconectar"], { message: "Ação inválida" }).parse(acao);
+    const a = z.enum(["conectar", "desconectar", "teste"], { message: "Ação inválida" }).parse(acao);
     await sql`update ads.jobs set status = 'CANCELLED', finished_at = now() where type = 'WHATSAPP' and status in ('PENDING','RUNNING')`;
     await sql`update ads.worker_status set info = info - 'whatsappErro'`;
     await enqueueJob(sql, { workspaceId: null, type: "WHATSAPP", payload: { acao: a }, createdBy: ctx.user.id, maxAttempts: 1 });
-    await audit(sql, { workspaceId: null, actor: ctx.actor, action: a === "conectar" ? "Conectar WhatsApp" : "Desconectar WhatsApp", entityType: "worker" });
+    await audit(sql, { workspaceId: null, actor: ctx.actor, action: { conectar: "Conectar WhatsApp", desconectar: "Desconectar WhatsApp", teste: "Teste de aviso no WhatsApp" }[a], entityType: "worker" });
   });
 }
 

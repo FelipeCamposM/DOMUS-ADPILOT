@@ -46,6 +46,7 @@ export function Settings(p: {
     configurada: boolean; vozes: number | null; erro: string | null;
     creditos: { plano: string; usados: number; limite: number; renovaEm: string | null } | null; erroCreditos: string | null;
   };
+  envios: { id: string; created_at: string; para: string; texto: string; status: string; erro: string | null }[];
   usoVoz: { id: string; created_at: string; voice_name: string | null; characters: number; credits: number; titulo: string | null; video_project_id: string | null }[];
   worker: { online: boolean; lastSeen: string | null; info: Record<string, unknown> };
 }) {
@@ -152,6 +153,23 @@ export function Settings(p: {
 
       <Secao id="whatsapp" icon={<MessageCircle size={16} aria-hidden />} titulo="WhatsApp" desc="Número que manda os avisos da plataforma (post publicado, falhas). Roda na Wuzapi do PC do worker.">
         <Whatsapp estado={(p.worker.info.whatsapp as EstadoWhatsapp | undefined) ?? null} qr={(p.worker.info.whatsappQr as string | null | undefined) ?? null} erro={(p.worker.info.whatsappErro as string | null | undefined) ?? null} avisos={p.avisos} podeAdmin={p.podeOwnerIA} workerOnline={p.worker.online} />
+        {p.envios.length > 0 && (
+          <div className="table-wrap">
+            <table className="data">
+              <thead><tr><th>Data</th><th>Para</th><th>Mensagem</th><th>Status</th></tr></thead>
+              <tbody>
+                {p.envios.map((e) => (
+                  <tr key={e.id}>
+                    <td suppressHydrationWarning style={{ whiteSpace: "nowrap" }}>{dateTime(e.created_at)}</td>
+                    <td className="tabular" style={{ whiteSpace: "nowrap" }}>{e.para.replace(/^(\d{2})(\d{2})(\d{4,5})(\d{4})$/, "+$1 ($2) $3-$4")}</td>
+                    <td style={{ whiteSpace: "pre-line" }}>{e.texto}</td>
+                    <td title={e.erro ?? undefined}><span className={`chip ${e.status === "ENVIADO" ? "" : "err"}`}><span className={`dot ${e.status === "ENVIADO" ? "on" : "err"}`} aria-hidden />{e.status === "ENVIADO" ? "Enviado" : "Falhou"}</span>{e.erro && <div className="subtle small">{e.erro}</div>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Secao>
 
       <Secao id="worker" icon={<Server size={16} aria-hidden />} titulo="Worker local" desc="Processo no PC que sincroniza as contas e roda a IA. Não abre nenhuma porta: ele busca o trabalho no banco.">

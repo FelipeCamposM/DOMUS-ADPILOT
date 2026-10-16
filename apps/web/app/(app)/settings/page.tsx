@@ -34,6 +34,9 @@ export default async function SettingsPage() {
     select u.id::text, u.created_at, u.voice_name, u.characters, u.credits, v.title as titulo, u.video_project_id
     from ads.tts_usage u left join ads.video_projects v on v.id = u.video_project_id
     where u.workspace_id = ${ctx.workspace.id} order by u.created_at desc limit 30`;
+  // avisos da plataforma (não são do workspace): só o admin da plataforma vê
+  const envios = isPlatformAdmin(ctx) ? await sql<{ id: string; created_at: Date; para: string; texto: string; status: string; erro: string | null }[]>`
+    select id, created_at, para, texto, status, erro from ads.whatsapp_envios order by created_at desc limit 50` : [];
   const iso = (d: Date | null) => d?.toISOString() ?? null;
   // contas que o worker achou logadas no PC e ainda não foram importadas (o caminho fica no servidor)
   const achadas = ((w.info.detected ?? []) as (Detectada & { config_dir: string })[])
@@ -57,6 +60,7 @@ export default async function SettingsPage() {
         usoVoz={usoVoz.map((u) => ({ ...u, created_at: u.created_at.toISOString() }))}
         podeOwnerIA={isPlatformAdmin(ctx)}
         avisos={isPlatformAdmin(ctx) ? await whatsappAvisos() : null}
+        envios={envios.map((e) => ({ ...e, created_at: e.created_at.toISOString() }))}
         worker={{ online: w.online, lastSeen: iso(w.lastSeen), info: { ...w.info, detected: undefined, whatsappQr: isPlatformAdmin(ctx) ? w.info.whatsappQr : undefined } }}
       />
     </div>

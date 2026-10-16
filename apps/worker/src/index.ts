@@ -12,7 +12,7 @@ import { inicializacaoAtiva, configurarInicializacao } from "./startup";
 import { arquivarExcesso, restaurar } from "./video/arquivo";
 import { gerarLegenda, type LegendaPayload } from "./instagram/legenda";
 import { publicarInstagram } from "./instagram/publicar";
-import { acaoWhatsapp, estadoWhatsapp, gravarQr } from "./whatsapp";
+import { acaoWhatsapp, avisar, estadoWhatsapp, gravarQr } from "./whatsapp";
 
 /**
  * DOMUS Worker: roda no PC local, sem nenhuma porta aberta. Ele mesmo busca trabalho na fila (ads.jobs) com
@@ -163,8 +163,9 @@ await sql`update ads.jobs set status = 'FAILED', error = 'Worker reiniciado', fi
            where status = 'RUNNING' and type in ('AI_LOGIN','WORKER_STARTUP','GENERATE_VIDEO','GENERATE_IMAGE','PUBLISH_INSTAGRAM','AI_INSTAGRAM_CAPTION','WHATSAPP')`;
 await gravarQr(null).catch(() => {});
 // queda no meio de uma publicação: não dá para saber se o Instagram chegou a publicar; avisa em vez de repetir
-await sql`update ads.instagram_posts set status = 'FALHOU', erro = 'O worker reiniciou durante a publicação. Confira no perfil se ela saiu antes de tentar de novo.', updated_at = now()
-           where status = 'PUBLICANDO'`;
+const interrompidos = await sql`update ads.instagram_posts set status = 'FALHOU', erro = 'O worker reiniciou durante a publicação. Confira no perfil se ela saiu antes de tentar de novo.', updated_at = now()
+           where status = 'PUBLICANDO' returning id`;
+if (interrompidos.length) void avisar(`⚠️ O worker reiniciou no meio de ${interrompidos.length} publicação(ões). Confira no perfil se saiu e veja em Instagram → Planejados.`);
 await sql`update ads.instagram_posts set sugestao = null where sugestao->>'gerando' = 'true'`;
 await sql`update ads.video_projects set status = 'FAILED', error = 'Worker reiniciado durante a geração. Gere de novo.', updated_at = now()
            where status in ('SCRIPTING','VOICE','COMPOSING','RENDERING','MIXING','UPLOADING')`;

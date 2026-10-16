@@ -1,4 +1,4 @@
-import { db } from "@domus-ads/core";
+import { db, whatsappAvisos } from "@domus-ads/core";
 
 /**
  * WhatsApp via Wuzapi local (infra/whatsapp). Só o worker fala com ela (localhost):
@@ -36,7 +36,23 @@ export async function estadoWhatsapp(): Promise<EstadoWhatsapp | null> {
   }
 }
 
-const gravarInfo = (info: Record<string, unknown>) => db()`update ads.worker_status set info = info || ${db().json(info as never)} where id = (select id from ads.worker_status order by last_seen desc limit 1)`;
+/** Manda um aviso para o número de Configurações → WhatsApp. Nunca lança: aviso não pode derrubar publicação. */
+export async function avisar(texto: string, falhar = false) {
+  const para = await whatsappAvisos();
+  const registrar = (erro: string | null) => db()`insert into ads.whatsapp_envios (para, texto, status, erro)
+    values (${para ?? "—"}, ${texto}, ${erro ? "FALHOU" : "ENVIADO"}, ${erro})`.catch(() => {});
+  try {
+    if (!URL_WZ || !TOKEN || !para) throw new Error("WhatsApp ou número dos avisos não configurado");
+    await wz("POST", "/chat/send/text", { Phone: para, Body: texto });
+    await registrar(null);
+  } catch (e) {
+    await registrar((e as Error).message);
+    if (falhar) throw e;
+    console.log(`aviso no WhatsApp não enviado: ${(e as Error).message}`);
+  }
+}
+
+const gravarInfo =(info: Record<string, unknown>) => db()`update ads.worker_status set info = info || ${db().json(info as never)} where id = (select id from ads.worker_status order by last_seen desc limit 1)`;
 export const gravarQr = (qr: string | null) => gravarInfo({ whatsappQr: qr });
 
 /** Job WHATSAPP: "conectar" mostra QRs novos por até 2 min até ler; "desconectar" desloga o número. */
@@ -45,6 +61,10 @@ export async function acaoWhatsapp(acao: string, signal: AbortSignal, log: (m: s
   if (acao === "desconectar") {
     await wz("POST", "/session/logout").catch(() => {});
     await gravarQr(null);
+    return { ok: true };
+  }
+  if (acao === "teste") {
+    await avisar("✅ Teste do DOMUS AdPilot: os avisos de publicação vão chegar neste número.", true);
     return { ok: true };
   }
   if (acao !== "conectar") throw new Error(`Ação inválida: ${acao}`);

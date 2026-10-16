@@ -4,10 +4,12 @@ import { join } from "node:path";
 import { DATA_DIR } from "../env";
 import { restaurar } from "../video/arquivo";
 import { ffmpeg, FFPROBE, rodar } from "../video/tools";
+import { avisar } from "../whatsapp";
 
 interface Post { id: string; tipo: "FEED" | "CARROSSEL" | "REELS" | "STORY"; legenda: string; midias: { creativeId: string }[]; opcoes: { compartilharNoFeed?: boolean; capaMs?: number }; workspace_id: string }
 interface Criativo { id: string; type: string; mime: string | null; storage: string; r2_key: string; arquivado: boolean }
 
+const NOME = { FEED: "Post", CARROSSEL: "Carrossel", REELS: "Reels", STORY: "Story" } as const;
 const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function dimensoes(arquivo: string): Promise<{ w: number; h: number }> {
@@ -39,6 +41,7 @@ export async function publicarInstagram(postId: string, c: { signal: AbortSignal
   if (!p) return { pulado: "não está agendada" };
   const temporarios: string[] = [];
   const pasta = join(DATA_DIR, "instagram", p.id);
+  let perfil = "";
   mkdirSync(pasta, { recursive: true });
   try {
     const [conta] = await sql<{ ig_user_id: string; username: string; credentials_enc: string }[]>`
@@ -46,6 +49,7 @@ export async function publicarInstagram(postId: string, c: { signal: AbortSignal
       join ads.instagram_accounts a on a.id = x.ig_account_id join ads.ad_connections k on k.id = a.connection_id
       where x.id = ${p.id} and k.status <> 'REVOKED'`;
     if (!conta) throw new Error("A conexão do Instagram foi removida");
+    perfil = ` em @${conta.username}`;
     const api = instagramDaConexao(conta.credentials_enc);
     const ids = p.midias.map((m) => m.creativeId);
     const lista = await sql<Criativo[]>`
@@ -115,9 +119,14 @@ export async function publicarInstagram(postId: string, c: { signal: AbortSignal
     const link = await api.permalink(pub.id).then((x) => x.permalink ?? null, () => null);
     await sql`update ads.instagram_posts set status = 'PUBLICADO', publicado_em = now(), ig_media_id = ${pub.id}, permalink = ${link}, updated_at = now() where id = ${p.id}`;
     await c.log(`publicado: ${link ?? pub.id}`);
+    await avisar(`✅ ${NOME[p.tipo]} publicado${perfil}${link ? `
+${link}` : ""}`);
     return { mediaId: pub.id, permalink: link };
   } catch (e) {
     await sql`update ads.instagram_posts set status = 'FALHOU', erro = ${(e as Error).message.slice(0, 2000)}, updated_at = now() where id = ${p.id}`;
+    await avisar(`❌ ${NOME[p.tipo]} não foi publicado${perfil}
+Motivo: ${(e as Error).message.slice(0, 300)}
+Veja em Instagram → Planejados.`);
     throw e;
   } finally {
     for (const k of temporarios) await r2Delete(k).catch(() => {});
