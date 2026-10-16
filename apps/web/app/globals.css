@@ -1213,7 +1213,12 @@ fieldset:disabled .chave { opacity: 0.6; cursor: default; }
 .cal-aviso > svg { color: var(--cor); flex: none; }
 .cal-aviso[data-status="SUGERIDO"] { --cor: rgb(var(--c-brand)); }
 .cal-mix { display: inline-flex; align-items: center; gap: 8px; padding: 6px 6px 6px 12px; border-radius: var(--radius-md); border: 1px solid rgb(var(--c-border)); font-size: 13.5px; }
-.cal-mix input { width: 58px; }
+.cal-passo { display: inline-flex; align-items: center; border-radius: 8px; background: rgb(var(--c-bg-inset)); border: 1px solid rgb(var(--c-border)); }
+.cal-passo button { display: grid; place-items: center; width: 28px; height: 28px; border: 0; background: none; color: rgb(var(--c-text-secondary)); cursor: pointer; border-radius: 7px; }
+.cal-passo button:hover:not(:disabled) { background: rgb(var(--c-brand) / 0.18); color: rgb(var(--c-text-primary)); }
+.cal-passo button:disabled { opacity: .35; cursor: default; }
+.cal-passo svg { width: 14px; height: 14px; }
+.cal-passo b { min-width: 22px; text-align: center; font-size: 14px; }
 .cal-editor { display: flex; flex-direction: column; gap: 14px; padding: 18px 20px; }
 .cal-campos { display: flex; flex-direction: column; gap: 12px; border: 0; padding: 0; margin: 0; min-width: 0; }
 .cal-rotulo { display: flex; align-items: center; gap: 8px; }

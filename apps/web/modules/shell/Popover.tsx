@@ -8,17 +8,19 @@ export function Popover({ open, onClose, children, align = "left", width, classN
   open: boolean; onClose: () => void; children: ReactNode; align?: "left" | "right"; width?: number; className?: string; style?: CSSProperties;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const fechar = useRef(onClose);
+  fechar.current = onClose;
 
   useEffect(() => {
     if (!open) return;
     gsap.fromTo(ref.current, { opacity: 0, y: -6, scale: 0.97, transformOrigin: align === "right" ? "top right" : "top left" },
       { opacity: 1, y: 0, scale: 1, duration: 0.32, ease: "back.out(1.6)" });
-    const fora = (e: PointerEvent) => { if (!ref.current?.parentElement?.contains(e.target as Node)) onClose(); };
-    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    const fora = (e: PointerEvent) => { if (!ref.current?.parentElement?.contains(e.target as Node)) fechar.current(); };
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") fechar.current(); };
     document.addEventListener("pointerdown", fora);
     document.addEventListener("keydown", esc);
     return () => { document.removeEventListener("pointerdown", fora); document.removeEventListener("keydown", esc); };
-  }, [open, onClose, align]);
+  }, [open, align]);
 
   if (!open) return null;
   return (

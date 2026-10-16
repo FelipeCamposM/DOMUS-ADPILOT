@@ -2,7 +2,7 @@
 
 import { faltasItem, FORMATOS_CAL, type FormatoCal, type Roteiro } from "@domus-ads/core/calendario";
 import { LIMITES_IG } from "@domus-ads/core/instagram-regras";
-import { AlertTriangle, ArrowDown, ArrowUp, CalendarRange, Check, CheckCheck, ChevronLeft, CircleDot, ChevronRight, Clapperboard, ExternalLink, GalleryHorizontal, ImageIcon, Loader2, Plus, RefreshCw, Sparkles, Trash2, Undo2, Wand2, X } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, CalendarRange, Check, CheckCheck, ChevronLeft, CircleDot, ChevronRight, Clapperboard, ExternalLink, GalleryHorizontal, ImageIcon, Loader2, Minus, Plus, RefreshCw, Sparkles, Trash2, Undo2, Wand2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
@@ -235,13 +235,17 @@ function Planejar({ open, onClose, contaId, marcas }: { open: boolean; onClose: 
           {(Object.keys(FORMATOS_CAL) as FormatoCal[]).map((k) => {
             const Icone = ICONE[k];
             return (
-              <label key={k} className="cal-mix"><Icone size={15} aria-hidden /> {FORMATOS_CAL[k]}
-                <input type="number" className="input-sm tabular" min={0} max={7} value={f.mix[k]} onChange={(e) => setF({ ...f, mix: { ...f.mix, [k]: Math.max(0, Math.min(7, Number(e.target.value) || 0)) } })} />
-              </label>
+              <div key={k} className="cal-mix"><Icone size={15} aria-hidden /> {FORMATOS_CAL[k]}
+                <span className="cal-passo">
+                  <button type="button" aria-label={`Menos ${FORMATOS_CAL[k]}`} disabled={f.mix[k] <= 0} onClick={() => setF({ ...f, mix: { ...f.mix, [k]: f.mix[k] - 1 } })}><Minus aria-hidden /></button>
+                  <b className="tabular" aria-live="polite">{f.mix[k]}</b>
+                  <button type="button" aria-label={`Mais ${FORMATOS_CAL[k]}`} disabled={f.mix[k] >= 7} onClick={() => setF({ ...f, mix: { ...f.mix, [k]: f.mix[k] + 1 } })}><Plus aria-hidden /></button>
+                </span>
+              </div>
             );
           })}
         </div>
-        <span className="subtle caption">Cerca de {total} post(s) no período. Stories ficam de fora: todo post vai para os stories automaticamente (em breve).</span>
+        <span className="subtle caption">Cerca de {total} post(s) no período. Stories ficam de fora: todo post publicado vai para os stories sozinho.</span>
       </div>
       <div className="cluster" style={{ justifyContent: "flex-end" }}>
         <button className="btn btn-ghost btn-sm" onClick={onClose}>Cancelar</button>
