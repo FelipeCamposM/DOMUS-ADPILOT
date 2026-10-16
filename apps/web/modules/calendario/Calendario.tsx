@@ -2,11 +2,11 @@
 
 import { faltasItem, FORMATOS_CAL, type FormatoCal, type Roteiro } from "@domus-ads/core/calendario";
 import { LIMITES_IG } from "@domus-ads/core/instagram-regras";
-import { AlertTriangle, ArrowDown, ArrowUp, CalendarRange, Check, CheckCheck, ChevronLeft, ChevronRight, Clapperboard, ExternalLink, GalleryHorizontal, ImageIcon, Loader2, Plus, RefreshCw, Sparkles, Trash2, Undo2, Wand2, X } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, CalendarRange, Check, CheckCheck, ChevronLeft, CircleDot, ChevronRight, Clapperboard, ExternalLink, GalleryHorizontal, ImageIcon, Loader2, Plus, RefreshCw, Sparkles, Trash2, Undo2, Wand2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
-import type { ItemTela, PlanoTela } from "@/lib/calendario";
+import type { ItemTela, PlanoTela, PostAvulso } from "@/lib/calendario";
 import { Dialog } from "../shell/Dialog";
 import { toast } from "../shell/toast";
 import { gradeDoMes, somaDias } from "./grade";
@@ -14,6 +14,7 @@ import { apagarPlanejamento, aprovarItens, descartarItem, novoItem, planejarPeri
 
 const TZ = "America/Sao_Paulo";
 const ICONE: Record<FormatoCal, typeof ImageIcon> = { FEED: ImageIcon, CARROSSEL: GalleryHorizontal, REELS: Clapperboard };
+const ICONE_POST = { ...ICONE, STORY: CircleDot };
 const STATUS: Record<string, string> = { SUGERIDO: "Sugestão", APROVADO: "Aprovado", GERANDO: "Gerando arte", AGENDADO: "Agendado", PUBLICADO: "Publicado", FALHOU: "Falhou" };
 const SEMANA = ["seg", "ter", "qua", "qui", "sex", "sáb", "dom"];
 
@@ -24,9 +25,9 @@ const paraInput = (iso: string) => `${diaDe(iso)}T${horaDe(iso)}`;
 const deInput = (v: string) => new Date(`${v}:00-03:00`).toISOString();
 const hojeBr = () => new Date().toLocaleDateString("en-CA", { timeZone: TZ });
 
-export function Calendario({ conta, contas, marcas, mes, itens, planos, podeEditar }: {
+export function Calendario({ conta, contas, marcas, mes, itens, avulsos, planos, podeEditar }: {
   conta: { id: string; username: string }; contas: { id: string; username: string }[]; marcas: { id: string; nome: string }[];
-  mes: string; itens: ItemTela[]; planos: PlanoTela[]; podeEditar: boolean;
+  mes: string; itens: ItemTela[]; avulsos: PostAvulso[]; planos: PlanoTela[]; podeEditar: boolean;
 }) {
   const router = useRouter();
   const [pend, start] = useTransition();
@@ -34,10 +35,12 @@ export function Calendario({ conta, contas, marcas, mes, itens, planos, podeEdit
   const [planejar, setPlanejar] = useState(false);
   const dias = useMemo(() => gradeDoMes(mes), [mes]);
   const porDia = useMemo(() => {
-    const m = new Map<string, ItemTela[]>();
-    for (const i of itens) m.set(diaDe(i.data_hora), [...(m.get(diaDe(i.data_hora)) ?? []), i]);
+    // posts do calendário e publicações agendadas à mão, na ordem do horário
+    const todos = [...itens.map((i) => ({ hora: i.data_hora, i, p: null })), ...avulsos.map((p) => ({ hora: p.data, i: null, p }))].sort((a, b) => a.hora.localeCompare(b.hora));
+    const m = new Map<string, typeof todos>();
+    for (const t of todos) m.set(diaDe(t.hora), [...(m.get(diaDe(t.hora)) ?? []), t]);
     return m;
-  }, [itens]);
+  }, [itens, avulsos]);
   const hoje = hojeBr();
   const item = itens.find((i) => i.id === aberto) ?? null;
   const sugeridos = itens.filter((i) => i.status === "SUGERIDO" && !i.refazendo);
@@ -55,7 +58,7 @@ export function Calendario({ conta, contas, marcas, mes, itens, planos, podeEdit
   const navegar = (delta: number) => {
     const [y, m] = mes.split("-").map(Number) as [number, number];
     const d = new Date(Date.UTC(y, m - 1 + delta, 1));
-    router.push(`/instagram/calendario?conta=${conta.id}&mes=${d.toISOString().slice(0, 7)}`);
+    router.push(`/conteudos?conta=${conta.id}&mes=${d.toISOString().slice(0, 7)}`);
   };
   const acao = (fn: () => Promise<{ ok: boolean; error?: string }>, msg?: string) => start(async () => {
     const r = await fn();
@@ -71,7 +74,7 @@ export function Calendario({ conta, contas, marcas, mes, itens, planos, podeEdit
       <div className="page-head">
         <div>
           <div className="eyebrow" data-enter>@{conta.username} · Instagram</div>
-          <h1 className="page-title" data-enter>Calendário de conteúdo</h1>
+          <h1 className="page-title" data-enter>Conteúdos programados</h1>
         </div>
         <div className="cluster" data-enter>
           <Link href={`/instagram?conta=${conta.id}`} className="btn btn-ghost btn-sm"><ChevronLeft aria-hidden /> Perfil</Link>
@@ -81,7 +84,7 @@ export function Calendario({ conta, contas, marcas, mes, itens, planos, podeEdit
 
       {contas.length > 1 && (
         <div className="cluster" style={{ gap: 6 }}>
-          {contas.map((c) => <Link key={c.id} href={`/instagram/calendario?conta=${c.id}&mes=${mes}`} className="chip" data-active={c.id === conta.id}>@{c.username}</Link>)}
+          {contas.map((c) => <Link key={c.id} href={`/conteudos?conta=${c.id}&mes=${mes}`} className="chip" data-active={c.id === conta.id}>@{c.username}</Link>)}
         </div>
       )}
 
@@ -124,7 +127,17 @@ export function Calendario({ conta, contas, marcas, mes, itens, planos, podeEdit
             return (
               <div key={d} className="cal-dia" data-fora={!d.startsWith(mes)} data-hoje={d === hoje} data-passado={d < hoje} data-tem={lista.length > 0}>
                 <span className="cal-num">{Number(d.slice(8))}<small>{new Date(`${d}T12:00:00Z`).toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "short", timeZone: "UTC" })}</small></span>
-                {lista.map((i) => {
+                {lista.map(({ i: doCal, p }) => {
+                  if (p) {
+                    const Icone = ICONE_POST[p.tipo];
+                    return (
+                      <Link key={p.id} href={`/instagram/publicar/${p.id}`} className="cal-item" data-status={p.status === "PUBLICANDO" ? "AGENDADO" : p.status} title={`${STATUS[p.status] ?? "Publicando"} · agendado à mão`}>
+                        {p.status === "PUBLICANDO" ? <Loader2 size={12} className="animate-spin" aria-hidden /> : <Icone size={12} aria-hidden />}
+                        <b>{horaDe(p.data)}</b><span>{p.tipo === "STORY" ? "Story" : p.legenda.split(/\n/)[0] || FORMATOS_CAL[p.tipo]}</span>
+                      </Link>
+                    );
+                  }
+                  const i = doCal!;
                   const Icone = ICONE[i.formato];
                   return (
                     <button key={i.id} type="button" className="cal-item" data-status={i.status} onClick={() => setAberto(i.id)} title={`${STATUS[i.status]} · ${i.tema}`}>
@@ -195,7 +208,7 @@ function Planejar({ open, onClose, contaId, marcas }: { open: boolean; onClose: 
     if (!r.ok) return toast.err(r.error);
     toast.ok("A IA está planejando: as sugestões aparecem no calendário em instantes");
     onClose();
-    router.push(`/instagram/calendario?conta=${contaId}&mes=${f.inicio.slice(0, 7)}`);
+    router.push(`/conteudos?conta=${contaId}&mes=${f.inicio.slice(0, 7)}`);
     router.refresh();
   });
   return (

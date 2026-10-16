@@ -28,6 +28,20 @@ export async function itensCalendario(workspaceId: string, contaId: string, de: 
   return r.map((i) => ({ ...i, roteiro: roteiroSchema.catch(roteiroSchema.parse({})).parse(i.roteiro ?? {}) }));
 }
 
+export interface PostAvulso { id: string; tipo: "FEED" | "CARROSSEL" | "REELS" | "STORY"; status: string; data: string; legenda: string }
+
+/** Publicações feitas fora do calendário (agendadas à mão), para aparecerem na mesma grade. Reposts automáticos nos stories ficam de fora. */
+export function postsAvulsos(workspaceId: string, contaId: string, de: Date, ate: Date) {
+  const sql = db();
+  return sql<PostAvulso[]>`
+    select p.id, p.tipo, p.status, ${sql.unsafe(ISO("coalesce(p.publicado_em, p.agendado_para)"))} as data, left(p.legenda, 120) as legenda
+    from ads.instagram_posts p
+    where p.workspace_id = ${workspaceId} and p.ig_account_id = ${contaId} and p.status in ('AGENDADO', 'PUBLICANDO', 'PUBLICADO', 'FALHOU')
+      and coalesce(p.publicado_em, p.agendado_para) >= ${de} and coalesce(p.publicado_em, p.agendado_para) < ${ate}
+      and not (p.opcoes ? 'repostDe') and not exists (select 1 from ads.calendario_itens i where i.post_id = p.id)
+    order by data`;
+}
+
 /** Planejamentos recentes do perfil (para mostrar "planejando…", erros e refazer). */
 export function planosCalendario(workspaceId: string, contaId: string) {
   return db()<PlanoTela[]>`

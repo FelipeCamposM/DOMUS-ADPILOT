@@ -22,7 +22,7 @@ async function itemDoWorkspace(ctx: Ctx, id: string) {
   return i;
 }
 
-const revalidar = () => revalidatePath("/instagram/calendario");
+const revalidar = () => revalidatePath("/conteudos");
 
 /** Novo planejamento: a IA sugere todos os posts do período numa chamada só. */
 export async function planejarPeriodo(input: unknown) {
