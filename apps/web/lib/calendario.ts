@@ -1,5 +1,5 @@
 import "server-only";
-import { db, type FormatoCal, type Roteiro } from "@domus-ads/core";
+import { db, roteiroSchema, type FormatoCal, type Roteiro } from "@domus-ads/core";
 
 export interface ItemTela {
   id: string; calendario_id: string; data_hora: string; formato: FormatoCal; tema: string; objetivo: string; roteiro: Roteiro; legenda: string; hashtags: string[];
@@ -11,9 +11,9 @@ export interface PlanoTela { id: string; inicio: string; fim: string; objetivo: 
 const ISO = (c: string) => `to_char(${c} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')`;
 
 /** Posts do calendário de um perfil num intervalo (a grade do mês), com o andamento da arte e da publicação. */
-export function itensCalendario(workspaceId: string, contaId: string, de: Date, ate: Date) {
+export async function itensCalendario(workspaceId: string, contaId: string, de: Date, ate: Date) {
   const sql = db();
-  return sql<ItemTela[]>`
+  const r = await sql<ItemTela[]>`
     select i.id, i.calendario_id, ${sql.unsafe(ISO("i.data_hora"))} as data_hora, i.formato, i.tema, i.objetivo, i.roteiro, i.legenda, i.hashtags,
       i.status, i.refazendo, i.erro, ${sql.unsafe(ISO("i.updated_at"))} as updated_at, i.project_id, p.step_detail as etapa,
       i.post_id, x.status as post_status, x.permalink,
@@ -24,6 +24,8 @@ export function itensCalendario(workspaceId: string, contaId: string, de: Date, 
     left join ads.video_projects p on p.id = i.project_id left join ads.instagram_posts x on x.id = i.post_id
     where i.workspace_id = ${workspaceId} and k.ig_account_id = ${contaId} and i.data_hora >= ${de} and i.data_hora < ${ate}
     order by i.data_hora`;
+  // post manual nasce com roteiro vazio: completa com os padrões (slides [], duração 30…)
+  return r.map((i) => ({ ...i, roteiro: roteiroSchema.catch(roteiroSchema.parse({})).parse(i.roteiro ?? {}) }));
 }
 
 /** Planejamentos recentes do perfil (para mostrar "planejando…", erros e refazer). */

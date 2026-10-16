@@ -2,6 +2,7 @@
 
 import type { ConfigCal } from "@domus-ads/core/calendario";
 import { FORMATOS_CAL, type FormatoCal } from "@domus-ads/core/calendario";
+import { ESTILOS, VOZES } from "@domus-ads/core/video";
 import { Loader2, Save } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -34,6 +35,29 @@ export function PrazosCalendario({ cfg, podeAdmin }: { cfg: ConfigCal; podeAdmin
             <span className="subtle small">horas</span>
           </div>
           <span className="subtle caption">Passou disso (PC desligado na hora), o post não sai, fica como “Falhou” e chega aviso no WhatsApp.</span>
+        </div>
+        <div className="field">
+          <label className="label" htmlFor="voz">Voz dos Reels</label>
+          <select id="voz" className="select" value={v.voz} onChange={(e) => setV({ ...v, voz: e.target.value as ConfigCal["voz"] })}>
+            {Object.entries(VOZES).map(([k, n]) => <option key={k} value={k}>{n}</option>)}
+          </select>
+        </div>
+        <div className="field">
+          <label className="label" htmlFor="estilo">Estilo dos Reels</label>
+          <select id="estilo" className="select" value={v.estiloVideo} onChange={(e) => setV({ ...v, estiloVideo: e.target.value as ConfigCal["estiloVideo"] })}>
+            {Object.entries(ESTILOS).map(([k, e]) => <option key={k} value={k}>{e.nome}</option>)}
+          </select>
+        </div>
+        <label className="chave">
+          <input type="checkbox" checked={v.stories} onChange={(e) => setV({ ...v, stories: e.target.checked })} />
+          <span><b>Repostar nos stories</b><small className="subtle">Todo post publicado volta como story: post e carrossel numa moldura da marca, Reels com o próprio vídeo (até 60 s).</small></span>
+        </label>
+        <div className="field">
+          <label className="label" htmlFor="story-atraso">Story sai depois de</label>
+          <div className="cluster" style={{ gap: 6 }}>
+            <input id="story-atraso" className="input-sm tabular" style={{ width: 90 }} type="number" min={1} max={240} disabled={!v.stories} value={v.storyAtrasoMin} onChange={(e) => setV({ ...v, storyAtrasoMin: Number(e.target.value) })} />
+            <span className="subtle small">minutos</span>
+          </div>
         </div>
       </fieldset>
       {podeAdmin ? (

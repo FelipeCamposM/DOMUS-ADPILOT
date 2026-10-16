@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { LIMITES_IG } from "./instagram-regras";
+import { ESTILOS, VOZES, type EstiloVisual } from "./video";
 
 /**
  * Calendário de conteúdo (sem dependência de servidor: a tela usa as mesmas regras que o worker).
@@ -74,6 +75,12 @@ export const configCalSchema = z.object({
     REELS: z.number().int().min(15, "Vídeo: mínimo 15 minutos").max(1440),
   }),
   toleranciaH: z.number().min(0.5, "Mínimo meia hora").max(24, "Máximo 24 horas"),
+  // todo post publicado volta como story (moldura da marca; Reels vai o próprio vídeo) X minutos depois
+  stories: z.boolean().default(true),
+  storyAtrasoMin: z.number().int("Use minutos inteiros").min(1, "Mínimo 1 minuto").max(240, "Máximo 4 horas").default(5),
+  // Reels do calendário: voz local e estilo visual
+  voz: z.enum(Object.keys(VOZES) as [keyof typeof VOZES, ...(keyof typeof VOZES)[]], { message: "Voz inválida" }).default("pf_dora"),
+  estiloVideo: z.enum(Object.keys(ESTILOS) as [EstiloVisual, ...EstiloVisual[]], { message: "Estilo inválido" }).default("hud"),
 });
 export type ConfigCal = z.infer<typeof configCalSchema>;
-export const CONFIG_CAL_PADRAO: ConfigCal = { antecedencia: { FEED: 15, CARROSSEL: 60, REELS: 180 }, toleranciaH: 3 };
+export const CONFIG_CAL_PADRAO: ConfigCal = { antecedencia: { FEED: 15, CARROSSEL: 60, REELS: 180 }, toleranciaH: 3, stories: true, storyAtrasoMin: 5, voz: "pf_dora", estiloVideo: "hud" };

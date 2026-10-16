@@ -133,9 +133,9 @@ export function Calendario({ conta, contas, marcas, mes, itens, planos, podeEdit
                     </button>
                   );
                 })}
-                {podeEditar && plano && d >= hoje && (
+                {podeEditar && d >= hoje && (
                   <button type="button" className="cal-mais" aria-label={`Adicionar post em ${d}`} disabled={pend} onClick={() => start(async () => {
-                    const r = await novoItem(plano.id, new Date(`${d}T${d === hoje ? horaDe(new Date(Date.now() + 2 * 3_600_000).toISOString()) : "12:00"}:00-03:00`).toISOString(), "FEED");
+                    const r = await novoItem(conta.id, plano?.id ?? null, new Date(`${d}T${d === hoje ? horaDe(new Date(Date.now() + 2 * 3_600_000).toISOString()) : "12:00"}:00-03:00`).toISOString(), "FEED");
                     if (!r.ok) return toast.err(r.error);
                     router.refresh();
                     setAberto(r.data);

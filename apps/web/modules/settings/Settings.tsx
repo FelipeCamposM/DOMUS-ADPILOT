@@ -190,7 +190,7 @@ export function Settings(p: {
         <Armazenamento cfg={p.armazenamento} uso={p.uso} podeAdmin={p.podeOwnerIA} />
       </Secao>
 
-      <Secao id="calendario" icon={<CalendarClock size={16} aria-hidden />} titulo="Calendário automático" desc="Posts aprovados no calendário são gerados perto da hora e publicados sozinhos. Aqui ficam os prazos.">
+      <Secao id="calendario" icon={<CalendarClock size={16} aria-hidden />} titulo="Calendário automático" desc="Posts aprovados no calendário são gerados perto da hora e publicados sozinhos. Prazos, voz dos Reels e repost nos stories.">
         <PrazosCalendario cfg={p.calendario} podeAdmin={p.podeOwnerIA} />
       </Secao>
 

@@ -162,17 +162,27 @@ export async function descartarItem(id: string) {
   });
 }
 
-/** Post manual num dia: entra como sugestão em branco; a IA pode preencher com “Refazer post”. */
-export async function novoItem(calendarioId: string, dataHora: string, formato: string) {
+/** Post manual num dia: entra como sugestão em branco; a IA pode preencher com “Refazer post”. Fora de um período planejado, cria um “avulsos” para o dia. */
+export async function novoItem(contaId: string, calendarioId: string | null, dataHora: string, formato: string) {
   return run(async () => {
     const ctx = await requireCtx();
     requireRole(ctx, "editor");
     const d = itemCalSchema.pick({ dataHora: true, formato: true }).parse({ dataHora, formato });
     const sql = db();
-    const [c] = await sql`select 1 from ads.calendarios where id = ${uuid.parse(calendarioId)} and workspace_id = ${ctx.workspace.id}`;
-    if (!c) throw new Error("Planejamento não encontrado");
+    let cal = calendarioId ? uuid.parse(calendarioId) : null;
+    if (cal) {
+      const [c] = await sql`select 1 from ads.calendarios where id = ${cal} and workspace_id = ${ctx.workspace.id}`;
+      if (!c) throw new Error("Planejamento não encontrado");
+    } else {
+      const [conta] = await sql`select 1 from ads.instagram_accounts where id = ${uuid.parse(contaId)} and workspace_id = ${ctx.workspace.id}`;
+      if (!conta) throw new Error("Perfil do Instagram não encontrado");
+      const dia = new Date(d.dataHora).toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+      const [c] = await sql<{ id: string }[]>`insert into ads.calendarios (workspace_id, ig_account_id, inicio, fim, objetivo, status, created_by)
+        values (${ctx.workspace.id}, ${contaId}, ${dia}, ${dia}, 'Posts avulsos adicionados no calendário', 'PRONTO', ${ctx.user.id}) returning id`;
+      cal = c!.id;
+    }
     const [i] = await sql<{ id: string }[]>`insert into ads.calendario_itens (calendario_id, workspace_id, data_hora, formato, tema)
-      values (${calendarioId}, ${ctx.workspace.id}, ${d.dataHora}, ${d.formato}, 'Novo post') returning id`;
+      values (${cal}, ${ctx.workspace.id}, ${d.dataHora}, ${d.formato}, 'Novo post') returning id`;
     revalidar();
     return i!.id;
   });

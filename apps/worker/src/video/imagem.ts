@@ -229,7 +229,7 @@ async function lint(pasta: string, html: string): Promise<string[]> {
 }
 
 /** PNG da arte (instante 0,5 s da composição de 1 s, já com fontes e anexos carregados). */
-async function capturar(pasta: string, html: string, signal: AbortSignal): Promise<string> {
+export async function capturar(pasta: string, html: string, signal: AbortSignal): Promise<string> {
   writeFileSync(join(pasta, "index.html"), html, "utf8");
   const saida = join(pasta, "snap");
   rmSync(saida, { recursive: true, force: true });

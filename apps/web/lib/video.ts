@@ -55,7 +55,7 @@ export async function criativos(ws: string, tipos: string[], q?: string): Promis
     select c.id, c.name, c.type, c.status, c.mime, c.size_bytes::text, c.width, c.height, c.duration_ms, c.tags, c.license,
       (c.thumbnail_key is not null) as thumb, c.created_at, c.metadata->>'projectId' as project_id,
       coalesce((c.metadata->>'carrossel')::boolean, false) as carrossel, (c.metadata->>'ordem')::int as ordem
-    from ads.creatives c where c.workspace_id = ${ws} and c.type = any(${tipos}) and c.status <> 'UPLOADING' and not ('referencia' = any(c.tags))
+    from ads.creatives c where c.workspace_id = ${ws} and c.type = any(${tipos}) and c.status <> 'UPLOADING' and not (c.tags && array['referencia','story'])
       and (${t}::text is null or c.name ilike ${t} or array_to_string(c.tags, ' ') ilike ${t}
         or exists (select 1 from ads.video_projects v where v.id::text = c.metadata->>'projectId' and v.workspace_id = c.workspace_id and v.title ilike ${t}))
     order by c.created_at desc limit 300`;

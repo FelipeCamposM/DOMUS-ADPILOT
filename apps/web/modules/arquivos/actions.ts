@@ -35,7 +35,7 @@ export async function listarArquivos(filtro: z.input<typeof filtroSchema>) {
         select id, name, type, width, height, duration_ms, coalesce(size_bytes, 0)::float8 as size, thumbnail_key is not null as thumb,
           arquivado, preview_key is not null as previa, 'asset' = any(tags) as enviado, pasta_id, created_at
         from ads.creatives
-        where workspace_id = ${ws} and status = 'READY' and r2_key is not null and type = any(${tipos}) and not ('referencia' = any(tags))
+        where workspace_id = ${ws} and status = 'READY' and r2_key is not null and type = any(${tipos}) and not (tags && array['referencia','story'])
           and (${f.origem} = 'todos' or ('asset' = any(tags)) = (${f.origem} = 'enviados'))
           and (${f.pasta} = 'todas' or (${f.pasta} = 'sem' and pasta_id is null) or pasta_id::text = ${f.pasta})
           and (${t}::text is null or name ilike ${t})

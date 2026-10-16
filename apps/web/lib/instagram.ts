@@ -54,6 +54,6 @@ export async function aoVivo(workspaceId: string, contaId: string): Promise<{ mi
 export function midiasDaBiblioteca(workspaceId: string) {
   return db()<{ id: string; name: string; type: "IMAGE" | "VIDEO"; width: number | null; height: number | null; duration_ms: number | null; created_at: Date }[]>`
     select id, name, type, width, height, duration_ms, created_at from ads.creatives
-    where workspace_id = ${workspaceId} and status = 'READY' and type in ('IMAGE', 'VIDEO') and r2_key is not null and not ('referencia' = any(tags))
+    where workspace_id = ${workspaceId} and status = 'READY' and type in ('IMAGE', 'VIDEO') and r2_key is not null and not (tags && array['referencia','story'])
     order by created_at desc limit 300`;
 }
