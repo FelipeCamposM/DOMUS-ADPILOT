@@ -150,7 +150,7 @@ export function Settings(p: {
         )}
       </Secao>
 
-      <Secao id="whatsapp" icon={<MessageCircle size={16} aria-hidden />} titulo="WhatsApp" desc="Número que manda os avisos da plataforma (post publicado, falhas). Roda na Evolution API do PC do worker.">
+      <Secao id="whatsapp" icon={<MessageCircle size={16} aria-hidden />} titulo="WhatsApp" desc="Número que manda os avisos da plataforma (post publicado, falhas). Roda na Wuzapi do PC do worker.">
         <Whatsapp estado={(p.worker.info.whatsapp as EstadoWhatsapp | undefined) ?? null} qr={(p.worker.info.whatsappQr as string | null | undefined) ?? null} podeAdmin={p.podeOwnerIA} workerOnline={p.worker.online} />
       </Secao>
 

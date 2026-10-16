@@ -1,36 +1,20 @@
-# Evolution API (WhatsApp) local, com Postgres próprio (não usa o Supabase compartilhado).
-# Sobe com: pnpm whatsapp:up   (lê EVOLUTION_API_KEY e EVOLUTION_DB_PASSWORD do .env da raiz)
-# Painel: http://localhost:8081/manager  — só escuta em 127.0.0.1.
+# Wuzapi (WhatsApp, MIT, whatsmeow) local, com SQLite em volume (não usa o Supabase compartilhado).
+# Sobe com: pnpm whatsapp:up   (lê WUZAPI_* do .env da raiz). Só escuta em 127.0.0.1:8081.
+# Sem imagem oficial publicada: compila do repositório num commit fixo (troque o hash para atualizar).
 name: domus-whatsapp
 
 services:
-  evolution:
-    image: evoapicloud/evolution-api:v2.3.7
+  wuzapi:
+    build: https://github.com/asternic/wuzapi.git#358d312a30c61099dd4e9173b2dc88d545325159
+    image: domus-wuzapi:358d312
     restart: unless-stopped
-    depends_on: [evolution-db]
     ports: ["127.0.0.1:8081:8080"]
     environment:
-      SERVER_URL: http://localhost:8081
-      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:?defina EVOLUTION_API_KEY no .env}
-      DATABASE_ENABLED: "true"
-      DATABASE_PROVIDER: postgresql
-      DATABASE_CONNECTION_URI: postgresql://evolution:${EVOLUTION_DB_PASSWORD}@evolution-db:5432/evolution?schema=public
-      DATABASE_CONNECTION_CLIENT_NAME: domus
-      CACHE_REDIS_ENABLED: "false"
-      CACHE_LOCAL_ENABLED: "true"
-      LOG_LEVEL: ERROR,WARN
-      DEL_INSTANCE: "false"
-    volumes: [evolution-instances:/evolution/instances]
-
-  evolution-db:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: evolution
-      POSTGRES_PASSWORD: ${EVOLUTION_DB_PASSWORD:?defina EVOLUTION_DB_PASSWORD no .env}
-      POSTGRES_DB: evolution
-    volumes: [evolution-db:/var/lib/postgresql/data]
+      WUZAPI_ADMIN_TOKEN: ${WUZAPI_ADMIN_TOKEN:?defina WUZAPI_ADMIN_TOKEN no .env}
+      WUZAPI_GLOBAL_ENCRYPTION_KEY: ${WUZAPI_ENCRYPTION_KEY:?defina WUZAPI_ENCRYPTION_KEY no .env}
+      SESSION_DEVICE_NAME: DOMUS AdPilot
+      TZ: America/Sao_Paulo
+    volumes: [wuzapi-data:/app/dbdata]
 
 volumes:
-  evolution-instances:
-  evolution-db:
+  wuzapi-data:

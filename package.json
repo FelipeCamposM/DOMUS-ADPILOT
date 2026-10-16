@@ -12,6 +12,7 @@
     "test": "pnpm -r test",
     "db:migrate": "pnpm --filter @domus-ads/core migrate",
     "user:create": "pnpm --filter @domus-ads/core user:create",
+    "worker:restart": "powershell -ExecutionPolicy Bypass -File apps/worker/scripts/reiniciar.ps1",
     "worker:startup": "powershell -ExecutionPolicy Bypass -File apps/worker/scripts/inicializacao.ps1",
     "dev:web": "pnpm --filter web dev",
     "whatsapp:up": "docker compose --env-file .env -f infra/whatsapp/docker-compose.yml up -d"

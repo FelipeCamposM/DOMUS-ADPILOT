@@ -10,7 +10,7 @@ export interface EstadoWhatsapp { state: "open" | "connecting" | "close" | "off"
 
 const fone = (n: string) => n.replace(/^(\d{2})(\d{2})(\d{4,5})(\d{4})$/, "+$1 ($2) $3-$4");
 
-/** WhatsApp dos avisos (Evolution API no PC do worker): status, QR para conectar e desconectar. */
+/** WhatsApp dos avisos (Wuzapi no PC do worker): status, QR para conectar e desconectar. */
 export function Whatsapp({ estado, qr, podeAdmin, workerOnline }: { estado: EstadoWhatsapp | null; qr: string | null; podeAdmin: boolean; workerOnline: boolean }) {
   const router = useRouter();
   const [pend, start] = useTransition();
@@ -36,7 +36,7 @@ export function Whatsapp({ estado, qr, podeAdmin, workerOnline }: { estado: Esta
     <>
       <div className="cluster">
         <span className="chip"><span className={`dot ${conectado ? "on" : estado?.state === "off" ? "err" : ""}`} aria-hidden />
-          {!estado ? "Evolution API não configurada no worker" : conectado ? `Conectado · ${estado.nome ?? ""}${estado.numero ? ` · ${fone(estado.numero)}` : ""}` : estado.state === "off" ? estado.erro : "Desconectado"}
+          {!estado ? "Wuzapi não configurada no worker" : conectado ? ["Conectado", estado.nome, estado.numero && fone(estado.numero)].filter(Boolean).join(" · ") : estado.state === "off" ? estado.erro : "Desconectado"}
         </span>
         <span style={{ flex: 1 }} />
         {podeAdmin && estado && estado.state !== "off" && (conectado ? (

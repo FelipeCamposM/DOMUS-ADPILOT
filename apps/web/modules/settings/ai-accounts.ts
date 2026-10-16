@@ -100,7 +100,7 @@ export async function removerContaIA(id: string) {
 }
 
 /** Liga/desliga o início do worker com o Windows (Agendador de Tarefas). Só acontece com este clique. */
-/** Conectar (gera QR na tela) ou desconectar o WhatsApp dos avisos. Quem fala com a Evolution é o worker. */
+/** Conectar (gera QR na tela) ou desconectar o WhatsApp dos avisos. Quem fala com a Wuzapi é o worker. */
 export async function whatsappAcao(acao: "conectar" | "desconectar") {
   return run(async () => {
     const ctx = await admin();
