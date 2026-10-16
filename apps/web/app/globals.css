@@ -48,7 +48,8 @@ a { color: inherit; text-decoration: none; }
 @keyframes aparece { to { opacity: 1; } }
 
 /* ── Shell ────────────────────────────────────────────────────────────── */
-.shell { display: grid; grid-template-columns: 248px 1fr; height: 100dvh; }
+/* fixed: o documento não tem altura própria, então link com âncora (/settings#worker) não rola a página inteira e esconde o topo; só o .content rola */
+.shell { position: fixed; inset: 0; display: grid; grid-template-columns: 248px 1fr; height: 100dvh; }
 .sidebar {
   position: relative; display: flex; flex-direction: column; gap: var(--space-2);
   padding: var(--space-4) var(--space-3); border-right: 1px solid rgb(var(--c-border));

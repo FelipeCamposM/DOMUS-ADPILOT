@@ -66,6 +66,7 @@ export function Shell(p: ShellProps) {
   });
 
   return (
+    <>
     <div className="shell">
       <Sidebar pendentes={p.notificacoes.acoes.length} open={mobile} />
       {mobile && <div className="overlay only-mobile" style={{ zIndex: 90 }} onClick={() => setMobile(false)} />}
@@ -143,9 +144,11 @@ export function Shell(p: ShellProps) {
       </div>
       <CommandPalette open={paleta} onClose={fecharPaleta} campanhas={p.campanhas} />
       <Consultor key={p.workspaceId} podeEditar={["editor", "admin", "owner"].includes(p.workspaces.find((w) => w.id === p.workspaceId)?.role ?? "")} />
-      <Toaster />
-      <Confirmador />
       <Motion />
     </div>
+    {/* fora do .shell (fixed = contexto de empilhamento próprio): toasts ficam acima dos modais, que vão para o <body> */}
+    <Toaster />
+    <Confirmador />
+    </>
   );
 }
