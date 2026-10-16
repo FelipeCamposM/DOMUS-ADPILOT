@@ -12,7 +12,7 @@ export function Dialog({ open, onClose, title, children, largo }: { open: boolea
   useEffect(() => {
     if (!open) return;
     gsap.fromTo(bg.current, { opacity: 0 }, { opacity: 1, duration: 0.2 });
-    gsap.fromTo(box.current, { opacity: 0, y: 18, scale: 0.96 }, { opacity: 1, y: 0, scale: 1, duration: 0.5, ease: "back.out(1.4)" });
+    gsap.fromTo(box.current, { opacity: 0, y: 18, scale: 0.96 }, { opacity: 1, y: 0, scale: 1, duration: 0.5, ease: "back.out(1.4)", clearProps: "transform" }); // sem transform: painéis "fixed" dentro (datas) usam a tela
     const esc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", esc);
     return () => window.removeEventListener("keydown", esc);

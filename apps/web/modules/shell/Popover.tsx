@@ -1,11 +1,11 @@
 "use client";
 
 import { gsap } from "gsap";
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 
 /** Menu flutuante com entrada em mola (GSAP). Fecha com Esc ou clique fora. */
-export function Popover({ open, onClose, children, align = "left", width, className = "" }: {
-  open: boolean; onClose: () => void; children: ReactNode; align?: "left" | "right"; width?: number; className?: string;
+export function Popover({ open, onClose, children, align = "left", width, className = "", style }: {
+  open: boolean; onClose: () => void; children: ReactNode; align?: "left" | "right"; width?: number; className?: string; style?: CSSProperties;
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -22,7 +22,7 @@ export function Popover({ open, onClose, children, align = "left", width, classN
 
   if (!open) return null;
   return (
-    <div ref={ref} className={`menu ${className}`} role="menu" style={{ top: "calc(100% + 8px)", [align]: 0, width }}>
+    <div ref={ref} className={`menu ${className}`} role="menu" style={{ top: "calc(100% + 8px)", [align]: 0, width, ...style }}>
       {children}
     </div>
   );

@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import type { ContaIG, PostIG } from "@/lib/instagram";
 import { BibliotecaModal } from "../arquivos/Biblioteca";
+import { DataPicker } from "../shell/DataPicker";
 import { Dialog } from "../shell/Dialog";
 import { toast } from "../shell/toast";
 import { agendarPublicacao, pedirLegenda, salvarPublicacao, voltarParaRascunho } from "./actions";
@@ -240,7 +241,7 @@ export function Composer({ post, conta, biblioteca, feed, marcas, podeEditar }: 
                 <label className="ig-modo" data-on={modo === "agora"}><input type="radio" checked={modo === "agora"} onChange={() => setModo("agora")} /><Rocket size={16} aria-hidden /><span><b>Publicar agora</b><small>Sai em até 1 minuto</small></span></label>
                 <label className="ig-modo" data-on={modo === "agendar"}><input type="radio" checked={modo === "agendar"} onChange={() => setModo("agendar")} /><CalendarClock size={16} aria-hidden /><span><b>Agendar</b><small>O worker publica na hora</small></span></label>
               </div>
-              {modo === "agendar" && <input type="datetime-local" className="input" value={data} onChange={(e) => setData(e.target.value)} aria-label="Data e hora" />}
+              {modo === "agendar" && <DataPicker hora value={data} onChange={setData} ariaLabel="Data e hora" />}
               {problemas.length > 0 && <ul className="ig-problemas">{problemas.map((p) => <li key={p}><AlertTriangle size={13} aria-hidden /> {p}</li>)}</ul>}
               <div className="cluster" style={{ justifyContent: "flex-end", gap: 8 }}>
                 <button className="btn btn-ghost btn-sm" onClick={() => void salvar()} disabled={pend || !sujo}><Save aria-hidden /> Salvar rascunho</button>

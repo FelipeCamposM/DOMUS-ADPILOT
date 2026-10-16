@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import type { ItemTela, PlanoTela, PostAvulso } from "@/lib/calendario";
+import { DataPicker } from "../shell/DataPicker";
 import { Dialog } from "../shell/Dialog";
 import { toast } from "../shell/toast";
 import { gradeDoMes, somaDias } from "./grade";
@@ -16,7 +17,7 @@ const TZ = "America/Sao_Paulo";
 const ICONE: Record<FormatoCal, typeof ImageIcon> = { FEED: ImageIcon, CARROSSEL: GalleryHorizontal, REELS: Clapperboard };
 const ICONE_POST = { ...ICONE, STORY: CircleDot };
 const STATUS: Record<string, string> = { SUGERIDO: "Sugestão", APROVADO: "Aprovado", GERANDO: "Gerando arte", AGENDADO: "Agendado", PUBLICADO: "Publicado", FALHOU: "Falhou" };
-const SEMANA = ["seg", "ter", "qua", "qui", "sex", "sáb", "dom"];
+const SEMANA = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
 
 /** "2026-10-20" do horário de Brasília (a grade e o worker usam o mesmo fuso). */
 const diaDe = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: TZ });
@@ -193,9 +194,9 @@ const fmtPeriodo = (p: { inicio: string; fim: string }) => {
 function Planejar({ open, onClose, contaId, marcas }: { open: boolean; onClose: () => void; contaId: string; marcas: { id: string; nome: string }[] }) {
   const router = useRouter();
   const [pend, start] = useTransition();
-  const segunda = (() => { const h = hojeBr(); const dow = (new Date(`${h}T12:00:00Z`).getUTCDay() + 6) % 7; return somaDias(h, 7 - dow); })();
-  const [f, setF] = useState({ marcaId: marcas[0]?.id ?? "", inicio: segunda, fim: somaDias(segunda, 6), objetivo: "", mix: { FEED: 2, CARROSSEL: 1, REELS: 1 } });
-  const periodo = (dias: number, de = segunda) => setF((x) => ({ ...x, inicio: de, fim: somaDias(de, dias - 1) }));
+  const domingo = (() => { const h = hojeBr(); return somaDias(h, 7 - new Date(`${h}T12:00:00Z`).getUTCDay()); })();
+  const [f, setF] = useState({ marcaId: marcas[0]?.id ?? "", inicio: domingo, fim: somaDias(domingo, 6), objetivo: "", mix: { FEED: 2, CARROSSEL: 1, REELS: 1 } });
+  const periodo = (dias: number, de = domingo) => setF((x) => ({ ...x, inicio: de, fim: somaDias(de, dias - 1) }));
   const total = Math.round(((f.mix.FEED + f.mix.CARROSSEL + f.mix.REELS) * (Math.round((Date.parse(f.fim) - Date.parse(f.inicio)) / 86_400_000) + 1)) / 7);
   const enviar = () => start(async () => {
     const r = await planejarPeriodo({ contaId, marcaId: f.marcaId || null, inicio: f.inicio, fim: f.fim, objetivo: f.objetivo, mix: f.mix });
@@ -220,9 +221,9 @@ function Planejar({ open, onClose, contaId, marcas }: { open: boolean; onClose: 
           <button type="button" className="chip" onClick={() => { const h = hojeBr(); const [y, m] = h.split("-").map(Number) as [number, number]; const ini = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10); periodo(new Date(Date.UTC(y, m + 1, 0)).getUTCDate(), ini); }}>Próximo mês</button>
         </div>
         <div className="cluster" style={{ gap: 6 }}>
-          <input type="date" className="input-sm" value={f.inicio} min={hojeBr()} onChange={(e) => setF({ ...f, inicio: e.target.value })} aria-label="Início" />
+          <DataPicker value={f.inicio} min={hojeBr()} onChange={(d) => setF({ ...f, inicio: d, fim: f.fim < d ? d : f.fim })} ariaLabel="Início" />
           <span className="subtle">até</span>
-          <input type="date" className="input-sm" value={f.fim} min={f.inicio} onChange={(e) => setF({ ...f, fim: e.target.value })} aria-label="Fim" />
+          <DataPicker value={f.fim} min={f.inicio} onChange={(d) => setF({ ...f, fim: d })} ariaLabel="Fim" />
         </div>
       </div>
       <div className="field"><label className="label" htmlFor="pl-obj">Objetivo do período</label>
@@ -299,7 +300,7 @@ function Editor({ item, podeEditar, onFechar }: { item: ItemTela; podeEditar: bo
       <fieldset disabled={!editavel || pend} className="cal-campos">
         <div className="cluster" style={{ gap: 10 }}>
           <div className="field"><label className="label" htmlFor="ed-quando">Data e hora (Brasília)</label>
-            <input id="ed-quando" type="datetime-local" className="input-sm" value={v.dataHora} onChange={(e) => setV({ ...v, dataHora: e.target.value })} /></div>
+            <DataPicker id="ed-quando" hora value={v.dataHora} min={hojeBr()} onChange={(d) => setV({ ...v, dataHora: d })} /></div>
           <div className="field"><label className="label" htmlFor="ed-formato">Formato</label>
             <select id="ed-formato" className="select" value={v.formato} onChange={(e) => setV({ ...v, formato: e.target.value as FormatoCal })}>
               {(Object.keys(FORMATOS_CAL) as FormatoCal[]).map((k) => <option key={k} value={k}>{FORMATOS_CAL[k]}</option>)}
