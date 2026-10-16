@@ -107,6 +107,7 @@ export async function whatsappAcao(acao: "conectar" | "desconectar") {
     const sql = db();
     const a = z.enum(["conectar", "desconectar"], { message: "Ação inválida" }).parse(acao);
     await sql`update ads.jobs set status = 'CANCELLED', finished_at = now() where type = 'WHATSAPP' and status in ('PENDING','RUNNING')`;
+    await sql`update ads.worker_status set info = info - 'whatsappErro'`;
     await enqueueJob(sql, { workspaceId: null, type: "WHATSAPP", payload: { acao: a }, createdBy: ctx.user.id, maxAttempts: 1 });
     await audit(sql, { workspaceId: null, actor: ctx.actor, action: a === "conectar" ? "Conectar WhatsApp" : "Desconectar WhatsApp", entityType: "worker" });
   });

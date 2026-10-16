@@ -1,4 +1,4 @@
-import { chaveElevenLabs, creditosElevenLabs, db, vozesElevenLabs, type CreditosElevenLabs } from "@domus-ads/core";
+import { chaveElevenLabs, creditosElevenLabs, db, vozesElevenLabs, whatsappAvisos, type CreditosElevenLabs } from "@domus-ads/core";
 import { isPlatformAdmin, requireCtx } from "@/lib/ctx";
 import { workerOnline } from "@/lib/queries";
 import type { Detectada } from "@/modules/settings/AiAccounts";
@@ -56,6 +56,7 @@ export default async function SettingsPage() {
         elevenlabs={elevenlabs}
         usoVoz={usoVoz.map((u) => ({ ...u, created_at: u.created_at.toISOString() }))}
         podeOwnerIA={isPlatformAdmin(ctx)}
+        avisos={isPlatformAdmin(ctx) ? await whatsappAvisos() : null}
         worker={{ online: w.online, lastSeen: iso(w.lastSeen), info: { ...w.info, detected: undefined, whatsappQr: isPlatformAdmin(ctx) ? w.info.whatsappQr : undefined } }}
       />
     </div>

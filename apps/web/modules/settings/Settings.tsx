@@ -41,7 +41,7 @@ function Secao({ id, icon, titulo, desc, children }: { id: string; icon: ReactNo
 }
 
 export function Settings(p: {
-  ws: { name: string; role: string }; membros: Membro[]; eu: string; contas: ContaIA[]; detectadas: Detectada[]; podeOwnerIA: boolean;
+  ws: { name: string; role: string }; membros: Membro[]; eu: string; contas: ContaIA[]; detectadas: Detectada[]; podeOwnerIA: boolean; avisos: string | null;
   elevenlabs: {
     configurada: boolean; vozes: number | null; erro: string | null;
     creditos: { plano: string; usados: number; limite: number; renovaEm: string | null } | null; erroCreditos: string | null;
@@ -151,7 +151,7 @@ export function Settings(p: {
       </Secao>
 
       <Secao id="whatsapp" icon={<MessageCircle size={16} aria-hidden />} titulo="WhatsApp" desc="Número que manda os avisos da plataforma (post publicado, falhas). Roda na Wuzapi do PC do worker.">
-        <Whatsapp estado={(p.worker.info.whatsapp as EstadoWhatsapp | undefined) ?? null} qr={(p.worker.info.whatsappQr as string | null | undefined) ?? null} podeAdmin={p.podeOwnerIA} workerOnline={p.worker.online} />
+        <Whatsapp estado={(p.worker.info.whatsapp as EstadoWhatsapp | undefined) ?? null} qr={(p.worker.info.whatsappQr as string | null | undefined) ?? null} erro={(p.worker.info.whatsappErro as string | null | undefined) ?? null} avisos={p.avisos} podeAdmin={p.podeOwnerIA} workerOnline={p.worker.online} />
       </Secao>
 
       <Secao id="worker" icon={<Server size={16} aria-hidden />} titulo="Worker local" desc="Processo no PC que sincroniza as contas e roda a IA. Não abre nenhuma porta: ele busca o trabalho no banco.">

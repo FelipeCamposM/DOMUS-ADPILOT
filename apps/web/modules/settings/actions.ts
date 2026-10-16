@@ -128,6 +128,19 @@ export async function atualizarContaIA(id: string, patch: { status?: string; pri
 }
 
 /** Chave do ElevenLabs (global, cifrada no banco): só admin da plataforma. Validada na API antes de salvar. */
+/** Número que recebe os avisos (post publicado, falhas). Celular ou fixo do Brasil, com DDD. */
+export async function salvarWhatsappAvisos(numero: string) {
+  return run(async () => {
+    const ctx = await requireCtx();
+    if (!isPlatformAdmin(ctx)) throw new Error("Só administradores da plataforma configuram os avisos");
+    const d = z.string().transform((s) => s.replace(/\D/g, "").replace(/^55(?=\d{10,11}$)/, ""))
+      .pipe(z.string().regex(/^[1-9]{2}(9\d{8}|[2-8]\d{7})$/, "Número inválido: use DDD + número, ex.: (62) 98179-3568")).parse(numero);
+    await gravarSegredo("whatsapp_avisos", `55${d}`, ctx.user.id);
+    await audit(db(), { workspaceId: null, actor: ctx.actor, action: "Alterar número dos avisos no WhatsApp", entityType: "settings", entityName: "whatsapp_avisos" });
+    revalidatePath("/settings");
+  });
+}
+
 export async function salvarChaveElevenLabs(chave: string | null) {
   return run(async () => {
     const ctx = await requireCtx();

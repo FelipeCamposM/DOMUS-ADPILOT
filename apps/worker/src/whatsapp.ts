@@ -48,18 +48,26 @@ export async function acaoWhatsapp(acao: string, signal: AbortSignal, log: (m: s
     return { ok: true };
   }
   if (acao !== "conectar") throw new Error(`Ação inválida: ${acao}`);
-  const usuarios = await wz<{ token: string }[]>("GET", "/admin/users", undefined, true);
-  if (!usuarios.some((u) => u.token === TOKEN)) await wz("POST", "/admin/users", { name: "domus", token: TOKEN, events: "Message" }, true);
-  await wz("POST", "/session/connect", { Subscribe: ["Message"], Immediate: true });
+  // 409 = socket já aberto (pedido anterior): segue e só busca o QR
+  const conectar = () => wz("POST", "/session/connect", { Subscribe: ["Message"], Immediate: true }).catch((e: Error) => { if (!e.message.includes("409")) throw e; });
+  await gravarInfo({ whatsappErro: null });
   try {
+    const usuarios = await wz<{ token: string }[]>("GET", "/admin/users", undefined, true);
+    if (!usuarios.some((u) => u.token === TOKEN)) await wz("POST", "/admin/users", { name: "domus", token: TOKEN, events: "Message" }, true);
+    await conectar();
     for (let t = 0; t < 40 && !signal.aborted; t++) {
       await new Promise((ok) => setTimeout(ok, 3000));
       const st = await estadoWhatsapp();
       if (st?.state === "open") { await gravarInfo({ whatsapp: st }); await log(`conectado: ${st.numero ?? ""}`); return { ok: true }; }
+      // a Wuzapi fecha o canal quando os QRs expiram: abre de novo
+      if (st?.state === "close") { await conectar(); continue; }
       const qr = await wz<{ QRCode?: string }>("GET", "/session/qr").catch(() => null);
       if (qr?.QRCode) await gravarQr(qr.QRCode);
     }
     throw new Error("QR não foi lido em 2 minutos. Clique em conectar de novo.");
+  } catch (e) {
+    if (!signal.aborted) await gravarInfo({ whatsappErro: (e as Error).message });
+    throw e;
   } finally {
     await gravarQr(null);
   }

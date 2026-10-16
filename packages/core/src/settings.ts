@@ -13,6 +13,9 @@ export async function gravarSegredo(chave: string, valor: string | null, userId:
                   on conflict (key) do update set value_enc = excluded.value_enc, updated_by = excluded.updated_by, updated_at = now()`;
 }
 
+/** Número (só dígitos, com DDI) que recebe os avisos da plataforma no WhatsApp. */
+export const whatsappAvisos = () => lerSegredo("whatsapp_avisos").catch(() => null);
+
 /** Chave do ElevenLabs: a cadastrada na tela tem prioridade; senão ELEVENLABS_API_KEY do .env. */
 export async function chaveElevenLabs(): Promise<string | null> {
   return (await lerSegredo("elevenlabs_api_key").catch(() => null)) ?? process.env.ELEVENLABS_API_KEY ?? null;
