@@ -43,7 +43,11 @@ export async function avisar(texto: string, falhar = false) {
     values (${para ?? "—"}, ${texto}, ${erro ? "FALHOU" : "ENVIADO"}, ${erro})`.catch(() => {});
   try {
     if (!URL_WZ || !TOKEN || !para) throw new Error("WhatsApp ou número dos avisos não configurado");
-    await wz("POST", "/chat/send/text", { Phone: para, Body: texto });
+    // o WhatsApp agora endereça por LID: mandar direto para o número dá "no LID found"
+    const { Users } = await wz<{ Users: { IsInWhatsapp: boolean; JID: string }[] }>("POST", "/user/check", { Phone: [para] });
+    const jid = Users.find((u) => u.IsInWhatsapp)?.JID;
+    if (!jid) throw new Error(`O número ${para} não tem WhatsApp`);
+    await wz("POST", "/chat/send/text", { Phone: jid, Body: texto });
     await registrar(null);
   } catch (e) {
     await registrar((e as Error).message);
