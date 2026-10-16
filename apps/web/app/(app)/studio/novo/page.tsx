@@ -14,8 +14,6 @@ export default async function NovoPage({ searchParams }: { searchParams: Promise
   const ws = ctx.workspace.id;
   const tags = await sql<{ tag: string; n: number }[]>`
     select t as tag, count(*)::int as n from ads.creatives, unnest(tags) t where workspace_id = ${ws} and type = 'MUSIC' and status = 'READY' group by t`;
-  const biblioteca = await sql<{ id: string; name: string; type: string }[]>`
-    select id, name, type from ads.creatives where workspace_id = ${ws} and status = 'READY' and 'asset' = any(tags) order by created_at desc limit 120`;
   const marcas = (await marcasDoWorkspace(ws)).map(resumo);
   const produto = marcas[0]?.nome ?? ctx.workspace.name;
 
@@ -27,8 +25,8 @@ export default async function NovoPage({ searchParams }: { searchParams: Promise
   return (
     <div className="page">
       <StudioNovo inicial={imagem ? "imagem" : "video"}
-        video={{ produto, musicas: Object.fromEntries(tags.map((t) => [t.tag, t.n])), biblioteca, marcas, vozesEl, favoritas: eu?.vozes_favoritas ?? [] }}
-        imagem={{ produto, biblioteca, marcas }} />
+        video={{ produto, musicas: Object.fromEntries(tags.map((t) => [t.tag, t.n])), marcas, vozesEl, favoritas: eu?.vozes_favoritas ?? [] }}
+        imagem={{ produto, marcas }} />
     </div>
   );
 }

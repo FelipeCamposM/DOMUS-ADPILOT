@@ -22,6 +22,7 @@ const uploadSchema = z.discriminatedUnion("type", [
   durationMs: z.number().int().positive().max(3_600_000).nullable(),
   width: z.number().int().positive().max(20000).nullable().optional(),
   height: z.number().int().positive().max(20000).nullable().optional(),
+  pastaId: z.string().uuid("Pasta inválida").nullable().optional(),
 }));
 const PASTA = { MUSIC: "music", SFX: "sfx", IMAGE: "images", VIDEO: "videos" } as const;
 
@@ -40,9 +41,11 @@ export async function iniciarUpload(input: unknown) {
       ?? u.mime.split("/")[1]!.replace(/[^a-z0-9]/g, "").slice(0, 5);
     const key = r2Key(ctx.workspace.id, PASTA[u.type], `${id}.${ext}`);
     const storage = storageAtual();
-    await db()`insert into ads.creatives (id, workspace_id, name, type, status, storage, r2_key, mime, size_bytes, duration_ms, width, height, tags, license, created_by)
+    // pasta só se for deste workspace (senão fica sem pasta)
+    await db()`insert into ads.creatives (id, workspace_id, name, type, status, storage, r2_key, mime, size_bytes, duration_ms, width, height, tags, license, created_by, pasta_id)
       values (${id}, ${ctx.workspace.id}, ${u.name.replace(/\.[^.]+$/, "")}, ${u.type}, 'UPLOADING', ${storage}, ${key}, ${u.mime}, ${u.size}, ${u.durationMs},
-        ${u.width ?? null}, ${u.height ?? null}, ${u.tags as string[]}, ${u.license || null}, ${ctx.user.id})`;
+        ${u.width ?? null}, ${u.height ?? null}, ${u.tags as string[]}, ${u.license || null}, ${ctx.user.id},
+        (select p.id from ads.pastas p where p.id = ${u.pastaId ?? null} and p.workspace_id = ${ctx.workspace.id}))`;
     return { id, url: storage === "local" ? `/api/creatives/${id}/upload` : await r2Presign(key, "PUT", 900) };
   });
 }
@@ -64,6 +67,7 @@ export async function concluirUpload(id: string) {
     await sql`update ads.creatives set status = 'READY', updated_at = now() where id = ${id}`;
     await audit(sql, { workspaceId: ctx.workspace.id, actor: ctx.actor, action: ({ MUSIC: "Enviar música", SFX: "Enviar efeito sonoro", IMAGE: "Enviar imagem", VIDEO: "Enviar vídeo" } as Record<string, string>)[c.type] ?? "Enviar arquivo", entityType: "creative", entityId: id, entityName: c.name });
     revalidatePath("/creatives");
+    revalidatePath("/arquivos");
   });
 }
 

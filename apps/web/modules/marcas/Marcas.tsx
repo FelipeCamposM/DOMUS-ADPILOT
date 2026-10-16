@@ -11,7 +11,7 @@ import { BrandEditor, type BrandValor } from "./BrandEditor";
 export interface MarcaTela { id: string; nome: string; brand: BrandValor }
 
 /** Marcas do workspace (abas) + editor da escolhida. Cada marca tem a própria identidade. */
-export function Marcas({ marcas, atual, imagens, podeEditar }: { marcas: MarcaTela[]; atual: MarcaTela | null; imagens: { id: string; name: string }[]; podeEditar: boolean }) {
+export function Marcas({ marcas, atual, podeEditar }: { marcas: MarcaTela[]; atual: MarcaTela | null; podeEditar: boolean }) {
   const router = useRouter();
   const [pend, start] = useTransition();
   const [nova, setNova] = useState("");
@@ -67,7 +67,7 @@ export function Marcas({ marcas, atual, imagens, podeEditar }: { marcas: MarcaTe
             ) : <button className="btn btn-ghost btn-xs" onClick={() => setConfirmar(true)}><Trash2 aria-hidden /> Apagar marca</button>)}
           </div>
           <div style={{ padding: 18 }}>
-            <BrandEditor key={atual.id} marcaId={atual.id} nome={atual.nome} inicial={atual.brand} imagens={imagens} podeEditar={podeEditar} />
+            <BrandEditor key={atual.id} marcaId={atual.id} nome={atual.nome} inicial={atual.brand} podeEditar={podeEditar} />
           </div>
         </section>
       ) : (

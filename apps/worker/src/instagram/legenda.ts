@@ -52,7 +52,7 @@ export async function gerarLegenda(payload: LegendaPayload, c: { signal: AbortSi
     const contexto = [
       `Perfil: @${p.username}${p.nome ? ` (${p.nome})` : ""}${p.bio ? `\nBio: ${p.bio}` : ""}`,
       p.marca && `Marca do post: ${p.marca} (o perfil pode ser da empresa-mãe; escreva sobre esta marca)`,
-      b?.sobre && `Sobre a marca: ${b.sobre}`, b?.tom && `Tom de voz: ${b.tom}`, b?.regras && `Regras da marca: ${b.regras}`,
+      b?.sobre && `Sobre a marca: ${b.sobre}`, b?.tom && `Tom de voz: ${b.tom}`, b?.regras && `Regras da marca: ${b.regras}`, b?.site && `Site da marca: ${b.site}`,
       `Tipo de publicação: ${p.tipo}`,
       `<midias>\n${midias.map((m) => `- ${m.type} “${m.name}”${m.metadata?.brief ? ` · briefing: ${JSON.stringify(m.metadata.brief).slice(0, 800)}` : ""}${m.metadata?.conceito ? ` · conceito: ${String(m.metadata.conceito).slice(0, 400)}` : ""}`).join("\n")}\n</midias>`,
       imagens.length ? `As imagens da publicação estão nos arquivos: ${imagens.join(", ")} (abra e olhe antes de escrever).` : "",

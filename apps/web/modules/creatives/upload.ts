@@ -31,11 +31,11 @@ function medir(f: File): Promise<{ durationMs: number | null; width: number | nu
  * Envia um arquivo para a biblioteca do workspace: registra, manda o binário (rota local ou URL pré-assinada do R2)
  * e confirma o tamanho. Lança Error com mensagem em português.
  */
-export async function enviarArquivo(f: File, extra: { type?: "MUSIC" | "SFX"; tags?: string[]; license?: string; onProgresso?: (pct: number) => void } = {}): Promise<Enviado> {
+export async function enviarArquivo(f: File, extra: { type?: "MUSIC" | "SFX"; tags?: string[]; license?: string; pastaId?: string | null; onProgresso?: (pct: number) => void } = {}): Promise<Enviado> {
   const type = extra.type ?? (f.type.startsWith("video/") ? "VIDEO" : f.type.startsWith("image/") ? "IMAGE" : null);
   if (!type) throw new Error(`“${f.name}”: envie imagem (PNG, JPG, WEBP, SVG) ou vídeo (MP4, MOV, WEBM)`);
   const m = await medir(f);
-  const r = await iniciarUpload({ type, tags: extra.tags ?? (type === "IMAGE" || type === "VIDEO" ? ["asset"] : []), name: f.name, mime: f.type || "application/octet-stream", size: f.size, license: extra.license ?? "", ...m });
+  const r = await iniciarUpload({ type, tags: extra.tags ?? (type === "IMAGE" || type === "VIDEO" ? ["asset"] : []), name: f.name, mime: f.type || "application/octet-stream", size: f.size, license: extra.license ?? "", pastaId: extra.pastaId ?? null, ...m });
   if (!r.ok) throw new Error(r.error);
   try {
     // XHR (e não fetch) para ter o progresso do envio

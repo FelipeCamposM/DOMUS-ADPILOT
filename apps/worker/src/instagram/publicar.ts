@@ -2,7 +2,7 @@ import { db, instagramDaConexao, lerArquivo, r2Delete, r2Presign, r2Put, type In
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { DATA_DIR } from "../env";
-import { restaurar } from "../video/arquivo";
+import { arquivarPublicados, restaurar } from "../video/arquivo";
 import { ffmpeg, FFPROBE, rodar } from "../video/tools";
 import { avisar } from "../whatsapp";
 
@@ -119,6 +119,7 @@ export async function publicarInstagram(postId: string, c: { signal: AbortSignal
     const link = await api.permalink(pub.id).then((x) => x.permalink ?? null, () => null);
     await sql`update ads.instagram_posts set status = 'PUBLICADO', publicado_em = now(), ig_media_id = ${pub.id}, permalink = ${link}, updated_at = now() where id = ${p.id}`;
     await c.log(`publicado: ${link ?? pub.id}`);
+    await arquivarPublicados(ids).catch(() => {}); // nunca vira falha da publicação. Já está no Instagram: o original vai para o Drive (fica a prévia no R2)
     await avisar(`✅ ${NOME[p.tipo]} publicado${perfil}${link ? `
 ${link}` : ""}`);
     return { mediaId: pub.id, permalink: link };

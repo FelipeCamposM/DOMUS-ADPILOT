@@ -1,6 +1,6 @@
 "use server";
 
-import { audit, db, gravarSegredo, vozesElevenLabs } from "@domus-ads/core";
+import { armazenamentoSchema, audit, db, gravarSegredo, vozesElevenLabs } from "@domus-ads/core";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
@@ -152,5 +152,18 @@ export async function salvarChaveElevenLabs(chave: string | null) {
     revalidatePath("/settings");
     revalidatePath("/studio/novo");
     return n;
+  });
+}
+
+/** Regras do armazenamento (limite do R2, dias sem uso, arquivar após publicar, prévias). Global: o R2 é um só. */
+export async function salvarArmazenamento(input: unknown) {
+  return run(async () => {
+    const ctx = await requireCtx();
+    if (!isPlatformAdmin(ctx)) throw new Error("Só administradores da plataforma alteram o armazenamento");
+    const v = armazenamentoSchema.parse(input);
+    await gravarSegredo("armazenamento", JSON.stringify(v), ctx.user.id);
+    await audit(db(), { workspaceId: null, actor: ctx.actor, action: "Alterar regras de armazenamento", entityType: "settings", entityName: "armazenamento", after: v });
+    revalidatePath("/settings");
+    revalidatePath("/arquivos");
   });
 }

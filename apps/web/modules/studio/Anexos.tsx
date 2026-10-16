@@ -1,15 +1,14 @@
 "use client";
 
-import { Check, Clipboard, Film, ImageIcon, Link2, Paperclip, Plus, Sparkles, UploadCloud, X } from "lucide-react";
+import { Check, Clipboard, Film, FolderOpen, ImageIcon, Link2, Paperclip, Sparkles, UploadCloud, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { BibliotecaModal } from "../arquivos/Biblioteca";
 import { enviarArquivo } from "../creatives/upload";
-import { Popover } from "../shell/Popover";
 import { toast } from "../shell/toast";
 import type { MarcaResumo } from "@/lib/marcas";
 
-export interface ArquivoLib { id: string; name: string; type: string }
 // preview: URL local (blob:) do arquivo recém-enviado, para mostrar na hora sem baixar de volta
 export interface AnexoItem { creativeId: string; uso: "incluir" | "inspiracao"; nota: string; name: string; type: string; preview?: string }
 export interface LinkItem { url: string; nota: string }
@@ -26,10 +25,7 @@ interface Envio { key: string; name: string; url: string; video: boolean; size: 
  * Entrada: clicar, arrastar para o quadro ou para QUALQUER lugar da página (abre uma área de soltar em tela cheia),
  * ou colar (Ctrl+V) uma imagem. Os envios correm em paralelo, com prévia local e progresso real.
  */
-export function Anexos({ valor, onChange, biblioteca, marca }: {
-  valor: AnexosValor; onChange: (v: AnexosValor) => void; biblioteca: ArquivoLib[];
-  marca: MarcaResumo | null;
-}) {
+export function Anexos({ valor, onChange, marca }: { valor: AnexosValor; onChange: (v: AnexosValor) => void; marca: MarcaResumo | null }) {
   const raiz = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const atual = useRef(valor);
@@ -41,10 +37,11 @@ export function Anexos({ valor, onChange, biblioteca, marca }: {
   const [url, setUrl] = useState("");
   const [nota, setNota] = useState("");
   const set = (v: Partial<AnexosValor>) => onChange({ ...atual.current, ...v });
-  const anexar = (a: { id: string; name: string; type: string }) => {
-    if (valor.assets.some((x) => x.creativeId === a.id)) return;
-    if (valor.assets.length >= MAX) return toast.err(`No máximo ${MAX} arquivos por projeto`);
-    set({ assets: [...valor.assets, { creativeId: a.id, name: a.name, type: a.type, uso: "incluir", nota: "" }] });
+  const anexar = (lista: { id: string; name: string; type: string }[]) => {
+    const novos = lista.filter((a) => !atual.current.assets.some((x) => x.creativeId === a.id));
+    const vagas = MAX - atual.current.assets.length;
+    if (novos.length > vagas) toast.err(`No máximo ${MAX} arquivos por projeto`);
+    set({ assets: [...atual.current.assets, ...novos.slice(0, vagas).map((a) => ({ creativeId: a.id, name: a.name, type: a.type, uso: "incluir" as const, nota: "" }))] });
   };
 
   const enviar = async (files: FileList | File[] | null) => {
@@ -186,21 +183,8 @@ export function Anexos({ valor, onChange, biblioteca, marca }: {
       </button>
 
       <div className="cluster">
-        <div style={{ position: "relative" }}>
-          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setLib((v) => !v)} disabled={!biblioteca.length} title={biblioteca.length ? undefined : "A biblioteca de arquivos está vazia"}>
-            <Plus aria-hidden /> Da biblioteca ({biblioteca.length})
-          </button>
-          <Popover open={lib} onClose={() => setLib(false)} width={340}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, maxHeight: 300, overflowY: "auto", padding: 2 }}>
-              {biblioteca.map((a) => (
-                <button key={a.id} type="button" onClick={() => anexar(a)} title={a.name} className="thumb-card"
-                  style={{ aspectRatio: "1", border: valor.assets.some((x) => x.creativeId === a.id) ? "2px solid rgb(var(--c-brand))" : "1px solid rgb(var(--c-border))", cursor: "pointer", padding: 0 }}>
-                  {a.type === "IMAGE" ? <img src={`/api/creatives/${a.id}/file`} alt={a.name} loading="lazy" /> : <span style={{ display: "grid", placeItems: "center", height: "100%" }}><Film size={20} aria-hidden /></span>}
-                </button>
-              ))}
-            </div>
-          </Popover>
-        </div>
+        <button type="button" className="btn btn-secondary btn-sm" onClick={() => setLib(true)} disabled={usados >= MAX}><FolderOpen aria-hidden /> Escolher da biblioteca</button>
+        <BibliotecaModal open={lib} onClose={() => setLib(false)} podeEditar max={Math.max(1, MAX - usados)} jaTem={valor.assets.map((a) => a.creativeId)} onEscolher={anexar} />
         <span className="subtle caption">Logo, prints do sistema, fotos do produto, vídeos curtos. A IA olha cada imagem antes de criar.</span>
       </div>
 

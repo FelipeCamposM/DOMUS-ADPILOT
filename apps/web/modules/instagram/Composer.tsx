@@ -1,12 +1,12 @@
 "use client";
 
 import { contarHashtags, LIMITES_IG, problemasPost, STATUS_POST, TIPOS_POST, type TipoPost } from "@domus-ads/core/instagram-regras";
-import { AlertTriangle, ArrowDown, ArrowUp, CalendarClock, Check, CheckCircle2, ChevronLeft, ExternalLink, Hash, ImagePlus, Loader2, Plus, Rocket, Save, Sparkles, Undo2, Upload, Wand2, X } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, CalendarClock, Check, CheckCircle2, ChevronLeft, ExternalLink, Hash, ImagePlus, Loader2, Rocket, Save, Sparkles, Undo2, Wand2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import type { ContaIG, PostIG } from "@/lib/instagram";
-import { enviarArquivo } from "../creatives/upload";
+import { BibliotecaModal } from "../arquivos/Biblioteca";
 import { Dialog } from "../shell/Dialog";
 import { toast } from "../shell/toast";
 import { agendarPublicacao, pedirLegenda, salvarPublicacao, voltarParaRascunho } from "./actions";
@@ -52,7 +52,8 @@ export function Composer({ post, conta, biblioteca, feed, marcas, podeEditar }: 
   const [pend, start] = useTransition();
 
   const travado = !podeEditar || status === "PUBLICANDO" || status === "PUBLICADO";
-  const lib = useMemo(() => new Map(biblioteca.map((b) => [b.id, b])), [biblioteca]);
+  const [extras, setExtras] = useState<ItemBiblioteca[]>([]); // escolhidos no modal que ainda não vieram na lista da página
+  const lib = useMemo(() => new Map([...biblioteca, ...extras].map((b) => [b.id, b])), [biblioteca, extras]);
   const midias = ids.map((id) => lib.get(id)).filter((x): x is ItemBiblioteca => !!x);
   const problemas = problemasPost({ tipo, legenda, midias: midias.map((m) => ({ type: m.type, durationMs: m.duration_ms })) });
   const perfil = { username: conta.username, foto: conta.foto, nome: conta.nome };
@@ -275,8 +276,9 @@ export function Composer({ post, conta, biblioteca, feed, marcas, podeEditar }: 
         </aside>
       </div>
 
-      <Picker open={picker} onClose={() => setPicker(false)} biblioteca={biblioteca} tipo={tipo} jaTem={ids} max={maxMidias - ids.length}
-        onEscolher={(novos) => { mudou(setIds)([...ids, ...novos].slice(0, maxMidias)); setPicker(false); }} />
+      <BibliotecaModal open={picker} onClose={() => setPicker(false)} titulo="Escolher mídia" podeEditar={podeEditar} jaTem={ids} max={Math.max(1, maxMidias - ids.length)}
+        tipos={tipo === "REELS" ? ["VIDEO"] : tipo === "FEED" ? ["IMAGE"] : ["IMAGE", "VIDEO"]}
+        onEscolher={(novos) => { setExtras((x) => [...x, ...novos]); mudou(setIds)([...ids, ...novos.map((n) => n.id)].slice(0, maxMidias)); }} />
 
       <Dialog open={confirmar} onClose={() => setConfirmar(false)} title="Publicar agora?">
         <p className="muted small">A publicação vai para <b>@{conta.username}</b> em até 1 minuto e fica visível para todos os seguidores. Para tirar depois, só apagando pelo Instagram.</p>
@@ -286,69 +288,5 @@ export function Composer({ post, conta, biblioteca, feed, marcas, podeEditar }: 
         </div>
       </Dialog>
     </div>
-  );
-}
-
-/** Escolha de mídias da biblioteca (ou envio do computador), filtrando pelo que o tipo aceita. */
-function Picker({ open, onClose, biblioteca, tipo, jaTem, max, onEscolher }: {
-  open: boolean; onClose: () => void; biblioteca: ItemBiblioteca[]; tipo: TipoPost; jaTem: string[]; max: number; onEscolher: (ids: string[]) => void;
-}) {
-  const router = useRouter();
-  const [sel, setSel] = useState<string[]>([]);
-  const [filtro, setFiltro] = useState<"IMAGE" | "VIDEO" | "TODOS">(tipo === "REELS" ? "VIDEO" : tipo === "FEED" ? "IMAGE" : "TODOS");
-  const [enviando, setEnviando] = useState<number | null>(null);
-  const input = useRef<HTMLInputElement>(null);
-  useEffect(() => { if (open) { setSel([]); setFiltro(tipo === "REELS" ? "VIDEO" : tipo === "FEED" ? "IMAGE" : "TODOS"); } }, [open, tipo]);
-  const aceita = (t: string) => (tipo === "REELS" ? t === "VIDEO" : tipo === "FEED" ? t === "IMAGE" : true);
-  const itens = biblioteca.filter((b) => aceita(b.type) && (filtro === "TODOS" || b.type === filtro) && !jaTem.includes(b.id));
-  const alternar = (id: string) => setSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : max === 1 ? [id] : s.length < max ? [...s, id] : s));
-
-  const subir = async (files: FileList | null) => {
-    if (!files?.length) return;
-    const novos: string[] = [];
-    for (const f of Array.from(files).slice(0, max)) {
-      try {
-        setEnviando(0);
-        const r = await enviarArquivo(f, { onProgresso: setEnviando });
-        novos.push(r.id);
-      } catch (e) { toast.err((e as Error).message); }
-    }
-    setEnviando(null);
-    if (input.current) input.current.value = "";
-    if (novos.length) { router.refresh(); onEscolher(novos); }
-  };
-
-  return (
-    <Dialog open={open} onClose={onClose} title="Escolher mídia">
-      <div className="cluster" style={{ gap: 6, justifyContent: "space-between" }}>
-        <div className="cluster" style={{ gap: 6 }}>
-          {tipo !== "REELS" && tipo !== "FEED" && (["TODOS", "IMAGE", "VIDEO"] as const).map((f) => <button key={f} type="button" className="chip" data-active={filtro === f} onClick={() => setFiltro(f)}>{f === "TODOS" ? "Tudo" : f === "IMAGE" ? "Imagens" : "Vídeos"}</button>)}
-        </div>
-        <input ref={input} type="file" hidden accept={tipo === "REELS" ? "video/*" : tipo === "FEED" ? "image/*" : "image/*,video/*"} multiple={max > 1} onChange={(e) => void subir(e.target.files)} />
-        <button type="button" className="btn btn-secondary btn-xs" onClick={() => input.current?.click()} disabled={enviando !== null}>
-          {enviando !== null ? <><Loader2 className="animate-spin" aria-hidden /> {enviando}%</> : <><Upload aria-hidden /> Enviar do computador</>}
-        </button>
-      </div>
-      <div className="ig-picker">
-        {itens.length === 0 && <p className="subtle small" style={{ gridColumn: "1/-1", padding: 24, textAlign: "center" }}>Nada aqui ainda. Gere no Studio ou envie do computador.</p>}
-        {itens.map((b) => {
-          const n = sel.indexOf(b.id);
-          return (
-            <button key={b.id} type="button" className="ig-picker-item" data-on={n >= 0} onClick={() => alternar(b.id)} title={b.name}>
-              <img src={arquivo(b.id, b.type === "VIDEO")} alt="" loading="lazy" />
-              {b.type === "VIDEO" && <span className="ig-midia-dur">{Math.round((b.duration_ms ?? 0) / 1000)}s</span>}
-              {n >= 0 && <span className="ig-picker-n">{max > 1 ? n + 1 : <Check size={12} />}</span>}
-            </button>
-          );
-        })}
-      </div>
-      <div className="cluster" style={{ justifyContent: "space-between" }}>
-        <span className="subtle small">{max > 1 ? `${sel.length} de até ${max}` : "Escolha 1"}</span>
-        <div className="cluster" style={{ gap: 6 }}>
-          <button className="btn btn-ghost btn-sm" onClick={onClose}>Cancelar</button>
-          <button className="btn btn-primary btn-sm" disabled={!sel.length} onClick={() => onEscolher(sel)}><Plus aria-hidden /> Adicionar</button>
-        </div>
-      </div>
-    </Dialog>
   );
 }

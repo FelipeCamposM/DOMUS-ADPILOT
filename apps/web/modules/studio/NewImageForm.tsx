@@ -8,7 +8,7 @@ import { toast } from "../shell/toast";
 import { EstiloPicker, type Estilo } from "./EstiloPicker";
 import { Palco } from "./Palco";
 import { criarImagem } from "./actions";
-import { Anexos, paraEnvio, type AnexosValor, type ArquivoLib } from "./Anexos";
+import { Anexos, paraEnvio, type AnexosValor } from "./Anexos";
 import type { MarcaResumo } from "@/lib/marcas";
 import { comMarca, faltando, Identidade } from "./Identidade";
 
@@ -20,8 +20,8 @@ const FORMATOS = [
 ] as const;
 const MAX_SLIDES = 20; // limite atual do Instagram
 
-export function NewImageForm({ produto, biblioteca, marcas }: {
-  produto: string; biblioteca: ArquivoLib[]; marcas: MarcaResumo[];
+export function NewImageForm({ produto, marcas }: {
+  produto: string; marcas: MarcaResumo[];
 }) {
   const router = useRouter();
   const [pend, start] = useTransition();
@@ -71,7 +71,7 @@ export function NewImageForm({ produto, biblioteca, marcas }: {
         </div>
         <Campo id="estilo" label="Estilo" valor={f.estilo} on={(v) => set("estilo", v)} max={300} />
       </div>
-      <div className="studio-anexos"><Anexos valor={anexos} onChange={setAnexos} biblioteca={biblioteca} marca={marcas.find((m) => m.id === marcaId) ?? null} /></div>
+      <div className="studio-anexos"><Anexos valor={anexos} onChange={setAnexos} marca={marcas.find((m) => m.id === marcaId) ?? null} /></div>
 
       <div className="stack studio-lateral" style={{ gap: 16 }}>
         <Identidade marcas={marcas} valor={marcaId} onChange={setMarcaId} />

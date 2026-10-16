@@ -1,16 +1,16 @@
 import { ImageIcon, Plus } from "lucide-react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { can, requireCtx } from "@/lib/ctx";
 import { ago } from "@/lib/format";
 import { criativos, type CriativoLinha } from "@/lib/video";
-import { AssetsLibrary } from "@/modules/creatives/AssetsLibrary";
 import { Library } from "@/modules/creatives/Library";
 import { Busca } from "@/modules/shell/Busca";
 import { VideoCard } from "@/modules/studio/VideoCard";
 
 export const metadata = { title: "Criativos" };
 
-const ABAS = [["todos", "Todos"], ["videos", "Vídeos"], ["imagens", "Imagens"], ["arquivos", "Arquivos"], ["musicas", "Músicas"], ["efeitos", "Efeitos sonoros"]] as const;
+const ABAS = [["todos", "Todos"], ["videos", "Vídeos"], ["imagens", "Imagens"], ["musicas", "Músicas"], ["efeitos", "Efeitos sonoros"]] as const;
 /** Slides de um carrossel viram um cartão só (capa = slide 1); o resto passa como está. */
 function agrupar(itens: CriativoLinha[]) {
   const grupos = new Map<string, { capa: CriativoLinha; slides: CriativoLinha[] }>();
@@ -33,6 +33,7 @@ const formatoDe = (w: number | null, h: number | null) =>
 export default async function CreativesPage({ searchParams }: { searchParams: Promise<{ aba?: string; q?: string }> }) {
   const ctx = await requireCtx();
   const { aba = "todos", q } = await searchParams;
+  if (aba === "arquivos") redirect("/arquivos"); // a aba virou a página Arquivos (com pastas)
   const editor = can(ctx, "editor");
   const ws = ctx.workspace.id;
   const gerado = (t: string[]) => !t.includes("asset");
@@ -74,9 +75,6 @@ export default async function CreativesPage({ searchParams }: { searchParams: Pr
   } else if (aba === "musicas" || aba === "efeitos") {
     const tipo = aba === "musicas" ? "MUSIC" : "SFX";
     corpo = <Library tipo={tipo} itens={await criativos(ws, [tipo], q)} podeEditar={editor} />;
-  } else if (aba === "arquivos") {
-    const itens = (await criativos(ws, ["IMAGE", "VIDEO"], q)).filter((c) => !gerado(c.tags));
-    corpo = <AssetsLibrary itens={itens} podeEditar={editor} />;
   } else {
     const tipo = aba === "imagens" ? "IMAGE" : "VIDEO";
     const itens = (await criativos(ws, [tipo], q)).filter((c) => gerado(c.tags));

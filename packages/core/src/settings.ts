@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { decrypt, encrypt } from "./crypto";
 import { db } from "./db";
 
@@ -63,4 +64,23 @@ export function usdPorMilCreditos(plano: string | null): number {
   const env = Number(process.env.ELEVENLABS_USD_POR_1K);
   if (env > 0) return env;
   return USD_POR_1K[(plano ?? "").toLowerCase().replace(/_.*$/, "")] ?? USD_POR_1K.creator!;
+}
+
+/**
+ * Regras do armazenamento (Configurações → Armazenamento). O R2 é pequeno e dividido com a Domus: guarda o que está em
+ * uso e as prévias leves; o original de todo o resto fica só no Google Drive do PC do worker.
+ */
+export const armazenamentoSchema = z.object({
+  limiteGb: z.number({ message: "Informe o limite em GB" }).min(0.2, "Mínimo 0,2 GB").max(9, "O R2 grátis tem 10 GB e é dividido com a Domus: no máximo 9 GB"),
+  diasSemUso: z.number({ message: "Informe os dias" }).int("Use um número inteiro de dias").min(1, "Mínimo 1 dia").max(365, "Máximo 365 dias"),
+  arquivarPublicados: z.boolean(),
+  previas: z.boolean(),
+});
+export type Armazenamento = z.infer<typeof armazenamentoSchema>;
+export const ARMAZENAMENTO_PADRAO: Armazenamento = { limiteGb: Number(process.env.R2_LIMITE_GB || 2), diasSemUso: 7, arquivarPublicados: true, previas: true };
+
+export async function armazenamento(): Promise<Armazenamento> {
+  const v = await lerSegredo("armazenamento").catch(() => null);
+  const p = v ? armazenamentoSchema.partial().safeParse(JSON.parse(v)) : null;
+  return { ...ARMAZENAMENTO_PADRAO, ...(p?.success ? p.data : {}) };
 }

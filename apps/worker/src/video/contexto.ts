@@ -96,6 +96,7 @@ export async function contextoCriativo(projectId: string, workspaceId: string, p
     if (brand.fonteTitulo || brand.fonteTexto) b.push(`Fontes (Google Fonts): títulos “${brand.fonteTitulo || brand.fonteTexto}”, textos “${brand.fonteTexto || brand.fonteTitulo}”`);
     if (brand.tom) b.push(`Tom de voz: ${brand.tom}`);
     if (brand.regras) b.push(`Regras da marca (obrigatórias): ${brand.regras}`);
+    if (brand.site) b.push(`Site da marca: ${brand.site}`);
     if (brand.referencias.length) b.push(`Referências: ${brand.referencias.join(", ")}`);
   }
 

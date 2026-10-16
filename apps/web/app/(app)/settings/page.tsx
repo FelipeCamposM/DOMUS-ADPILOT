@@ -1,6 +1,7 @@
-import { chaveElevenLabs, creditosElevenLabs, db, vozesElevenLabs, whatsappAvisos, type CreditosElevenLabs } from "@domus-ads/core";
+import { armazenamento, chaveElevenLabs, creditosElevenLabs, db, vozesElevenLabs, whatsappAvisos, type CreditosElevenLabs } from "@domus-ads/core";
 import { isPlatformAdmin, requireCtx } from "@/lib/ctx";
 import { workerOnline } from "@/lib/queries";
+import { usoArmazenamento } from "@/lib/armazenamento";
 import type { Detectada } from "@/modules/settings/AiAccounts";
 import { Settings, type ContaIA, type Membro } from "@/modules/settings/Settings";
 
@@ -40,7 +41,7 @@ export default async function SettingsPage() {
     .filter((d) => !contas.some((c) => c.provider === d.provider && c.config_dir === d.config_dir))
     .map(({ key, provider, name, email, plan }) => ({ key, provider, name, email, plan }));
   return (
-    <div className="page" style={{ maxWidth: 1100 }}>
+    <div className="page" style={{ maxWidth: 1240 }}>
       <div className="page-head">
         <div>
           <div className="eyebrow" data-enter>{ctx.workspace.name}</div>
@@ -57,6 +58,8 @@ export default async function SettingsPage() {
         usoVoz={usoVoz.map((u) => ({ ...u, created_at: u.created_at.toISOString() }))}
         podeOwnerIA={isPlatformAdmin(ctx)}
         avisos={isPlatformAdmin(ctx) ? await whatsappAvisos() : null}
+        armazenamento={await armazenamento()}
+        uso={await usoArmazenamento()}
         worker={{ online: w.online, lastSeen: iso(w.lastSeen), info: { ...w.info, detected: undefined, whatsappQr: isPlatformAdmin(ctx) ? w.info.whatsappQr : undefined } }}
       />
     </div>

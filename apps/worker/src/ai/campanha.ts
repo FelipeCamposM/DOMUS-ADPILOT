@@ -62,7 +62,7 @@ export async function runCampanhaIA(payload: CampanhaPayload, c: { signal: Abort
     const pasta = join(DATA_DIR, "campanhas", d.id);
     mkdirSync(pasta, { recursive: true });
     const brand = brandSchema.parse(d.brand ?? {});
-    const marca = [brand.sobre && `Sobre a marca: ${brand.sobre}`, brand.tom && `Tom de voz: ${brand.tom}`, brand.regras && `Regras da marca: ${brand.regras}`].filter(Boolean).join("\n");
+    const marca = [brand.sobre && `Sobre a marca: ${brand.sobre}`, brand.tom && `Tom de voz: ${brand.tom}`, brand.regras && `Regras da marca: ${brand.regras}`, brand.site && `Site da marca: ${brand.site}`].filter(Boolean).join("\n");
 
     // páginas citadas no pedido: o texto público vira contexto (sem login, sem rede interna)
     const urls = [...new Set(`${d.prompt ?? ""} ${String(d.spec?.urlFinal ?? "")}`.match(/https?:\/\/[^\s"'<>]+/g) ?? [])].slice(0, 3);

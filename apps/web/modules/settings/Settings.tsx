@@ -1,13 +1,15 @@
 "use client";
 
-import { AudioLines, KeyRound, Loader2, MessageCircle, Plus, Power, Server, Terminal, Trash2, Users } from "lucide-react";
+import { AudioLines, HardDrive, KeyRound, Loader2, MessageCircle, Plus, Power, Server, Terminal, Trash2, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition, type ReactNode } from "react";
+import { useEffect, useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { ago, dateTime, int } from "@/lib/format";
 import { toast } from "../shell/toast";
 import { adicionarMembro, alterarPapel, criarWorkspace, removerMembro, renomearWorkspace, salvarChaveElevenLabs, trocarSenha } from "./actions";
+import type { UsoArmazenamento } from "@/lib/armazenamento";
 import { AiAccounts, type ContaIA, type Detectada } from "./AiAccounts";
+import { Armazenamento, type CfgArmazenamento } from "./Armazenamento";
 import { inicializacaoWorker } from "./ai-accounts";
 import { Whatsapp, type EstadoWhatsapp } from "./Whatsapp";
 
@@ -26,6 +28,35 @@ function useAcao() {
     router.refresh();
   });
   return { pend, rodar };
+}
+
+const INDICE = [
+  ["Workspace", [["workspace", "Workspace", Users], ["membros", "Membros", Users]]],
+  ["Inteligência", [["ia", "Contas de IA", Terminal], ["vozes", "Vozes", AudioLines]]],
+  ["Plataforma", [["armazenamento", "Armazenamento", HardDrive], ["whatsapp", "WhatsApp", MessageCircle], ["worker", "Worker local", Server]]],
+  ["Pessoal", [["conta", "Minha conta", KeyRound]]],
+] as const;
+
+/** Índice fixo ao lado das seções, marcando a que está na tela. */
+function Indice() {
+  const [ativa, setAtiva] = useState("workspace");
+  useEffect(() => {
+    const obs = new IntersectionObserver((es) => { for (const e of es) if (e.isIntersecting) setAtiva(e.target.id); }, { rootMargin: "-15% 0px -70% 0px" });
+    for (const [, itens] of INDICE) for (const [id] of itens) { const el = document.getElementById(id); if (el) obs.observe(el); }
+    return () => obs.disconnect();
+  }, []);
+  return (
+    <nav className="cfg-nav" aria-label="Seções das configurações">
+      {INDICE.map(([grupo, itens]) => (
+        <div key={grupo}>
+          <div className="cfg-nav-grupo">{grupo}</div>
+          {itens.map(([id, rotulo, Icone]) => (
+            <a key={id} href={`#${id}`} aria-current={ativa === id ? "true" : undefined} onClick={() => setAtiva(id)}><Icone size={15} aria-hidden />{rotulo}</a>
+          ))}
+        </div>
+      ))}
+    </nav>
+  );
 }
 
 function Secao({ id, icon, titulo, desc, children }: { id: string; icon: ReactNode; titulo: string; desc: string; children: ReactNode }) {
@@ -48,6 +79,7 @@ export function Settings(p: {
   };
   usoVoz: { id: string; created_at: string; voice_name: string | null; characters: number; credits: number; titulo: string | null; video_project_id: string | null }[];
   worker: { online: boolean; lastSeen: string | null; info: Record<string, unknown> };
+  armazenamento: CfgArmazenamento; uso: UsoArmazenamento;
 }) {
   const { pend, rodar } = useAcao();
   const [wsNome, setWsNome] = useState(p.ws.name);
@@ -58,7 +90,9 @@ export function Settings(p: {
   const admin = p.ws.role === "owner" || p.ws.role === "admin";
 
   return (
-    <>
+    <div className="cfg">
+      <Indice />
+      <div className="cfg-secoes">
       <Secao id="workspace" icon={<Users size={16} aria-hidden />} titulo="Workspace" desc="Cada workspace tem as próprias conexões, campanhas, conversas e membros.">
         <div className="cluster">
           <input className="input-sm" style={{ width: 260 }} value={wsNome} onChange={(e) => setWsNome(e.target.value)} disabled={!admin} aria-label="Nome do workspace" />
@@ -150,6 +184,10 @@ export function Settings(p: {
         )}
       </Secao>
 
+      <Secao id="armazenamento" icon={<HardDrive size={16} aria-hidden />} titulo="Armazenamento" desc="O R2 é pequeno e dividido com a Domus: guarda o que está em uso. O original de todo o resto fica no Google Drive do PC do worker.">
+        <Armazenamento cfg={p.armazenamento} uso={p.uso} podeAdmin={p.podeOwnerIA} />
+      </Secao>
+
       <Secao id="whatsapp" icon={<MessageCircle size={16} aria-hidden />} titulo="WhatsApp" desc="Número que manda os avisos da plataforma (post publicado, falhas). Roda na Wuzapi do PC do worker. O histórico fica em Mensagens.">
         <Whatsapp estado={(p.worker.info.whatsapp as EstadoWhatsapp | undefined) ?? null} qr={(p.worker.info.whatsappQr as string | null | undefined) ?? null} erro={(p.worker.info.whatsappErro as string | null | undefined) ?? null} avisos={p.avisos} podeAdmin={p.podeOwnerIA} workerOnline={p.worker.online} />
       </Secao>
@@ -182,6 +220,7 @@ export function Settings(p: {
           </button>
         </div>
       </Secao>
-    </>
+      </div>
+    </div>
   );
 }

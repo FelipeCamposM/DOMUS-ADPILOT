@@ -1,15 +1,16 @@
 "use client";
 
-import { ImagePlus, Loader2, Plus, Save, X } from "lucide-react";
+import { FolderOpen, Globe, ImagePlus, Loader2, Plus, Save, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
+import { BibliotecaModal } from "../arquivos/Biblioteca";
 import { enviarArquivo } from "../creatives/upload";
 import { toast } from "../shell/toast";
 import { salvarMarca } from "./actions";
 
 export interface BrandValor {
   cores: { nome: string; hex: string }[]; fonteTitulo: string; fonteTexto: string; logoId: string | null;
-  tom: string; sobre: string; regras: string; referencias: string[];
+  tom: string; sobre: string; regras: string; referencias: string[]; site: string;
 }
 const FONTES = ["Plus Jakarta Sans", "Inter", "Poppins", "Montserrat", "Manrope", "DM Sans", "Space Grotesk", "Sora", "Outfit", "Urbanist", "Bricolage Grotesque", "Anton", "Bebas Neue", "Playfair Display", "Fraunces", "Instrument Serif", "Archivo Black", "Syne"];
 
@@ -17,15 +18,14 @@ const FONTES = ["Plus Jakarta Sans", "Inter", "Poppins", "Montserrat", "Manrope"
  * Identidade visual de uma marca. O que a IA cria com ela (vídeos, imagens, campanhas, legendas) segue isto: cores,
  * fontes, logo, tom de voz e regras. A prévia ao lado carrega as fontes do Google Fonts para conferir.
  */
-export function BrandEditor({ marcaId, nome: nomeInicial, inicial, imagens, podeEditar }: {
-  marcaId: string; nome: string; inicial: BrandValor; imagens: { id: string; name: string }[]; podeEditar: boolean;
-}) {
+export function BrandEditor({ marcaId, nome: nomeInicial, inicial, podeEditar }: { marcaId: string; nome: string; inicial: BrandValor; podeEditar: boolean }) {
   const router = useRouter();
   const [nome, setNome] = useState(nomeInicial);
   const [b, setB] = useState(inicial);
   const [refs, setRefs] = useState(inicial.referencias.join("\n"));
   const [pend, start] = useTransition();
   const [enviando, setEnviando] = useState(false);
+  const [lib, setLib] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const set = (v: Partial<BrandValor>) => setB((x) => ({ ...x, ...v }));
 
@@ -92,17 +92,26 @@ export function BrandEditor({ marcaId, nome: nomeInicial, inicial, imagens, pode
 
         <div className="field">
           <span className="label">Logo</span>
-          <div className="cluster" style={{ gap: 8 }}>
-            {imagens.slice(0, 18).map((i) => (
-              <button key={i.id} type="button" title={i.name} onClick={() => set({ logoId: b.logoId === i.id ? null : i.id })} className="thumb-card"
-                style={{ width: 54, height: 54, padding: 4, cursor: "pointer", border: b.logoId === i.id ? "2px solid rgb(var(--c-brand))" : "1px solid rgb(var(--c-border))", boxShadow: b.logoId === i.id ? "var(--glow-sm)" : "none" }}>
-                <img src={`/api/creatives/${i.id}/file`} alt={i.name} style={{ objectFit: "contain" }} />
-              </button>
-            ))}
-            <input ref={input} type="file" hidden accept="image/png,image/svg+xml,image/webp,image/jpeg" onChange={(e) => void enviarLogo(e.target.files?.[0])} />
-            <button type="button" className="btn btn-secondary btn-xs" onClick={() => input.current?.click()} disabled={enviando}>{enviando ? <Loader2 className="animate-spin" aria-hidden /> : <ImagePlus aria-hidden />} Enviar logo</button>
+          <div className="cluster" style={{ gap: 12, alignItems: "center" }}>
+            <div className="thumb-card" style={{ width: 88, height: 88, padding: 8, display: "grid", placeItems: "center", background: "repeating-conic-gradient(rgb(var(--c-bg-inset)) 0 25%, rgb(var(--c-bg-elevated)) 0 50%) 0 0 / 14px 14px" }}>
+              {b.logoId ? <img src={`/api/creatives/${b.logoId}/file`} alt="Logo atual" style={{ objectFit: "contain", width: "100%", height: "100%" }} /> : <span className="subtle caption" style={{ textAlign: "center" }}>Sem logo</span>}
+            </div>
+            <div className="stack" style={{ gap: 6 }}>
+              <div className="cluster" style={{ gap: 6 }}>
+                <button type="button" className="btn btn-secondary btn-xs" onClick={() => setLib(true)}><FolderOpen aria-hidden /> Escolher da biblioteca</button>
+                <input ref={input} type="file" hidden accept="image/png,image/svg+xml,image/webp,image/jpeg" onChange={(e) => void enviarLogo(e.target.files?.[0])} />
+                <button type="button" className="btn btn-ghost btn-xs" onClick={() => input.current?.click()} disabled={enviando}>{enviando ? <Loader2 className="animate-spin" aria-hidden /> : <ImagePlus aria-hidden />} Enviar do computador</button>
+                {b.logoId && <button type="button" className="btn btn-ghost btn-xs" onClick={() => set({ logoId: null })}><X aria-hidden /> Remover</button>}
+              </div>
+              <span className="subtle caption">PNG ou SVG com fundo transparente funciona melhor. A logo sempre fica no R2 (não vai para o Drive).</span>
+            </div>
           </div>
+          <BibliotecaModal open={lib} onClose={() => setLib(false)} titulo="Escolher a logo" tipos={["IMAGE"]} max={1} podeEditar={podeEditar} onEscolher={([i]) => i && set({ logoId: i.id })} />
         </div>
+
+        <div className="field"><label className="label" htmlFor="site"><Globe size={13} aria-hidden style={{ verticalAlign: -2 }} /> Site da marca</label>
+          <input id="site" className="input-sm" type="url" inputMode="url" maxLength={500} value={b.site} onChange={(e) => set({ site: e.target.value })} placeholder="https://digitaldomus.com.br" />
+          <span className="subtle caption">A IA lê o site para sugerir temas, produtos e o jeito de falar (calendário de conteúdo e legendas).</span></div>
 
         <div className="field"><label className="label" htmlFor="sobre">Sobre a marca (o que faz, para quem)</label>
           <textarea id="sobre" className="input-sm" rows={2} style={{ height: "auto", paddingBlock: 8 }} maxLength={2000} value={b.sobre} onChange={(e) => set({ sobre: e.target.value })} /></div>

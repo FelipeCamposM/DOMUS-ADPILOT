@@ -3,9 +3,10 @@
 import { gsap } from "gsap";
 import { X } from "lucide-react";
 import { useEffect, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
-/** Modal com entrada em mola. Esc e clique no fundo fecham. */
-export function Dialog({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: ReactNode }) {
+/** Modal com entrada em mola. Esc e clique no fundo fecham. Vai para o <body> (portal): dentro de painel animado ou de <form> ficaria preso. */
+export function Dialog({ open, onClose, title, children, largo }: { open: boolean; onClose: () => void; title: string; children: ReactNode; largo?: boolean }) {
   const box = useRef<HTMLDivElement>(null);
   const bg = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -17,15 +18,16 @@ export function Dialog({ open, onClose, title, children }: { open: boolean; onCl
     return () => window.removeEventListener("keydown", esc);
   }, [open, onClose]);
   if (!open) return null;
-  return (
+  return createPortal(
     <div className="overlay" ref={bg} onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="dialog" ref={box} role="dialog" aria-modal="true" aria-label={title}>
+      <div className={largo ? "dialog dialog-largo" : "dialog"} ref={box} role="dialog" aria-modal="true" aria-label={title}>
         <div className="panel-head">
           <span className="panel-title">{title}</span>
           <button className="btn btn-ghost btn-xs" onClick={onClose} aria-label="Fechar"><X aria-hidden /></button>
         </div>
         <div className="dialog-body">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

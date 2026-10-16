@@ -13,6 +13,8 @@ export const brandSchema = z.object({
   sobre: z.string().trim().max(2000).default(""),    // o que a marca faz, para quem
   regras: z.string().trim().max(2000).default(""),   // faça / não faça
   referencias: z.array(z.string().trim().url("Link inválido").max(500)).max(10).default([]),
+  // site oficial: a IA lê para tirar temas, produtos e linguagem (calendário de conteúdo, legendas)
+  site: z.string().trim().max(500).refine((u) => !u || /^https?:\/\/[^\s.]+\.[^\s]+$/i.test(u), "Site inválido: use o endereço completo, ex.: https://digitaldomus.com.br").default(""),
 });
 export type Brand = z.infer<typeof brandSchema>;
 
