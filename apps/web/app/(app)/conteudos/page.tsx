@@ -25,7 +25,7 @@ export default async function ConteudosPage({ searchParams }: { searchParams: Pr
     marcasDoWorkspace(ctx.workspace.id),
   ]);
   return (
-    <div className="page">
+    <div className="page page-cheia">
       <Calendario conta={{ id: conta.id, username: conta.username }} contas={contas.map((c) => ({ id: c.id, username: c.username }))}
         marcas={marcas.map((m) => ({ id: m.id, nome: m.nome }))} mes={mes} itens={itens} avulsos={avulsos} planos={planos} podeEditar={can(ctx, "editor")} />
     </div>

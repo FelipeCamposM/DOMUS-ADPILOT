@@ -33,6 +33,7 @@ export function Calendario({ conta, contas, marcas, mes, itens, avulsos, planos,
   const [pend, start] = useTransition();
   const [aberto, setAberto] = useState<string | null>(null);
   const [planejar, setPlanejar] = useState(false);
+  const [verPlanos, setVerPlanos] = useState(false);
   const dias = useMemo(() => gradeDoMes(mes), [mes]);
   const porDia = useMemo(() => {
     // posts do calendário e publicações agendadas à mão, na ordem do horário
@@ -70,23 +71,19 @@ export function Calendario({ conta, contas, marcas, mes, itens, avulsos, planos,
   const titulo = new Date(`${mes}-15T12:00:00Z`).toLocaleDateString("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" });
 
   return (
-    <div className="stack" style={{ gap: 16 }}>
+    <div className="cal-pagina">
       <div className="page-head">
         <div>
           <div className="eyebrow" data-enter>@{conta.username} · Instagram</div>
           <h1 className="page-title" data-enter>Conteúdos programados</h1>
         </div>
         <div className="cluster" data-enter>
+          {contas.length > 1 && contas.map((c) => <Link key={c.id} href={`/conteudos?conta=${c.id}&mes=${mes}`} className="chip" data-active={c.id === conta.id}>@{c.username}</Link>)}
           <Link href={`/instagram?conta=${conta.id}`} className="btn btn-ghost btn-sm"><ChevronLeft aria-hidden /> Perfil</Link>
+          {planos.length > 0 && <button className="btn btn-secondary btn-sm" onClick={() => setVerPlanos(true)}><CalendarRange aria-hidden /> Planejamentos ({planos.length})</button>}
           {podeEditar && <button className="btn btn-primary btn-sm" onClick={() => setPlanejar(true)}><Sparkles aria-hidden /> Planejar período</button>}
         </div>
       </div>
-
-      {contas.length > 1 && (
-        <div className="cluster" style={{ gap: 6 }}>
-          {contas.map((c) => <Link key={c.id} href={`/conteudos?conta=${c.id}&mes=${mes}`} className="chip" data-active={c.id === conta.id}>@{c.username}</Link>)}
-        </div>
-      )}
 
       {planos.filter((p) => p.status !== "PRONTO" || p.erro).map((p) => (
         <div key={p.id} className="cal-aviso" data-status={p.status}>
@@ -160,9 +157,7 @@ export function Calendario({ conta, contas, marcas, mes, itens, avulsos, planos,
         </div>
       </div>
 
-      {planos.length > 0 && (
-        <div className="panel" style={{ padding: 0 }}>
-          <div className="panel-head"><span className="panel-title"><CalendarRange size={15} aria-hidden style={{ verticalAlign: -2 }} /> Planejamentos</span></div>
+      <Dialog open={verPlanos && planos.length > 0} onClose={() => setVerPlanos(false)} title="Planejamentos" largo>
           <table className="data">
             <tbody>
               {planos.map((p) => (
@@ -179,8 +174,7 @@ export function Calendario({ conta, contas, marcas, mes, itens, avulsos, planos,
               ))}
             </tbody>
           </table>
-        </div>
-      )}
+      </Dialog>
 
       <Planejar open={planejar} onClose={() => setPlanejar(false)} contaId={conta.id} marcas={marcas} />
       <Dialog open={!!item} onClose={() => setAberto(null)} title={item ? `${FORMATOS_CAL[item.formato]} · ${new Date(item.data_hora).toLocaleString("pt-BR", { timeZone: TZ, weekday: "long", day: "2-digit", month: "long", hour: "2-digit", minute: "2-digit" })}` : ""} largo>

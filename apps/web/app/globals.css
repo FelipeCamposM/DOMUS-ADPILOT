@@ -164,9 +164,10 @@ table.data .num { text-align: right; }
 @keyframes shimmer { to { background-position: -200% 0; } }
 
 /* ── Overlays: modal, paleta, menu ───────────────────────────────────── */
-.overlay { position: fixed; inset: 0; z-index: var(--z-overlay); background: rgb(0 0 0 / 0.55); backdrop-filter: blur(6px); display: grid; place-items: start center; padding-top: 12vh; }
-.dialog { width: min(560px, calc(100vw - 32px)); background: rgb(var(--c-bg-surface)); border: 1px solid rgb(var(--c-border-strong)); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); overflow: hidden; }
-.dialog-body { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+.overlay { position: fixed; inset: 0; z-index: var(--z-overlay); background: rgb(0 0 0 / 0.55); backdrop-filter: blur(6px); display: grid; place-items: start center; padding: min(10vh, 72px) 16px 16px; }
+.dialog { display: flex; flex-direction: column; max-height: calc(100dvh - min(10vh, 72px) - 16px); width: min(560px, calc(100vw - 32px)); background: rgb(var(--c-bg-surface)); border: 1px solid rgb(var(--c-border-strong)); border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); overflow: hidden; }
+.dialog > .panel-head { flex: none; }
+.dialog-body { padding: 20px; display: flex; flex-direction: column; gap: 14px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .menu { position: absolute; z-index: var(--z-nav); min-width: 240px; padding: 6px; background: rgb(var(--c-bg-elevated)); border: 1px solid rgb(var(--c-border-strong)); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); }
 .menu-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border-radius: 8px; border: 0; background: none; text-align: left; cursor: pointer; color: rgb(var(--c-text-secondary)); }
 .menu-item:hover, .menu-item[data-active="true"] { background: rgb(var(--c-text-primary) / 0.06); color: rgb(var(--c-text-primary)); }
@@ -1213,7 +1214,7 @@ fieldset:disabled .chave { opacity: 0.6; cursor: default; }
 .cal-aviso[data-status="SUGERIDO"] { --cor: rgb(var(--c-brand)); }
 .cal-mix { display: inline-flex; align-items: center; gap: 8px; padding: 6px 6px 6px 12px; border-radius: var(--radius-md); border: 1px solid rgb(var(--c-border)); font-size: 13.5px; }
 .cal-mix input { width: 58px; }
-.cal-editor { display: flex; flex-direction: column; gap: 14px; padding: 18px 20px; max-height: calc(100dvh - 130px); overflow-y: auto; }
+.cal-editor { display: flex; flex-direction: column; gap: 14px; padding: 18px 20px; }
 .cal-campos { display: flex; flex-direction: column; gap: 12px; border: 0; padding: 0; margin: 0; min-width: 0; }
 .cal-rotulo { display: flex; align-items: center; gap: 8px; }
 .cal-rotulo > .label, .cal-rotulo > b { flex: 1; }
@@ -1224,10 +1225,25 @@ fieldset:disabled .chave { opacity: 0.6; cursor: default; }
 .cal-dica { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: var(--radius-md); background: rgb(var(--c-brand) / 0.07); border: 1px solid rgb(var(--c-brand) / 0.25); }
 .cal-dica > svg { color: rgb(var(--c-glow)); flex: none; }
 .cal-dica input { flex: 1; min-width: 0; }
-.cal-rodape { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 10px; border-top: 1px solid rgb(var(--c-border)); }
-.cal-capa { width: 100%; max-height: 280px; object-fit: contain; border-radius: var(--radius-md); background: rgb(var(--c-bg-inset)); }
+.cal-rodape { position: sticky; bottom: -18px; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: -18px; padding: 10px 0 18px; border-top: 1px solid rgb(var(--c-border)); background: rgb(var(--c-bg-surface)); }
+.cal-capa { width: 100%; max-height: 220px; object-fit: contain; border-radius: var(--radius-md); background: rgb(var(--c-bg-inset)); }
 .cal-status { height: 26px; border-color: color-mix(in srgb, var(--cor) 50%, transparent); color: var(--cor); }
+/* a página do calendário ocupa a altura da tela: a grade divide o espaço em 6 semanas e cada dia rola por dentro */
+.page.page-cheia { height: 100%; min-height: 620px; padding-block: 20px; gap: 0; }
+.cal-pagina { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
+.cal-pagina > .cal { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.cal-pagina .cal-grade { flex: 1; min-height: 0; grid-template-rows: auto repeat(6, minmax(0, 1fr)); }
+.cal-pagina .cal-dia { min-height: 0; overflow-y: auto; scrollbar-width: thin; }
+.cal-pagina .page-title { font-size: 1.6rem; }
+@media (min-width: 1000px) {
+  .cal-campos { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 18px; row-gap: 12px; align-items: start; }
+  .cal-campos > * { grid-column: 1; }
+  .cal-campos > .cal-bloco { grid-column: 2; grid-row: 1 / span 6; }
+}
 @media (max-width: 860px) {
+  .page.page-cheia { height: auto; }
+  .cal-pagina .cal-grade { grid-template-rows: none; }
+  .cal-pagina .cal-dia { overflow: visible; }
   .cal-grade { grid-template-columns: 1fr; }
   .cal-sem, .cal-dia[data-tem="false"] { display: none; }
   .cal-dia { min-height: 0; border-right: 0; padding: 10px 12px; }
