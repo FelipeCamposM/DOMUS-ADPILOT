@@ -1,5 +1,5 @@
-# DOMUS Worker: inicia junto com o Windows (Agendador de Tarefas, no logon do usuário atual).
-# Sem PM2: o Agendador reinicia o worker se ele cair (até 999 vezes, 1 minuto de intervalo).
+﻿# DOMUS Worker: inicia junto com o Windows (Agendador de Tarefas, no logon do usuário atual).
+# Sem PM2: supervisor.ps1 religa o worker se ele sair; a tarefa religa o supervisor a cada 5 min se ele morrer.
 #
 #   powershell -ExecutionPolicy Bypass -File apps\worker\scripts\inicializacao.ps1            instala
 #   powershell -ExecutionPolicy Bypass -File apps\worker\scripts\inicializacao.ps1 -Remover   remove
@@ -16,18 +16,17 @@ if ($Remover) {
   exit 0
 }
 
-# pnpm.cmd (não o pnpm.ps1: pelo cmd.exe, o .ps1 abre no Bloco de Notas em vez de rodar)
-$pnpm = (Get-Command pnpm.cmd -ErrorAction Stop).Source
 New-Item -ItemType Directory -Force (Join-Path $raiz ".worker-data") | Out-Null
 $log = Join-Path $raiz ".worker-data\worker.log"
-# cmd /c mantém o código de saída: se o worker cair, a tarefa "falha" e o Agendador reinicia.
-$acao = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c `"`"$pnpm`" worker >> `"$log`" 2>&1`"" -WorkingDirectory $raiz
-$gatilho = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
-# O "reiniciar se falhar" do Agendador só cobre falha ao abrir, não worker que sai com erro (ex.: Ctrl+C no console).
-# Então a tarefa também dispara a cada 5 min; com IgnoreNew, se o worker já está no ar, o disparo é ignorado.
-$gatilho.Repetition = (New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 5)).Repetition
+# O supervisor roda em janela oculta (ninguém fecha o console nem aperta Ctrl+C sem querer) e religa o worker se ele sair.
+$supervisor = Join-Path $PSScriptRoot "supervisor.ps1"
+$acao = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$supervisor`"" -WorkingDirectory $raiz
+# Dois gatilhos: no logon e a cada 5 min o dia todo. O de 5 min é um gatilho de horário próprio: a repetição presa ao
+# logon só vale se o logon disparou (worker iniciado à mão ficava sem ela). Com IgnoreNew, se já está no ar, nada acontece.
+$logon = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
+$cinco = New-ScheduledTaskTrigger -Once -At (Get-Date).Date -RepetitionInterval (New-TimeSpan -Minutes 5) -RepetitionDuration (New-TimeSpan -Days 3650)
 $config = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable `
   -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero) -MultipleInstances IgnoreNew -Hidden
-Register-ScheduledTask -TaskName $nome -Action $acao -Trigger $gatilho -Settings $config -Description "Fila de jobs e IA do DOMUS AdPilot" -Force | Out-Null
+Register-ScheduledTask -TaskName $nome -Action $acao -Trigger $logon, $cinco -Settings $config -Description "Fila de jobs e IA do DOMUS AdPilot" -Force | Out-Null
 Write-Host "Tarefa '$nome' instalada. Ela inicia no próximo logon; para iniciar agora: Start-ScheduledTask -TaskName '$nome'"
 Write-Host "Log: $log"
