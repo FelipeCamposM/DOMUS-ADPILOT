@@ -100,6 +100,18 @@ export async function removerContaIA(id: string) {
 }
 
 /** Liga/desliga o início do worker com o Windows (Agendador de Tarefas). Só acontece com este clique. */
+/** Conectar (gera QR na tela) ou desconectar o WhatsApp dos avisos. Quem fala com a Evolution é o worker. */
+export async function whatsappAcao(acao: "conectar" | "desconectar") {
+  return run(async () => {
+    const ctx = await admin();
+    const sql = db();
+    const a = z.enum(["conectar", "desconectar"], { message: "Ação inválida" }).parse(acao);
+    await sql`update ads.jobs set status = 'CANCELLED', finished_at = now() where type = 'WHATSAPP' and status in ('PENDING','RUNNING')`;
+    await enqueueJob(sql, { workspaceId: null, type: "WHATSAPP", payload: { acao: a }, createdBy: ctx.user.id, maxAttempts: 1 });
+    await audit(sql, { workspaceId: null, actor: ctx.actor, action: a === "conectar" ? "Conectar WhatsApp" : "Desconectar WhatsApp", entityType: "worker" });
+  });
+}
+
 export async function inicializacaoWorker(ligar: boolean) {
   return run(async () => {
     const ctx = await admin();

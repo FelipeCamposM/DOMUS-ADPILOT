@@ -1,6 +1,6 @@
 "use client";
 
-import { AudioLines, KeyRound, Loader2, Plus, Power, Server, Terminal, Trash2, Users } from "lucide-react";
+import { AudioLines, KeyRound, Loader2, MessageCircle, Plus, Power, Server, Terminal, Trash2, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
@@ -9,6 +9,7 @@ import { toast } from "../shell/toast";
 import { adicionarMembro, alterarPapel, criarWorkspace, removerMembro, renomearWorkspace, salvarChaveElevenLabs, trocarSenha } from "./actions";
 import { AiAccounts, type ContaIA, type Detectada } from "./AiAccounts";
 import { inicializacaoWorker } from "./ai-accounts";
+import { Whatsapp, type EstadoWhatsapp } from "./Whatsapp";
 
 export type { ContaIA };
 
@@ -147,6 +148,10 @@ export function Settings(p: {
             </table>
           </div>
         )}
+      </Secao>
+
+      <Secao id="whatsapp" icon={<MessageCircle size={16} aria-hidden />} titulo="WhatsApp" desc="Número que manda os avisos da plataforma (post publicado, falhas). Roda na Evolution API do PC do worker.">
+        <Whatsapp estado={(p.worker.info.whatsapp as EstadoWhatsapp | undefined) ?? null} qr={(p.worker.info.whatsappQr as string | null | undefined) ?? null} podeAdmin={p.podeOwnerIA} workerOnline={p.worker.online} />
       </Secao>
 
       <Secao id="worker" icon={<Server size={16} aria-hidden />} titulo="Worker local" desc="Processo no PC que sincroniza as contas e roda a IA. Não abre nenhuma porta: ele busca o trabalho no banco.">

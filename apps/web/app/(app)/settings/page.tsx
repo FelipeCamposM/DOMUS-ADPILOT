@@ -56,7 +56,7 @@ export default async function SettingsPage() {
         elevenlabs={elevenlabs}
         usoVoz={usoVoz.map((u) => ({ ...u, created_at: u.created_at.toISOString() }))}
         podeOwnerIA={isPlatformAdmin(ctx)}
-        worker={{ online: w.online, lastSeen: iso(w.lastSeen), info: { ...w.info, detected: undefined } }}
+        worker={{ online: w.online, lastSeen: iso(w.lastSeen), info: { ...w.info, detected: undefined, whatsappQr: isPlatformAdmin(ctx) ? w.info.whatsappQr : undefined } }}
       />
     </div>
   );

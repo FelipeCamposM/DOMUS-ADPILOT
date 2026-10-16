@@ -12,13 +12,14 @@ import { inicializacaoAtiva, configurarInicializacao } from "./startup";
 import { arquivarExcesso, restaurar } from "./video/arquivo";
 import { gerarLegenda, type LegendaPayload } from "./instagram/legenda";
 import { publicarInstagram } from "./instagram/publicar";
+import { acaoWhatsapp, estadoWhatsapp, gravarQr } from "./whatsapp";
 
 /**
  * DOMUS Worker: roda no PC local, sem nenhuma porta aberta. Ele mesmo busca trabalho na fila (ads.jobs) com
  * FOR UPDATE SKIP LOCKED e grava progresso/resultado no banco; a web só lê. A web nunca manda comando de shell:
  * cada tipo de job tem um handler fixo aqui (allowlist).
  */
-const TIPOS: readonly JobType[] = ["SYNC_META", "SYNC_GOOGLE", "AI_CHAT", "AI_LOGIN", "AI_DETECT", "WORKER_STARTUP", "GENERATE_VIDEO", "GENERATE_IMAGE", "AI_CAMPAIGN", "RESTORE_MEDIA", "SYNC_INSTAGRAM", "PUBLISH_INSTAGRAM", "AI_INSTAGRAM_CAPTION", "AI_USAGE"];
+const TIPOS: readonly JobType[] = ["SYNC_META", "SYNC_GOOGLE", "AI_CHAT", "AI_LOGIN", "AI_DETECT", "WORKER_STARTUP", "GENERATE_VIDEO", "GENERATE_IMAGE", "AI_CAMPAIGN", "RESTORE_MEDIA", "SYNC_INSTAGRAM", "PUBLISH_INSTAGRAM", "AI_INSTAGRAM_CAPTION", "AI_USAGE", "WHATSAPP"];
 const sql = db();
 const ativos = new Map<string, AbortController>();
 let parando = false;
@@ -62,6 +63,8 @@ async function executar(job: Job) {
       // "Atualizar" no menu de uso das assinaturas (topo)
       await atualizarUsoContas((m) => void log(m));
       result = { ok: true };
+    } else if (job.type === "WHATSAPP") {
+      result = await acaoWhatsapp(String(job.payload.acao), ctl.signal, log);
     } else if (job.type === "RESTORE_MEDIA") {
       result = await restaurar(String(job.payload.creativeId));
     } else if (job.type === "WORKER_STARTUP") {
@@ -101,7 +104,7 @@ async function loop() {
 /** Sinal de vida para a web (topo: "Worker online") + contas de IA cadastradas. */
 async function heartbeat() {
   const [c] = await sql<{ n: number }[]>`select count(*)::int as n from ads.ai_accounts where status = 'ACTIVE'`;
-  const info = { host: hostname(), pid: process.pid, node: process.version, concurrency: CONCURRENCY, running: ativos.size, aiAccounts: c?.n ?? 0, syncIntervalMin: SYNC_INTERVAL_MIN, autostart: await inicializacaoAtiva() };
+  const info = { host: hostname(), pid: process.pid, node: process.version, concurrency: CONCURRENCY, running: ativos.size, aiAccounts: c?.n ?? 0, syncIntervalMin: SYNC_INTERVAL_MIN, autostart: await inicializacaoAtiva(), whatsapp: await estadoWhatsapp() };
   await sql`insert into ads.worker_status (id, last_seen, info) values (${WORKER_ID}, now(), ${sql.json(info)})
             on conflict (id) do update set last_seen = now(), info = ads.worker_status.info || excluded.info`;
 }
@@ -157,7 +160,8 @@ await migrate(process.env.DIRECT_URL, (m) => console.log(m)); // banco sempre em
 await sql`update ads.ai_logins set status = 'FAILED', error = 'Worker reiniciado durante o login', updated_at = now()
            where status in ('STARTING','AWAITING_USER','CODE_SUBMITTED')`;
 await sql`update ads.jobs set status = 'FAILED', error = 'Worker reiniciado', finished_at = now()
-           where status = 'RUNNING' and type in ('AI_LOGIN','WORKER_STARTUP','GENERATE_VIDEO','GENERATE_IMAGE','PUBLISH_INSTAGRAM','AI_INSTAGRAM_CAPTION')`;
+           where status = 'RUNNING' and type in ('AI_LOGIN','WORKER_STARTUP','GENERATE_VIDEO','GENERATE_IMAGE','PUBLISH_INSTAGRAM','AI_INSTAGRAM_CAPTION','WHATSAPP')`;
+await gravarQr(null).catch(() => {});
 // queda no meio de uma publicação: não dá para saber se o Instagram chegou a publicar; avisa em vez de repetir
 await sql`update ads.instagram_posts set status = 'FALHOU', erro = 'O worker reiniciou durante a publicação. Confira no perfil se ela saiu antes de tentar de novo.', updated_at = now()
            where status = 'PUBLICANDO'`;
