@@ -1,7 +1,7 @@
 "use client";
 
 import { gsap } from "gsap";
-import { Activity, Bot, Cable, Clapperboard, Images, LayoutDashboard, Megaphone, Palette, ScrollText, Settings } from "lucide-react";
+import { Activity, Bot, Cable, Clapperboard, Images, LayoutDashboard, Megaphone, MessageCircle, Palette, ScrollText, Settings } from "lucide-react";
 import Link from "next/link";
 import { InstagramIcon } from "../connections/Logos";
 import { usePathname } from "next/navigation";
@@ -17,6 +17,7 @@ export const NAV = [
   { href: "/ai", label: "IA", icon: Bot, group: "Inteligência" },
   { href: "/jobs", label: "Jobs", icon: Activity, group: "Operação" },
   { href: "/connections", label: "Conexões", icon: Cable, group: "Operação" },
+  { href: "/mensagens", label: "Mensagens", icon: MessageCircle, group: "Operação" },
   { href: "/audit", label: "Auditoria", icon: ScrollText, group: "Operação" },
   { href: "/settings", label: "Configurações", icon: Settings, group: "Operação" },
 ] as const;
