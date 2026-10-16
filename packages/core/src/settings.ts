@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { decrypt, encrypt } from "./crypto";
+import { CONFIG_CAL_PADRAO, configCalSchema, type ConfigCal } from "./calendario";
 import { db } from "./db";
 
 /** Segredos globais da plataforma (cifrados no banco). Nunca vão para o navegador. */
@@ -83,4 +84,11 @@ export async function armazenamento(): Promise<Armazenamento> {
   const v = await lerSegredo("armazenamento").catch(() => null);
   const p = v ? armazenamentoSchema.partial().safeParse(JSON.parse(v)) : null;
   return { ...ARMAZENAMENTO_PADRAO, ...(p?.success ? p.data : {}) };
+}
+
+/** Prazos do calendário automático (antecedência por formato, tolerância de atraso). */
+export async function configCalendario(): Promise<ConfigCal> {
+  const v = await lerSegredo("calendario").catch(() => null);
+  const p = v ? configCalSchema.safeParse(JSON.parse(v)) : null;
+  return p?.success ? p.data : CONFIG_CAL_PADRAO;
 }

@@ -12,6 +12,7 @@ import { inicializacaoAtiva, configurarInicializacao } from "./startup";
 import { arquivarExcesso, restaurar } from "./video/arquivo";
 import { gerarLegenda, type LegendaPayload } from "./instagram/legenda";
 import { publicarInstagram } from "./instagram/publicar";
+import { automatizarCalendario, expirarAtrasados, gerarCalendario, type CalendarioPayload } from "./instagram/calendario";
 import { acaoWhatsapp, avisar, estadoWhatsapp, gravarQr } from "./whatsapp";
 
 /**
@@ -19,7 +20,7 @@ import { acaoWhatsapp, avisar, estadoWhatsapp, gravarQr } from "./whatsapp";
  * FOR UPDATE SKIP LOCKED e grava progresso/resultado no banco; a web só lê. A web nunca manda comando de shell:
  * cada tipo de job tem um handler fixo aqui (allowlist).
  */
-const TIPOS: readonly JobType[] = ["SYNC_META", "SYNC_GOOGLE", "AI_CHAT", "AI_LOGIN", "AI_DETECT", "WORKER_STARTUP", "GENERATE_VIDEO", "GENERATE_IMAGE", "AI_CAMPAIGN", "RESTORE_MEDIA", "SYNC_INSTAGRAM", "PUBLISH_INSTAGRAM", "AI_INSTAGRAM_CAPTION", "AI_USAGE", "WHATSAPP"];
+const TIPOS: readonly JobType[] = ["SYNC_META", "SYNC_GOOGLE", "AI_CHAT", "AI_LOGIN", "AI_DETECT", "WORKER_STARTUP", "GENERATE_VIDEO", "GENERATE_IMAGE", "AI_CAMPAIGN", "RESTORE_MEDIA", "SYNC_INSTAGRAM", "PUBLISH_INSTAGRAM", "AI_INSTAGRAM_CAPTION", "AI_USAGE", "WHATSAPP", "AI_CALENDARIO"];
 const sql = db();
 const ativos = new Map<string, AbortController>();
 let parando = false;
@@ -59,6 +60,8 @@ async function executar(job: Job) {
       result = await publicarInstagram(String(job.payload.postId), { signal: ctl.signal, log });
     } else if (job.type === "AI_INSTAGRAM_CAPTION") {
       result = await gerarLegenda(job.payload as unknown as LegendaPayload, { signal: ctl.signal, log });
+    } else if (job.type === "AI_CALENDARIO") {
+      result = await gerarCalendario(job.payload as unknown as CalendarioPayload, { signal: ctl.signal, log });
     } else if (job.type === "AI_USAGE") {
       // "Atualizar" no menu de uso das assinaturas (topo)
       await atualizarUsoContas((m) => void log(m));
@@ -111,6 +114,7 @@ async function heartbeat() {
 
 /** Instagram agendado: na hora marcada, vira job de publicação (um por publicação). */
 async function publicarAgendados() {
+  await expirarAtrasados(); // passou da tolerância (PC desligado): não publica atrasado demais
   const devidos = await sql<{ id: string; workspace_id: string }[]>`
     select p.id, p.workspace_id from ads.instagram_posts p
     where p.status = 'AGENDADO' and p.agendado_para <= now()
@@ -160,7 +164,9 @@ await migrate(process.env.DIRECT_URL, (m) => console.log(m)); // banco sempre em
 await sql`update ads.ai_logins set status = 'FAILED', error = 'Worker reiniciado durante o login', updated_at = now()
            where status in ('STARTING','AWAITING_USER','CODE_SUBMITTED')`;
 await sql`update ads.jobs set status = 'FAILED', error = 'Worker reiniciado', finished_at = now()
-           where status = 'RUNNING' and type in ('AI_LOGIN','WORKER_STARTUP','GENERATE_VIDEO','GENERATE_IMAGE','PUBLISH_INSTAGRAM','AI_INSTAGRAM_CAPTION','WHATSAPP')`;
+           where status = 'RUNNING' and type in ('AI_LOGIN','WORKER_STARTUP','GENERATE_VIDEO','GENERATE_IMAGE','PUBLISH_INSTAGRAM','AI_INSTAGRAM_CAPTION','WHATSAPP','AI_CALENDARIO')`;
+await sql`update ads.calendarios set status = 'ERRO', erro = 'Worker reiniciado durante o planejamento. Gere de novo.' where status = 'GERANDO'`;
+await sql`update ads.calendario_itens set refazendo = null where refazendo is not null`;
 await gravarQr(null).catch(() => {});
 // queda no meio de uma publicação: não dá para saber se o Instagram chegou a publicar; avisa em vez de repetir
 const interrompidos = await sql`update ads.instagram_posts set status = 'FALHOU', erro = 'O worker reiniciou durante a publicação. Confira no perfil se ela saiu antes de tentar de novo.', updated_at = now()
@@ -178,6 +184,7 @@ console.log(`DOMUS Worker "${WORKER_ID}" no ar · ${CONCURRENCY} jobs simultâne
 repetir(heartbeat, 30_000);
 repetir(agendarSyncs, 5 * 60_000);
 repetir(publicarAgendados, 30_000);
+repetir(automatizarCalendario, 60_000);
 repetir(async function usoDasContas() { await atualizarUsoContas((m) => console.log(`[${agora()}] ${m}`)); }, 5 * 60_000);
 repetir(async function arquivarNoDrive() { await arquivarExcesso((m) => console.log(`[${agora()}] arquivo: ${m}`)); }, 30 * 60_000);
 repetir(async function detectarContas() { await publicarDetectadas(await detectar()); }, 10 * 60_000);

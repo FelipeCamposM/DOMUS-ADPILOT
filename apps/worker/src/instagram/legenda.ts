@@ -5,6 +5,9 @@ import { bloco, perguntarIA } from "../ai/ask";
 import { DATA_DIR } from "../env";
 import { ffmpeg } from "../video/tools";
 
+/** Hashtags da IA no formato do Instagram: #, sem acento nem espaço, sem repetir, até o limite. */
+export const limparHashtags = (hs: unknown): string[] => [...new Set((Array.isArray(hs) ? hs : []).map((h) => `#${String(h).replace(/^#+/, "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\p{L}\p{N}_]/gu, "")}`).filter((h) => h.length > 2))].slice(0, LIMITES_IG.hashtags);
+
 export interface LegendaPayload { postId: string; dica?: string }
 
 const SISTEMA = `Você é social media sênior no Brasil e escreve legendas de Instagram em português do Brasil.
@@ -62,7 +65,7 @@ export async function gerarLegenda(payload: LegendaPayload, c: { signal: AbortSi
 
     const r = await perguntarIA({ workspaceId: p.workspace_id, sistema: SISTEMA, prompt: contexto, cwd: pasta, signal: c.signal, log: c.log, imagens: imagens.length ? imagens : undefined });
     const j = JSON.parse(bloco(r.text, "json")) as { legenda?: string; hashtags?: string[] };
-    const hashtags = [...new Set((j.hashtags ?? []).map((h) => `#${String(h).replace(/^#+/, "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\p{L}\p{N}_]/gu, "")}`).filter((h) => h.length > 2))].slice(0, LIMITES_IG.hashtags);
+    const hashtags = limparHashtags(j.hashtags);
     const sugestao = { legenda: String(j.legenda ?? "").trim(), hashtags, geradoEm: new Date().toISOString() };
     if (!sugestao.legenda) throw new Error("A IA não devolveu a legenda");
     await sql`update ads.instagram_posts set sugestao = ${sql.json(sugestao as unknown as Json)}, updated_at = now() where id = ${p.id}`;

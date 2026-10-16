@@ -1,6 +1,6 @@
 "use client";
 
-import { AudioLines, HardDrive, KeyRound, Loader2, MessageCircle, Plus, Power, Server, Terminal, Trash2, Users } from "lucide-react";
+import { AudioLines, CalendarClock, HardDrive, KeyRound, Loader2, MessageCircle, Plus, Power, Server, Terminal, Trash2, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
@@ -10,6 +10,8 @@ import { adicionarMembro, alterarPapel, criarWorkspace, removerMembro, renomearW
 import type { UsoArmazenamento } from "@/lib/armazenamento";
 import { AiAccounts, type ContaIA, type Detectada } from "./AiAccounts";
 import { Armazenamento, type CfgArmazenamento } from "./Armazenamento";
+import { PrazosCalendario } from "./PrazosCalendario";
+import type { ConfigCal } from "@domus-ads/core/calendario";
 import { inicializacaoWorker } from "./ai-accounts";
 import { Whatsapp, type EstadoWhatsapp } from "./Whatsapp";
 
@@ -33,7 +35,7 @@ function useAcao() {
 const INDICE = [
   ["Workspace", [["workspace", "Workspace", Users], ["membros", "Membros", Users]]],
   ["Inteligência", [["ia", "Contas de IA", Terminal], ["vozes", "Vozes", AudioLines]]],
-  ["Plataforma", [["armazenamento", "Armazenamento", HardDrive], ["whatsapp", "WhatsApp", MessageCircle], ["worker", "Worker local", Server]]],
+  ["Plataforma", [["armazenamento", "Armazenamento", HardDrive], ["calendario", "Calendário", CalendarClock], ["whatsapp", "WhatsApp", MessageCircle], ["worker", "Worker local", Server]]],
   ["Pessoal", [["conta", "Minha conta", KeyRound]]],
 ] as const;
 
@@ -79,7 +81,7 @@ export function Settings(p: {
   };
   usoVoz: { id: string; created_at: string; voice_name: string | null; characters: number; credits: number; titulo: string | null; video_project_id: string | null }[];
   worker: { online: boolean; lastSeen: string | null; info: Record<string, unknown> };
-  armazenamento: CfgArmazenamento; uso: UsoArmazenamento;
+  armazenamento: CfgArmazenamento; uso: UsoArmazenamento; calendario: ConfigCal;
 }) {
   const { pend, rodar } = useAcao();
   const [wsNome, setWsNome] = useState(p.ws.name);
@@ -186,6 +188,10 @@ export function Settings(p: {
 
       <Secao id="armazenamento" icon={<HardDrive size={16} aria-hidden />} titulo="Armazenamento" desc="O R2 é pequeno e dividido com a Domus: guarda o que está em uso. O original de todo o resto fica no Google Drive do PC do worker.">
         <Armazenamento cfg={p.armazenamento} uso={p.uso} podeAdmin={p.podeOwnerIA} />
+      </Secao>
+
+      <Secao id="calendario" icon={<CalendarClock size={16} aria-hidden />} titulo="Calendário automático" desc="Posts aprovados no calendário são gerados perto da hora e publicados sozinhos. Aqui ficam os prazos.">
+        <PrazosCalendario cfg={p.calendario} podeAdmin={p.podeOwnerIA} />
       </Secao>
 
       <Secao id="whatsapp" icon={<MessageCircle size={16} aria-hidden />} titulo="WhatsApp" desc="Número que manda os avisos da plataforma (post publicado, falhas). Roda na Wuzapi do PC do worker. O histórico fica em Mensagens.">

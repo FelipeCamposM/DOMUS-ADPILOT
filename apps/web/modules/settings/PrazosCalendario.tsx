@@ -1,0 +1,48 @@
+"use client";
+
+import type { ConfigCal } from "@domus-ads/core/calendario";
+import { FORMATOS_CAL, type FormatoCal } from "@domus-ads/core/calendario";
+import { Loader2, Save } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
+import { toast } from "../shell/toast";
+import { salvarConfigCalendario } from "./actions";
+
+/** Quanto antes da hora cada formato começa a ser gerado, e até quanto atraso ainda publica. */
+export function PrazosCalendario({ cfg, podeAdmin }: { cfg: ConfigCal; podeAdmin: boolean }) {
+  const router = useRouter();
+  const [v, setV] = useState(cfg);
+  const [pend, start] = useTransition();
+  const mudou = JSON.stringify(v) !== JSON.stringify(cfg);
+  return (
+    <>
+      <fieldset disabled={!podeAdmin || pend} className="cfg-grade">
+        {(Object.keys(FORMATOS_CAL) as FormatoCal[]).map((k) => (
+          <div key={k} className="field">
+            <label className="label" htmlFor={`ant-${k}`}>Gerar {FORMATOS_CAL[k].toLowerCase()} antes da hora</label>
+            <div className="cluster" style={{ gap: 6 }}>
+              <input id={`ant-${k}`} className="input-sm tabular" style={{ width: 90 }} type="number" min={k === "REELS" ? 15 : 5} max={1440} step={5}
+                value={v.antecedencia[k]} onChange={(e) => setV({ ...v, antecedencia: { ...v.antecedencia, [k]: Number(e.target.value) } })} />
+              <span className="subtle small">minutos</span>
+            </div>
+          </div>
+        ))}
+        <div className="field">
+          <label className="label" htmlFor="tol">Publicar atrasado até</label>
+          <div className="cluster" style={{ gap: 6 }}>
+            <input id="tol" className="input-sm tabular" style={{ width: 90 }} type="number" min={0.5} max={24} step={0.5} value={v.toleranciaH} onChange={(e) => setV({ ...v, toleranciaH: Number(e.target.value) })} />
+            <span className="subtle small">horas</span>
+          </div>
+          <span className="subtle caption">Passou disso (PC desligado na hora), o post não sai, fica como “Falhou” e chega aviso no WhatsApp.</span>
+        </div>
+      </fieldset>
+      {podeAdmin ? (
+        <button className="btn btn-primary btn-sm" style={{ alignSelf: "flex-start" }} disabled={pend || !mudou} onClick={() => start(async () => {
+          const r = await salvarConfigCalendario(v);
+          if (r.ok) toast.ok("Prazos salvos"); else toast.err(r.error);
+          router.refresh();
+        })}>{pend ? <Loader2 className="animate-spin" aria-hidden /> : <Save aria-hidden />} Salvar prazos</button>
+      ) : <p className="subtle small">Só o administrador da plataforma altera os prazos.</p>}
+    </>
+  );
+}

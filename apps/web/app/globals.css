@@ -1176,3 +1176,63 @@ fieldset:disabled .chave { opacity: 0.6; cursor: default; }
   .cfg-nav-grupo { display: none; }
   .cfg-nav a { flex: none; }
 }
+
+/* Calendário de conteúdo */
+.cal { padding: 0; overflow: hidden; }
+.cal-topo { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid rgb(var(--c-border)); }
+.cal-mes { font-size: 16px; text-transform: capitalize; min-width: 150px; text-align: center; }
+.cal-legenda { display: flex; flex-wrap: wrap; gap: 10px; font-size: 11.5px; color: rgb(var(--c-text-tertiary)); }
+.cal-legenda span { display: inline-flex; align-items: center; gap: 5px; }
+.cal-legenda i { width: 9px; height: 9px; border-radius: 3px; background: var(--cor); }
+.cal-grade { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.cal-sem { padding: 8px 10px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: rgb(var(--c-text-tertiary)); border-bottom: 1px solid rgb(var(--c-border)); }
+.cal-dia { position: relative; display: flex; flex-direction: column; gap: 4px; min-height: 118px; padding: 6px; border-right: 1px solid rgb(var(--c-border) / 0.7); border-bottom: 1px solid rgb(var(--c-border) / 0.7); min-width: 0; }
+.cal-dia:nth-child(7n + 7) { border-right: 0; }
+.cal-dia[data-fora="true"] { background: rgb(var(--c-bg-inset) / 0.5); }
+.cal-dia[data-fora="true"] .cal-num { opacity: 0.45; }
+.cal-dia[data-passado="true"] { background-image: linear-gradient(rgb(var(--c-bg-inset) / 0.35), rgb(var(--c-bg-inset) / 0.35)); }
+.cal-num { font-size: 12.5px; font-weight: 700; color: rgb(var(--c-text-secondary)); padding: 2px 4px; }
+.cal-num small { display: none; }
+.cal-dia[data-hoje="true"] .cal-num { align-self: flex-start; color: rgb(var(--c-brand-ink)); background: var(--gradient-btn); border-radius: 99px; padding: 2px 8px; box-shadow: var(--glow-sm); }
+.cal-item { --cor: rgb(var(--c-text-tertiary)); display: flex; align-items: center; gap: 5px; width: 100%; min-width: 0; padding: 4px 6px; border-radius: 7px; border: 1px solid color-mix(in srgb, var(--cor) 45%, transparent); background: color-mix(in srgb, var(--cor) 14%, transparent); color: rgb(var(--c-text-primary)); font: inherit; font-size: 12px; text-align: left; cursor: pointer; transition: transform .12s var(--ease-out); }
+.cal-item:hover { transform: translateY(-1px); background: color-mix(in srgb, var(--cor) 24%, transparent); }
+.cal-item svg { flex: none; color: var(--cor); }
+.cal-item b { flex: none; font-weight: 700; font-variant-numeric: tabular-nums; }
+.cal-item span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: rgb(var(--c-text-secondary)); }
+.cal-item[data-status="SUGERIDO"] { border-style: dashed; }
+[data-status="SUGERIDO"] { --cor: rgb(var(--c-text-tertiary)); }
+[data-status="APROVADO"] { --cor: rgb(var(--c-brand)); }
+[data-status="GERANDO"] { --cor: rgb(var(--c-warning)); }
+[data-status="AGENDADO"] { --cor: rgb(var(--c-info)); }
+[data-status="PUBLICADO"] { --cor: rgb(var(--c-success)); }
+[data-status="FALHOU"], [data-status="ERRO"] { --cor: rgb(var(--c-error)); }
+.cal-mais { position: absolute; top: 5px; right: 5px; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; border: 1px dashed rgb(var(--c-border-strong)); background: none; color: rgb(var(--c-text-tertiary)); cursor: pointer; opacity: 0; }
+.cal-dia:hover .cal-mais, .cal-mais:focus-visible { opacity: 1; }
+.cal-aviso { --cor: rgb(var(--c-brand)); display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid color-mix(in srgb, var(--cor) 40%, transparent); background: color-mix(in srgb, var(--cor) 10%, transparent); font-size: 13.5px; }
+.cal-aviso > svg { color: var(--cor); flex: none; }
+.cal-aviso[data-status="SUGERIDO"] { --cor: rgb(var(--c-brand)); }
+.cal-mix { display: inline-flex; align-items: center; gap: 8px; padding: 6px 6px 6px 12px; border-radius: var(--radius-md); border: 1px solid rgb(var(--c-border)); font-size: 13.5px; }
+.cal-mix input { width: 58px; }
+.cal-editor { display: flex; flex-direction: column; gap: 14px; padding: 18px 20px; max-height: calc(100dvh - 130px); overflow-y: auto; }
+.cal-campos { display: flex; flex-direction: column; gap: 12px; border: 0; padding: 0; margin: 0; min-width: 0; }
+.cal-rotulo { display: flex; align-items: center; gap: 8px; }
+.cal-rotulo > .label, .cal-rotulo > b { flex: 1; }
+.cal-refazer { height: 26px; }
+.cal-bloco { display: flex; flex-direction: column; gap: 6px; padding: 12px; border-radius: var(--radius-md); border: 1px solid rgb(var(--c-border)); background: rgb(var(--c-bg-elevated) / 0.4); }
+.cal-slide { display: flex; gap: 8px; align-items: center; padding: 6px; border-radius: 8px; background: rgb(var(--c-bg-inset) / 0.6); }
+.cal-slide-n { display: grid; place-items: center; flex: none; width: 24px; height: 24px; border-radius: 99px; font-size: 12px; font-weight: 800; background: rgb(var(--c-brand) / 0.2); color: rgb(var(--c-glow)); }
+.cal-dica { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: var(--radius-md); background: rgb(var(--c-brand) / 0.07); border: 1px solid rgb(var(--c-brand) / 0.25); }
+.cal-dica > svg { color: rgb(var(--c-glow)); flex: none; }
+.cal-dica input { flex: 1; min-width: 0; }
+.cal-rodape { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 10px; border-top: 1px solid rgb(var(--c-border)); }
+.cal-capa { width: 100%; max-height: 280px; object-fit: contain; border-radius: var(--radius-md); background: rgb(var(--c-bg-inset)); }
+.cal-status { height: 26px; border-color: color-mix(in srgb, var(--cor) 50%, transparent); color: var(--cor); }
+@media (max-width: 860px) {
+  .cal-grade { grid-template-columns: 1fr; }
+  .cal-sem, .cal-dia[data-tem="false"] { display: none; }
+  .cal-dia { min-height: 0; border-right: 0; padding: 10px 12px; }
+  .cal-num small { display: inline; margin-left: 8px; font-weight: 500; text-transform: capitalize; }
+  .cal-num { font-size: 0; }
+  .cal-num small { font-size: 12.5px; margin: 0; }
+  .cal-mais { opacity: 1; }
+}

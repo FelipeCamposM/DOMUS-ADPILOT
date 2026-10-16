@@ -2,7 +2,7 @@
 
 import type { MidiaIG } from "@domus-ads/core";
 import { STATUS_POST } from "@domus-ads/core/instagram-regras";
-import { AlertTriangle, CalendarClock, ChevronLeft, ChevronRight, Clapperboard, Copy, ExternalLink, Grid3x3, Heart, MessageCircle, Plus } from "lucide-react";
+import { AlertTriangle, CalendarClock, CalendarDays, ChevronLeft, ChevronRight, Clapperboard, Copy, ExternalLink, Grid3x3, Heart, MessageCircle, Plus } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import type { ContaIG, PostIG } from "@/lib/instagram";
@@ -47,6 +47,7 @@ export function PerfilInstagram({ conta, contas, midias, posts, erroApi, podeEdi
           <div className="ig-perfil-linha">
             <h1>{conta.username}</h1>
             {podeEditar && <button className="btn btn-primary btn-sm" onClick={() => setNova(true)}><Plus aria-hidden /> Nova publicação</button>}
+            <Link className="btn btn-secondary btn-sm" href={`/instagram/calendario?conta=${conta.id}`}><CalendarDays aria-hidden /> Calendário</Link>
             <a className="btn btn-secondary btn-sm" href={`https://www.instagram.com/${conta.username}/`} target="_blank" rel="noreferrer">Abrir no Instagram <ExternalLink aria-hidden /></a>
           </div>
           <ul className="ig-perfil-nums">

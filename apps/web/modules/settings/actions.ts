@@ -1,6 +1,6 @@
 "use server";
 
-import { armazenamentoSchema, audit, db, gravarSegredo, vozesElevenLabs } from "@domus-ads/core";
+import { armazenamentoSchema, audit, configCalSchema, db, gravarSegredo, vozesElevenLabs } from "@domus-ads/core";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
@@ -165,5 +165,17 @@ export async function salvarArmazenamento(input: unknown) {
     await audit(db(), { workspaceId: null, actor: ctx.actor, action: "Alterar regras de armazenamento", entityType: "settings", entityName: "armazenamento", after: v });
     revalidatePath("/settings");
     revalidatePath("/arquivos");
+  });
+}
+
+/** Prazos do calendário automático (antecedência da geração por formato e tolerância de atraso). */
+export async function salvarConfigCalendario(input: unknown) {
+  return run(async () => {
+    const ctx = await requireCtx();
+    if (!isPlatformAdmin(ctx)) throw new Error("Só administradores da plataforma alteram os prazos do calendário");
+    const v = configCalSchema.parse(input);
+    await gravarSegredo("calendario", JSON.stringify(v), ctx.user.id);
+    await audit(db(), { workspaceId: null, actor: ctx.actor, action: "Alterar prazos do calendário", entityType: "settings", entityName: "calendario", after: v });
+    revalidatePath("/settings");
   });
 }

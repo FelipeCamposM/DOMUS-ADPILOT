@@ -1,4 +1,4 @@
-import { armazenamento, chaveElevenLabs, creditosElevenLabs, db, vozesElevenLabs, whatsappAvisos, type CreditosElevenLabs } from "@domus-ads/core";
+import { armazenamento, chaveElevenLabs, configCalendario, creditosElevenLabs, db, vozesElevenLabs, whatsappAvisos, type CreditosElevenLabs } from "@domus-ads/core";
 import { isPlatformAdmin, requireCtx } from "@/lib/ctx";
 import { workerOnline } from "@/lib/queries";
 import { usoArmazenamento } from "@/lib/armazenamento";
@@ -60,6 +60,7 @@ export default async function SettingsPage() {
         avisos={isPlatformAdmin(ctx) ? await whatsappAvisos() : null}
         armazenamento={await armazenamento()}
         uso={await usoArmazenamento()}
+        calendario={await configCalendario()}
         worker={{ online: w.online, lastSeen: iso(w.lastSeen), info: { ...w.info, detected: undefined, whatsappQr: isPlatformAdmin(ctx) ? w.info.whatsappQr : undefined } }}
       />
     </div>
