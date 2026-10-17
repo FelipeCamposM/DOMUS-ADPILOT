@@ -93,7 +93,7 @@ export async function rejectAiAction(workspaceId: string, actionId: string, acto
 type PostConsultor = Extract<AiAction, { type: "CRIAR_POST_INSTAGRAM" }>;
 
 /**
- * Post pedido ao consultor vira item APROVADO num planejamento "Consultor de marketing" do perfil (um por perfil, criado
+ * Post pedido ao consultor vira item APROVADO num planejamento "Consultor de marketing" do perfil e da marca (um por par, criado
  * na primeira vez). Daí em diante é o mesmo caminho do calendário: aparece em Conteúdos, gera na antecedência, publica.
  */
 async function criarPostDoConsultor(workspaceId: string, p: PostConsultor, actor: Actor) {
@@ -110,7 +110,8 @@ async function criarPostDoConsultor(workspaceId: string, p: PostConsultor, actor
   const dia = quando.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
   await sql.begin(async (tx) => {
     let [cal] = await tx<{ id: string }[]>`
-      select id from ads.calendarios where workspace_id = ${workspaceId} and ig_account_id = ${p.igAccountId} and objetivo = ${OBJETIVO_CONSULTOR} limit 1`;
+      select id from ads.calendarios where workspace_id = ${workspaceId} and ig_account_id = ${p.igAccountId} and objetivo = ${OBJETIVO_CONSULTOR}
+        and brand_id is not distinct from ${p.brandId}::uuid limit 1`; // a marca (logo, cores) vem do planejamento: um por perfil + marca
     if (cal) await tx`update ads.calendarios set fim = greatest(fim, ${dia}::date), inicio = least(inicio, ${dia}::date), updated_at = now() where id = ${cal.id}`;
     else [cal] = await tx<{ id: string }[]>`
       insert into ads.calendarios (workspace_id, ig_account_id, brand_id, inicio, fim, objetivo, mix, status, created_by)
