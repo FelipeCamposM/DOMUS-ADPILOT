@@ -15,7 +15,8 @@ export function Popover({ open, onClose, children, align = "left", width, classN
     if (!open) return;
     gsap.fromTo(ref.current, { opacity: 0, y: -6, scale: 0.97, transformOrigin: align === "right" ? "top right" : "top left" },
       { opacity: 1, y: 0, scale: 1, duration: 0.32, ease: "back.out(1.6)" });
-    const fora = (e: PointerEvent) => { if (!ref.current?.parentElement?.contains(e.target as Node)) fechar.current(); };
+    // [data-flutuante]: listas que vão para o <body> (Seletor) contam como dentro do menu
+    const fora = (e: PointerEvent) => { if (!ref.current?.parentElement?.contains(e.target as Node) && !(e.target as Element).closest?.("[data-flutuante]")) fechar.current(); };
     const esc = (e: KeyboardEvent) => { if (e.key === "Escape") fechar.current(); };
     document.addEventListener("pointerdown", fora);
     document.addEventListener("keydown", esc);

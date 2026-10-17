@@ -11,16 +11,17 @@ import { ago } from "@/lib/format";
 import type { UsoContaIA } from "@/lib/queries";
 import { ClaudeLogo, OpenAILogo } from "../connections/Logos";
 import { Popover } from "./Popover";
+import { Seletor, type OpcaoSeletor } from "./Seletor";
 
 type Janela = { pct: number; resets_at: string | null };
 const COR = { claude: "#D97757", codex: "#10A37F" } as const;
 const hora = (iso: string) => new Date(iso).toLocaleString("pt-BR", { weekday: "short", hour: "2-digit", minute: "2-digit" });
 // ponytail: lista fixa (modelos de out/2026); trocar aqui quando sair modelo novo
-const MODELOS = {
-  claude: [["", "Padrão do CLI"], ["claude-fable-5-1", "Fable 5.1"], ["claude-opus-5-5", "Opus 5.5"], ["claude-sonnet-5-5", "Sonnet 5.5"], ["claude-haiku-5-5", "Haiku 5.5"]],
-  codex: [["", "Padrão do CLI"], ["gpt-6-astra", "GPT-6 Astra"], ["gpt-5.6-sol", "GPT-5.6 Sol"], ["gpt-5.6-terra", "GPT-5.6 Terra"], ["gpt-5.6-luna", "GPT-5.6 Luna"]],
-} as const;
-const ESFORCO = [["", "Esforço padrão"], ["low", "Baixo"], ["medium", "Médio"], ["high", "Alto"], ["xhigh", "Muito alto"], ["max", "Máximo"]] as const;
+const MODELOS: Record<"claude" | "codex", OpcaoSeletor[]> = {
+  claude: [{ valor: "", rotulo: "Padrão do CLI" }, { valor: "claude-fable-5-1", rotulo: "Fable 5.1" }, { valor: "claude-opus-5-5", rotulo: "Opus 5.5" }, { valor: "claude-sonnet-5-5", rotulo: "Sonnet 5.5" }, { valor: "claude-haiku-5-5", rotulo: "Haiku 5.5" }],
+  codex: [{ valor: "", rotulo: "Padrão do CLI" }, { valor: "gpt-6-astra", rotulo: "GPT-6 Astra" }, { valor: "gpt-5.6-sol", rotulo: "GPT-5.6 Sol" }, { valor: "gpt-5.6-terra", rotulo: "GPT-5.6 Terra" }, { valor: "gpt-5.6-luna", rotulo: "GPT-5.6 Luna" }],
+};
+const ESFORCO: OpcaoSeletor[] = [{ valor: "", rotulo: "Esforço padrão" }, { valor: "low", rotulo: "Baixo" }, { valor: "medium", rotulo: "Médio" }, { valor: "high", rotulo: "Alto" }, { valor: "xhigh", rotulo: "Muito alto" }, { valor: "max", rotulo: "Máximo" }];
 const nivel = (pct: number) => (pct >= 100 ? "cheio" : pct >= 80 ? "alto" : "ok");
 
 function Medidor({ rotulo, w, cor }: { rotulo: string; w?: Janela; cor: string }) {
@@ -110,14 +111,10 @@ export function UsoIA({ contas, pref: prefServidor, podeEditar, aberto, onToggle
             {(["claude", "codex"] as const).filter((pv) => ativas.some((c) => c.provider === pv)).map((pv) => (
               <div key={pv} className="ia-escolha-linha">
                 {pv === "codex" ? <OpenAILogo size={15} /> : <ClaudeLogo size={16} />}
-                <select className="input-sm" aria-label={`Modelo do ${pv === "codex" ? "ChatGPT" : "Claude"}`} value={pref[pv].modelo}
-                  onChange={(e) => mudar({ ...pref, [pv]: { ...pref[pv], modelo: e.target.value } })}>
-                  {MODELOS[pv].map(([v, r]) => <option key={v} value={v}>{r}</option>)}
-                </select>
-                <select className="input-sm" aria-label={`Esforço do ${pv === "codex" ? "ChatGPT" : "Claude"}`} value={pref[pv].esforco}
-                  onChange={(e) => mudar({ ...pref, [pv]: { ...pref[pv], esforco: e.target.value as IaPreferencias["claude"]["esforco"] } })}>
-                  {ESFORCO.map(([v, r]) => <option key={v} value={v}>{r}</option>)}
-                </select>
+                <Seletor ariaLabel={`Modelo do ${pv === "codex" ? "ChatGPT" : "Claude"}`} valor={pref[pv].modelo} opcoes={MODELOS[pv]}
+                  onChange={(v) => mudar({ ...pref, [pv]: { ...pref[pv], modelo: v } })} />
+                <Seletor ariaLabel={`Esforço do ${pv === "codex" ? "ChatGPT" : "Claude"}`} valor={pref[pv].esforco} opcoes={ESFORCO}
+                  onChange={(v) => mudar({ ...pref, [pv]: { ...pref[pv], esforco: v as IaPreferencias["claude"]["esforco"] } })} />
               </div>
             ))}
             <span className="ia-escolha-dica">{pref.conta ? "Conta fixada: se ela bater o limite, a IA passa para a próxima sozinha." : "Automático: a IA usa a primeira conta livre por prioridade. Fixe uma conta abaixo."}</span>
