@@ -5,7 +5,6 @@ import { DATA_DIR } from "../env";
 import { arquivarPublicados, restaurar } from "../video/arquivo";
 import { ffmpeg, FFPROBE, rodar } from "../video/tools";
 import { avisar } from "../whatsapp";
-import { agendarStory } from "./story";
 
 interface Post { id: string; tipo: "FEED" | "CARROSSEL" | "REELS" | "STORY"; legenda: string; midias: { creativeId: string }[]; opcoes: { compartilharNoFeed?: boolean; capaMs?: number; repostDe?: string }; workspace_id: string }
 interface Criativo { id: string; type: string; mime: string | null; storage: string; r2_key: string; arquivado: boolean }
@@ -120,7 +119,6 @@ export async function publicarInstagram(postId: string, c: { signal: AbortSignal
     const link = await api.permalink(pub.id).then((x) => x.permalink ?? null, () => null);
     await sql`update ads.instagram_posts set status = 'PUBLICADO', publicado_em = now(), ig_media_id = ${pub.id}, permalink = ${link}, updated_at = now() where id = ${p.id}`;
     await c.log(`publicado: ${link ?? pub.id}`);
-    if (p.tipo !== "STORY") await agendarStory(p.id, c.log); // antes de arquivar: o story usa a arte (e o vídeo fica protegido enquanto agendado)
     await arquivarPublicados(ids).catch(() => {}); // nunca vira falha da publicação. Já está no Instagram: o original vai para o Drive (fica a prévia no R2)
     if (!p.opcoes.repostDe) await avisar(`✅ ${NOME[p.tipo]} publicado${perfil}${link ? `
 ${link}` : ""}`);

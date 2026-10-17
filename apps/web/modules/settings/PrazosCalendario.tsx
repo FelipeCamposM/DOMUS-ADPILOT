@@ -48,17 +48,6 @@ export function PrazosCalendario({ cfg, podeAdmin }: { cfg: ConfigCal; podeAdmin
             {Object.entries(ESTILOS).map(([k, e]) => <option key={k} value={k}>{e.nome}</option>)}
           </select>
         </div>
-        <label className="chave">
-          <input type="checkbox" checked={v.stories} onChange={(e) => setV({ ...v, stories: e.target.checked })} />
-          <span><b>Repostar nos stories</b><small className="subtle">Todo post publicado volta como story: post e carrossel numa moldura da marca, Reels com o próprio vídeo (até 60 s).</small></span>
-        </label>
-        <div className="field">
-          <label className="label" htmlFor="story-atraso">Story sai depois de</label>
-          <div className="cluster" style={{ gap: 6 }}>
-            <input id="story-atraso" className="input-sm tabular" style={{ width: 90 }} type="number" min={1} max={240} disabled={!v.stories} value={v.storyAtrasoMin} onChange={(e) => setV({ ...v, storyAtrasoMin: Number(e.target.value) })} />
-            <span className="subtle small">minutos</span>
-          </div>
-        </div>
       </fieldset>
       {podeAdmin ? (
         <button className="btn btn-primary btn-sm" style={{ alignSelf: "flex-start" }} disabled={pend || !mudou} onClick={() => start(async () => {

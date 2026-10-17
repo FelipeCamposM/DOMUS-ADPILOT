@@ -30,7 +30,7 @@ export async function itensCalendario(workspaceId: string, contaId: string, de: 
 
 export interface PostAvulso { id: string; tipo: "FEED" | "CARROSSEL" | "REELS" | "STORY"; status: string; data: string; legenda: string }
 
-/** Publicações feitas fora do calendário (agendadas à mão), para aparecerem na mesma grade. Reposts automáticos nos stories ficam de fora. */
+/** Publicações feitas fora do calendário (agendadas à mão), para aparecerem na mesma grade. Reposts automáticos antigos nos stories ficam de fora. */
 export function postsAvulsos(workspaceId: string, contaId: string, de: Date, ate: Date) {
   const sql = db();
   return sql<PostAvulso[]>`
