@@ -20,7 +20,7 @@ New-Item -ItemType Directory -Force (Join-Path $raiz ".worker-data") | Out-Null
 $log = Join-Path $raiz ".worker-data\worker.log"
 # O supervisor roda em janela oculta (ninguém fecha o console nem aperta Ctrl+C sem querer) e religa o worker se ele sair.
 $supervisor = Join-Path $PSScriptRoot "supervisor.ps1"
-$acao = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$supervisor`"" -WorkingDirectory $raiz
+$acao = New-ScheduledTaskAction -Execute "conhost.exe" -Argument "--headless powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$supervisor`"" -WorkingDirectory $raiz
 # Dois gatilhos: no logon e a cada 5 min o dia todo. O de 5 min é um gatilho de horário próprio: a repetição presa ao
 # logon só vale se o logon disparou (worker iniciado à mão ficava sem ela). Com IgnoreNew, se já está no ar, nada acontece.
 $logon = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME

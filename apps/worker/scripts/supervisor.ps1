@@ -1,4 +1,4 @@
-﻿﻿# DOMUS Worker: supervisor que a tarefa do Windows roda (sem janela), com ícone na bandeja (ícones ocultos).
+﻿# DOMUS Worker: supervisor que a tarefa do Windows roda (sem janela), com ícone na bandeja (ícones ocultos).
 # - Ícone colorido = worker no ar; cinza = parado. Menu: Reiniciar, Parar/Iniciar, Abrir log, Sair.
 # - Se o worker sair sozinho (erro, processo morto), sobe de novo em 10 s.
 # - Se o supervisor morrer, o gatilho de 5 em 5 min da tarefa abre outro (IgnoreNew evita duplicar).
@@ -16,7 +16,9 @@ Remove-Item $trava -ErrorAction SilentlyContinue
 
 Add-Type -AssemblyName System.Windows.Forms, System.Drawing
 $pnpm = (Get-Command pnpm.cmd -ErrorAction Stop).Source
-function Registrar($m) { Add-Content -Encoding UTF8 $log "[$(Get-Date -Format 'dd/MM HH:mm:ss')] supervisor: $m" }
+# log próprio: o worker.log fica preso pelo redirecionamento do cmd do worker
+$logSup = Join-Path $dados "supervisor.log"
+function Registrar($m) { try { Add-Content -Encoding UTF8 $logSup "[$(Get-Date -Format 'dd/MM HH:mm:ss')] $m" -ErrorAction Stop } catch {} }
 
 # ícone: favicon do DOMUS; versão cinza para "parado"
 $png = [System.Drawing.Bitmap]::FromFile((Join-Path $raiz "apps\web\app\icon.png"))
