@@ -1,10 +1,10 @@
-import { db, iaPreferencias, parseActionBlocks, toDecimal, type GoogleSearchSpec, type Json } from "@domus-ads/core";
+import { db, iaPreferencias, parseActionBlocks, resumoPostConsultor, toDecimal, type GoogleSearchSpec, type Json } from "@domus-ads/core";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { CONV_DIR } from "../env";
 import { runCli, type AiProvider } from "./cli";
 import { resolveConfigDir } from "./login";
-import { contextoPagina, instrucoes, snapshot } from "./context";
+import { contextoPagina, instrucoes, snapshot, snapshotMarketing } from "./context";
 import { blockedUntil, type Usage } from "./limits";
 
 interface Conta { id: string; provider: AiProvider; name: string; config_dir: string; priority: number }
@@ -64,8 +64,8 @@ export async function runChatTurn(conversationId: string, signal: AbortSignal, l
         select session_id, last_message_id::int as last_message_id from ads.ai_sessions where conversation_id = ${conv.id} and ai_account_id = ${conta.id}`;
       const naoVistas = msgs.filter((m) => m.id !== pergunta.id && m.status === "DONE" && (m.role === "user" || m.role === "assistant") && (!sess || m.id > sess.last_message_id));
       const prompt = [
-        await snapshot(conv.workspace_id),
-        conv.tipo === "consultor" ? await contextoPagina(conv.workspace_id, pergunta.meta?.pagina) : "",
+        conv.tipo === "marketing" ? await snapshotMarketing(conv.workspace_id) : await snapshot(conv.workspace_id),
+        conv.tipo !== "analista" ? await contextoPagina(conv.workspace_id, pergunta.meta?.pagina) : "",
         naoVistas.length ? `<historico${sess ? "_que_voce_nao_viu" : ""}>\n${historico(naoVistas)}\n</historico${sess ? "_que_voce_nao_viu" : ""}>` : "",
         `<mensagem_do_usuario>\n${pergunta.content}\n</mensagem_do_usuario>`,
       ].filter(Boolean).join("\n\n");
@@ -155,6 +155,16 @@ async function registrarAcoes(workspaceId: string, conversationId: string, messa
   const { actions, erros } = parseActionBlocks(texto);
   let n = 0;
   for (const a of actions) {
+    if (a.type === "CRIAR_POST_INSTAGRAM") {
+      const [perfil] = await sql<{ username: string }[]>`select username from ads.instagram_accounts where id = ${a.igAccountId} and workspace_id = ${workspaceId}`;
+      if (!perfil) { erros.push("perfil do Instagram não encontrado"); continue; }
+      if (a.quando !== "agora" && Date.parse(a.quando) < Date.now() - 5 * 60_000) { erros.push("horário já passou"); continue; }
+      await sql`
+        insert into ads.ai_actions (workspace_id, conversation_id, message_id, type, payload, summary, reason)
+        values (${workspaceId}, ${conversationId}, ${messageId}, ${a.type}, ${sql.json(a as unknown as Json)}, ${resumoPostConsultor(a, perfil.username)}, ${a.reason ?? null})`;
+      n++;
+      continue;
+    }
     if (a.type === "UPDATE_DRAFT") {
       const [d] = await sql<{ name: string; status: string; spec: { grupos?: { palavras?: unknown[] }[]; orcamentoDiario?: string } }[]>`
         select name, status, spec from ads.campaign_drafts where id = ${a.draftId} and workspace_id = ${workspaceId}`;

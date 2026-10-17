@@ -15,7 +15,7 @@ const pagina = z.object({
   titulo: z.string().max(300).default(""),
   texto: z.string().max(20_000, "Página grande demais").default(""),
 }).optional();
-const tipo = z.enum(["analista", "consultor"], { message: "Tipo de conversa inválido" }).default("analista");
+const tipo = z.enum(["analista", "consultor", "marketing"], { message: "Tipo de conversa inválido" }).default("analista");
 
 async function conversaDoWorkspace(ctx: Ctx, id: string) {
   const [c] = await db()<{ id: string; status: string }[]>`

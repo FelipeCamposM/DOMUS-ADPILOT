@@ -26,3 +26,12 @@ test("UPDATE_DRAFT só passa com a campanha completa e válida", () => {
   expect(ruim.actions).toHaveLength(0);
   expect(ruim.erros[0]).toMatch(/grupos/);
 });
+
+test("CRIAR_POST_INSTAGRAM: carrossel completo passa, horário inválido não", () => {
+  const post = { type: "CRIAR_POST_INSTAGRAM", igAccountId: id, brandId: null, quando: "agora", formato: "CARROSSEL", tema: "3 erros no tráfego",
+    roteiro: { slides: [{ headline: "Gancho" }, { headline: "Erro 1" }, { headline: "Chamada" }], cta: "Siga" }, legenda: "Legenda", hashtags: ["#trafegopago"] };
+  const ok = parseActionBlocks("```domus-action\n" + JSON.stringify(post) + "\n```");
+  expect(ok.actions).toHaveLength(1);
+  expect(parseActionBlocks("```domus-action\n" + JSON.stringify({ ...post, quando: "hoje à noite" }) + "\n```").actions).toHaveLength(0);
+  expect(parseActionBlocks("```domus-action\n" + JSON.stringify({ ...post, quando: "2026-10-17T18:30:00-03:00" }) + "\n```").actions).toHaveLength(1);
+});

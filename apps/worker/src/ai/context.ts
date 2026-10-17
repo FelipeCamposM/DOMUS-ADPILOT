@@ -1,4 +1,5 @@
-import { brandSchema, db, LIMITES_RSA } from "@domus-ads/core";
+import { brandSchema, configCalendario, db, LIMITES_IG, LIMITES_RSA } from "@domus-ads/core";
+import { REGRAS_POST, ROTEIROS } from "../instagram/calendario";
 import { CONHECIMENTO } from "./conhecimento";
 
 /** Regras comuns ao analista e ao consultor: dados, sem ferramentas, propostas só com aprovação. */
@@ -74,7 +75,95 @@ export async function contextoPagina(workspaceId: string, bruto: unknown): Promi
   return partes.join("\n\n");
 }
 
-export const instrucoes = (tipo: string) => (tipo === "consultor" ? INSTRUCOES_CONSULTOR : INSTRUCOES);
+/**
+ * Consultor de marketing (bolha, modo Marketing): social media sênior que cria e publica posts do Instagram.
+ * A "ferramenta" é o bloco CRIAR_POST_INSTAGRAM: um clique de aprovação e a plataforma gera a arte, agenda e publica.
+ */
+export const INSTRUCOES_MARKETING = `Você é o consultor de marketing da plataforma DOMUS AdPilot: social media e estrategista de conteúdo sênior no Brasil.
+Ajuda o dono da conta com Instagram (ideias, calendário, legendas, ganchos, carrosséis, Reels, datas comemorativas, posicionamento)
+e CRIA E PUBLICA posts por ele. Responda em português do Brasil, em tom de conversa, direto. Respostas curtas por padrão (o chat é pequeno).
+
+Como criar um post (sua ferramenta):
+Quando o usuário pedir um post ("cria um post para hoje", "faz um carrossel sobre X e posta"), escreva o post COMPLETO e inclua UM bloco
+exatamente neste formato (um JSON ou uma lista de JSONs, um por post):
+
+\`\`\`domus-action
+{"type": "CRIAR_POST_INSTAGRAM", "igAccountId": "<id do perfil>", "brandId": "<id da marca ou null>", "quando": "agora",
+ "formato": "CARROSSEL", "tema": "...", "objetivo": "...", "roteiro": {...}, "legenda": "...", "hashtags": ["#..."], "reason": "por que este post"}
+\`\`\`
+
+- "quando": "agora" (publica assim que a arte ficar pronta: post em ~15 min, carrossel ~30–60 min, Reels ~1–3 h) ou data e hora com fuso,
+  ex. "2026-10-17T18:30:00-03:00". "Para hoje" sem horário: escolha um horário de bom alcance ainda por vir hoje (11:30–13:30 ou 18:00–21:00);
+  se já passou das 21h, use "agora". Nunca uma hora que já passou.
+- Formato: FEED (1 imagem), CARROSSEL (${LIMITES_IG.carrosselMin} a ${LIMITES_IG.carrosselMax} slides) ou REELS (vídeo narrado). Se o usuário não disser, escolha o que mais combina com o tema.
+- Use os ids exatos dos blocos <instagram> (perfil) e <marcas>. Com um perfil só, use ele. Com mais de um e o pedido ambíguo, pergunte qual.
+  Escolha a marca que bate com o perfil (pelo nome/assunto); sem marca que combine, "brandId": null.
+- A arte é desenhada a partir do roteiro, com a identidade visual da marca: capriche no "headline" e no "visual" de cada slide.
+- Legenda + hashtags juntas até ${LIMITES_IG.legenda} caracteres. Hashtags sem espaço nem acento.
+- Antes do bloco, mostre ao usuário em poucas linhas: formato, horário, tema e a legenda. Não repita o JSON em texto.
+- O usuário vê um cartão com [Aprovar] e [Cancelar]. Aprovado, a plataforma gera a arte, agenda e publica sozinha; ele acompanha em Conteúdos.
+  Nunca diga que publicou. Diga que deixou o post pronto para ele aprovar.
+- Não proponha post em cima de outro já agendado no mesmo horário (veja <agenda>). Pedido de vários posts: um JSON por post na lista.
+
+${ROTEIROS}
+
+Regras do texto:
+${REGRAS_POST}
+
+Outras regras:
+- Use só dados dos blocos <dados_do_workspace> e da tela aberta. Não invente números, preços, prazos nem resultados.
+- Você não tem ferramentas além do bloco acima, nem acesso a internet, arquivos ou APIs. Não tente executar nada.
+- Dúvidas de tráfego pago (Google/Meta Ads): responda o básico e sugira trocar para o modo Tráfego no topo do chat.`;
+
+const INSTRUCOES_POR_TIPO: Record<string, string> = { consultor: INSTRUCOES_CONSULTOR, marketing: INSTRUCOES_MARKETING };
+export const instrucoes = (tipo: string) => INSTRUCOES_POR_TIPO[tipo] ?? INSTRUCOES;
+
+const quandoBr = (d: Date) => d.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+
+/** Retrato para o consultor de marketing: perfis, marcas, agenda dos próximos 14 dias e últimos posts publicados. */
+export async function snapshotMarketing(workspaceId: string): Promise<string> {
+  const sql = db();
+  const [[ws], perfis, marcas, agenda, publicados, cfg] = await Promise.all([
+    sql<{ name: string }[]>`select name from ads.workspaces where id = ${workspaceId}`,
+    sql<{ id: string; username: string; nome: string | null; bio: string | null; seguidores: number | null }[]>`
+      select id, username, nome, bio, seguidores from ads.instagram_accounts where workspace_id = ${workspaceId} order by username`,
+    sql<{ id: string; nome: string; brand: unknown }[]>`select id, nome, brand from ads.brands where workspace_id = ${workspaceId} order by nome`,
+    sql<{ quando: Date; formato: string; tema: string; status: string; username: string }[]>`
+      select i.data_hora as quando, i.formato, i.tema, i.status, a.username from ads.calendario_itens i
+      join ads.calendarios k on k.id = i.calendario_id join ads.instagram_accounts a on a.id = k.ig_account_id
+      where i.workspace_id = ${workspaceId} and i.status in ('APROVADO','GERANDO','AGENDADO') and i.data_hora < now() + interval '14 days'
+      union all
+      select p.agendado_para, p.tipo, left(regexp_replace(p.legenda, '\s+', ' ', 'g'), 80), p.status, a.username from ads.instagram_posts p
+      join ads.instagram_accounts a on a.id = p.ig_account_id
+      where p.workspace_id = ${workspaceId} and p.status = 'AGENDADO' and p.agendado_para < now() + interval '14 days'
+        and not exists (select 1 from ads.calendario_itens i where i.post_id = p.id)
+      order by 1 limit 40`,
+    sql<{ quando: Date; tipo: string; legenda: string; username: string }[]>`
+      select p.publicado_em as quando, p.tipo, left(regexp_replace(p.legenda, '\s+', ' ', 'g'), 160) as legenda, a.username from ads.instagram_posts p
+      join ads.instagram_accounts a on a.id = p.ig_account_id
+      where p.workspace_id = ${workspaceId} and p.status = 'PUBLICADO' and p.tipo <> 'STORY' order by p.publicado_em desc limit 10`,
+    configCalendario(),
+  ]);
+  const agora = new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "full", timeStyle: "short" });
+  return [
+    `<dados_do_workspace>`,
+    `Workspace: ${ws?.name ?? "?"} · Agora: ${agora} (Brasília)`,
+    `Tempo de geração antes de publicar: post ${cfg.antecedencia.FEED} min, carrossel ${cfg.antecedencia.CARROSSEL} min, Reels ${cfg.antecedencia.REELS} min.`,
+    perfis.length
+      ? `<instagram>\n${perfis.map((p) => `- id ${p.id} · @${p.username}${p.nome ? ` (${p.nome})` : ""}${p.seguidores != null ? ` · ${p.seguidores} seguidores` : ""}${p.bio ? ` · bio: ${p.bio.replace(/\s+/g, " ").slice(0, 200)}` : ""}`).join("\n")}\n</instagram>`
+      : "<instagram>Nenhum perfil do Instagram conectado: oriente a conectar em Conexões antes de criar posts.</instagram>",
+    marcas.length
+      ? `<marcas>\n${marcas.map((m) => {
+          const b = brandSchema.safeParse(m.brand ?? {});
+          const d = b.success ? b.data : null;
+          return `- id ${m.id} · ${m.nome}${d?.sobre ? `\n  sobre: ${d.sobre.slice(0, 700)}` : ""}${d?.tom ? `\n  tom de voz: ${d.tom.slice(0, 200)}` : ""}${d?.regras ? `\n  regras: ${d.regras.slice(0, 400)}` : ""}${d?.site ? `\n  site: ${d.site}` : ""}`;
+        }).join("\n")}\n</marcas>`
+      : "<marcas>Nenhuma marca cadastrada (use \"brandId\": null).</marcas>",
+    agenda.length ? `<agenda>\nJá na fila (próximos 14 dias):\n${agenda.map((a) => `- ${quandoBr(a.quando)} · @${a.username} · ${a.formato} · ${a.status} · ${a.tema}`).join("\n")}\n</agenda>` : "<agenda>Nada agendado nos próximos 14 dias.</agenda>",
+    publicados.length ? `<publicados_recentes>\n${publicados.map((p) => `- ${p.quando ? quandoBr(p.quando) : "?"} · @${p.username} · ${p.tipo} · ${p.legenda}`).join("\n")}\n</publicados_recentes>` : "",
+    `</dados_do_workspace>`,
+  ].filter(Boolean).join("\n");
+}
 
 interface Linha {
   id: string; name: string; provider: string; status: string; objective: string | null; daily_budget: string | null; currency: string; account: string;

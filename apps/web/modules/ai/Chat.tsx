@@ -173,13 +173,14 @@ function AcaoCard({ a, podeEditar, onDecidiu }: { a: ChatAction; podeEditar: boo
   const [pend, start] = useTransition();
   const [status, setStatus] = useState(a.status);
   const ref = useRef<HTMLDivElement>(null);
+  const post = a.type === "CRIAR_POST_INSTAGRAM";
   useEffect(() => setStatus(a.status), [a.status]);
   const decidir = (aprovar: boolean) => start(async () => {
     const r = aprovar ? await aprovarAcao(a.id) : await rejeitarAcao(a.id);
     if (!r.ok) { toast.err(r.error); setStatus("FAILED"); }
     else {
       setStatus(aprovar ? "EXECUTED" : "REJECTED");
-      toast.ok(aprovar ? "Mudança aplicada e registrada na auditoria" : "Proposta cancelada");
+      toast.ok(!aprovar ? "Proposta cancelada" : post ? "Post aprovado: a arte começa a ser gerada e ele publica sozinho" : "Mudança aplicada e registrada na auditoria");
       if (aprovar) gsap.fromTo(ref.current, { boxShadow: "0 0 0 0 rgb(168 85 255 / 0.7)" }, { boxShadow: "0 0 0 18px rgb(168 85 255 / 0)", duration: 0.9, ease: "power2.out" });
     }
     onDecidiu();
@@ -191,6 +192,7 @@ function AcaoCard({ a, podeEditar, onDecidiu }: { a: ChatAction; podeEditar: boo
           <div style={{ fontWeight: 650 }}>{a.summary}</div>
           {a.reason && <div className="muted small" style={{ marginTop: 2 }}>{a.reason}</div>}
           {status === "FAILED" && a.error && <div className="error-text" style={{ marginTop: 4 }}>{a.error}</div>}
+          {post && status === "EXECUTED" && <Link href="/conteudos" className="small" style={{ display: "inline-block", marginTop: 4, color: "rgb(var(--c-brand))" }}>Acompanhar em Conteúdos →</Link>}
         </div>
         {status === "PENDING_APPROVAL" && podeEditar ? (
           <div className="cluster" style={{ gap: 6, flexWrap: "nowrap" }}>
@@ -199,7 +201,7 @@ function AcaoCard({ a, podeEditar, onDecidiu }: { a: ChatAction; podeEditar: boo
           </div>
         ) : (
           <span className={`badge ${status === "EXECUTED" ? "badge-brand" : status === "FAILED" ? "badge-error" : status === "PENDING_APPROVAL" ? "badge-warning" : ""}`}>
-            {STATUS_ACAO[status] ?? "Aguardando aprovação"}
+            {post && status === "EXECUTED" ? "Na fila de produção" : STATUS_ACAO[status] ?? "Aguardando aprovação"}
           </span>
         )}
       </div>

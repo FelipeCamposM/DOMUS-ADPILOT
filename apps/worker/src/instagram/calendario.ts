@@ -19,12 +19,12 @@ export type CalendarioPayload = { calendarioId: string } | { itemId: string; cam
 
 const quando = (d: Date) => d.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
-const ROTEIROS = `Roteiro por formato (campo "roteiro"):
+export const ROTEIROS = `Roteiro por formato (campo "roteiro"):
 - FEED (1 imagem 4:5): {"headline": texto grande da arte, até 60 caracteres, "apoio": até 140, "cta": até 40, "visual": composição da arte, até 300}
 - CARROSSEL (slides 4:5): {"slides": [{"headline": até 70, "apoio": até 160, "visual": até 250}] com 4 a 8 slides (1º = gancho, último = chamada), "cta": até 40}
 - REELS (vídeo 9:16 narrado): {"narracao": o texto falado, 35–45 palavras para 15 s ou 70–85 para 30 s, com gancho nos 2 primeiros segundos, "duracao": 15 ou 30, "visual": até 300, "cta": até 40}`;
 
-const REGRAS = `- Legenda: gancho forte na 1ª linha, parágrafos curtos, chamada para ação no fim, SEM hashtags dentro. Reels: legenda mais curta.
+export const REGRAS_POST = `- Legenda: gancho forte na 1ª linha, parágrafos curtos, chamada para ação no fim, SEM hashtags dentro. Reels: legenda mais curta.
 - Hashtags: 8 a 15 por post (nicho + local, se fizer sentido + marca), sem acento nem espaço.
 - Use só fatos da marca, do site e do pedido. Não invente preço, prazo, número, depoimento nem garantia.
 - Tudo em português do Brasil.`;
@@ -40,14 +40,14 @@ Regras:
 - Os posts de melhor desempenho mostram o que o público gosta (assunto, formato, gancho): use como pista, sem copiar.
 - Varie os pilares: educar, inspirar, provar (bastidores, cases), vender e engajar. Não repita temas já planejados.
 - "objetivo" diz o que o post quer causar (ex.: salvar, comentar, clicar no link da bio).
-${REGRAS}`;
+${REGRAS_POST}`;
 
 const SISTEMA_AJUSTE = `Você é social media sênior no Brasil e ajusta UM post de um calendário de Instagram já planejado.
 Responda APENAS com um bloco \`\`\`json no formato pedido.
 
 ${ROTEIROS}
 
-${REGRAS}`;
+${REGRAS_POST}`;
 
 interface Contexto { workspace_id: string; ig_account_id: string; username: string; bio: string | null; marca: string | null; brand: Brand | null; credentials_enc: string; ig_user_id: string }
 

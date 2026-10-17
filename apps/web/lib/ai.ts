@@ -23,7 +23,7 @@ export async function chatState(workspaceId: string, conversationId: string): Pr
   return { conversation, messages, actions };
 }
 
-export async function listaConversas(workspaceId: string, tipo: "analista" | "consultor" = "analista") {
+export async function listaConversas(workspaceId: string, tipo: "analista" | "consultor" | "marketing" = "analista") {
   return db()<{ id: string; title: string; status: string; updated_at: Date; pendentes: number }[]>`
     select c.id, c.title, c.status, c.updated_at,
       (select count(*)::int from ads.ai_actions a where a.conversation_id = c.id and a.status = 'PENDING_APPROVAL') as pendentes
