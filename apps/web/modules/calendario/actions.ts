@@ -187,3 +187,51 @@ export async function novoItem(contaId: string, calendarioId: string | null, dat
     return i!.id;
   });
 }
+
+const OBJETIVO_STUDIO = "Posts criados no Studio";
+const novoPostSchema = z.object({
+  contaId: uuid,
+  marcaId: z.string().uuid("Marca inválida").nullable(),
+  formato: z.enum(["FEED", "CARROSSEL", "REELS"], { message: "Escolha o tipo do post" }),
+  tema: z.string().trim().min(3, "Diga sobre o que é o post").max(160, "Tema com no máximo 160 caracteres"),
+  detalhes: z.string().trim().max(320, "Detalhes com no máximo 320 caracteres").default(""),
+  dataHora: z.string().datetime({ offset: true, message: "Data inválida" }),
+});
+
+/**
+ * "Novo post" do Studio: entra no planejamento do Studio (um por perfil + marca, para a arte usar a logo e as cores certas)
+ * e a IA escreve roteiro, legenda e hashtags. Depois o usuário revisa e aprova em Conteúdos; aprovado, gera e publica sozinho.
+ */
+export async function novoPostIA(input: unknown) {
+  return run(async () => {
+    const ctx = await requireCtx();
+    requireRole(ctx, "editor");
+    const p = novoPostSchema.parse(input);
+    const quando = new Date(p.dataHora);
+    if (quando.getTime() < Date.now() + 15 * 60_000) throw new Error("Escolha um horário daqui a pelo menos 15 minutos");
+    const marca = await marcaDoWorkspace(ctx.workspace.id, p.marcaId);
+    await workerOnline();
+    const sql = db();
+    const [conta] = await sql`select 1 from ads.instagram_accounts where id = ${p.contaId} and workspace_id = ${ctx.workspace.id}`;
+    if (!conta) throw new Error("Perfil do Instagram não encontrado");
+    const dia = quando.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+    const id = await sql.begin(async (tx) => {
+      let [cal] = await tx<{ id: string }[]>`
+        select id from ads.calendarios where workspace_id = ${ctx.workspace.id} and ig_account_id = ${p.contaId} and objetivo = ${OBJETIVO_STUDIO}
+          and brand_id is not distinct from ${marca}::uuid limit 1`;
+      if (cal) await tx`update ads.calendarios set fim = greatest(fim, ${dia}::date), inicio = least(inicio, ${dia}::date), updated_at = now() where id = ${cal.id}`;
+      else [cal] = await tx<{ id: string }[]>`
+        insert into ads.calendarios (workspace_id, ig_account_id, brand_id, inicio, fim, objetivo, mix, status, created_by)
+        values (${ctx.workspace.id}, ${p.contaId}, ${marca}, ${dia}, ${dia}, ${OBJETIVO_STUDIO}, '{}', 'PRONTO', ${ctx.user.id}) returning id`;
+      const [i] = await tx<{ id: string }[]>`
+        insert into ads.calendario_itens (calendario_id, workspace_id, data_hora, formato, tema, objetivo, refazendo)
+        values (${cal!.id}, ${ctx.workspace.id}, ${quando}, ${p.formato}, ${p.tema}, ${p.detalhes.slice(0, 300)}, 'item') returning id`;
+      return i!.id;
+    });
+    const dica = `Post sobre: ${p.tema}${p.detalhes ? `. ${p.detalhes}` : ""}`.slice(0, 500);
+    await enqueueJob(sql, { workspaceId: ctx.workspace.id, type: "AI_CALENDARIO", payload: { itemId: id, campo: "item", dica }, createdBy: ctx.user.id, maxAttempts: 1 });
+    await audit(sql, { workspaceId: ctx.workspace.id, actor: ctx.actor, action: "Novo post com IA", entityType: "calendario_item", entityId: id, after: { formato: p.formato, tema: p.tema } });
+    revalidar();
+    return { id, conta: p.contaId, mes: dia.slice(0, 7) };
+  });
+}

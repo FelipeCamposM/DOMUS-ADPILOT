@@ -177,7 +177,7 @@ async function refazer(p: { itemId: string; campo: CampoRefazer; dica?: string }
       `Objetivo do período: ${it.cal_objetivo}`,
       `Outros temas do calendário (não repita): ${vizinhos.map((v) => v.tema).join(" · ").slice(0, 1500)}`,
       `<post_atual data="${quando(it.data_hora)}">\n${JSON.stringify(atual)}\n</post_atual>`,
-      `Refaça ${p.campo === "item" ? "o post inteiro com outra ideia" : `só o campo "${p.campo}", coerente com o resto do post`}. Responda: ${formato}`,
+      `Refaça ${p.campo === "item" ? (p.dica?.trim() ? "o post inteiro seguindo o pedido do usuário" : "o post inteiro com outra ideia") : `só o campo "${p.campo}", coerente com o resto do post`}. Responda: ${formato}`,
       p.dica?.trim() ? `<pedido_do_usuario>\n${p.dica.trim()}\n</pedido_do_usuario>` : "",
     ].filter(Boolean).join("\n\n");
     const j = await pedir(ctx.workspace_id, SISTEMA_AJUSTE, prompt, c, join(DATA_DIR, "calendario", it.id));

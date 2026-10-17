@@ -27,13 +27,13 @@ const paraInput = (iso: string) => `${diaDe(iso)}T${horaDe(iso)}`;
 const deInput = (v: string) => new Date(`${v}:00-03:00`).toISOString();
 const hojeBr = () => new Date().toLocaleDateString("en-CA", { timeZone: TZ });
 
-export function Calendario({ conta, contas, marcas, mes, itens, avulsos, planos, podeEditar }: {
+export function Calendario({ conta, contas, marcas, mes, itens, avulsos, planos, podeEditar, abrir }: {
   conta: { id: string; username: string }; contas: { id: string; username: string }[]; marcas: { id: string; nome: string }[];
-  mes: string; itens: ItemTela[]; avulsos: PostAvulso[]; planos: PlanoTela[]; podeEditar: boolean;
+  mes: string; itens: ItemTela[]; avulsos: PostAvulso[]; planos: PlanoTela[]; podeEditar: boolean; abrir?: string;
 }) {
   const router = useRouter();
   const [pend, start] = useTransition();
-  const [aberto, setAberto] = useState<string | null>(null);
+  const [aberto, setAberto] = useState<string | null>(abrir ?? null); // ?item= (vindo do Novo post do Studio)
   const [planejar, setPlanejar] = useState(false);
   const [verPlanos, setVerPlanos] = useState(false);
   const dias = useMemo(() => gradeDoMes(mes), [mes]);

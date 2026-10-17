@@ -1,4 +1,4 @@
-import { ImageIcon, Plus } from "lucide-react";
+import { Clapperboard, FolderOpen } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { can, requireCtx } from "@/lib/ctx";
@@ -91,13 +91,12 @@ export default async function CreativesPage({ searchParams }: { searchParams: Pr
         <div>
           <div className="eyebrow" data-enter>{ctx.workspace.name}</div>
           <h1 className="page-title" data-enter>Criativos</h1>
+          <p className="page-sub" data-enter>Biblioteca dos arquivos prontos: imagens e vídeos gerados no Studio ou enviados, músicas e efeitos. Use em anúncios e posts.</p>
         </div>
-        {editor && (
-          <div className="cluster" data-enter>
-            <Link href="/studio/novo?tipo=imagem" className="btn btn-secondary"><ImageIcon aria-hidden /> Nova imagem</Link>
-            <Link href="/studio/novo" className="btn btn-primary"><Plus aria-hidden /> Novo vídeo</Link>
-          </div>
-        )}
+        <div className="cluster" data-enter>
+          <Link href="/arquivos" className="btn btn-secondary"><FolderOpen aria-hidden /> Arquivos</Link>
+          {editor && <Link href="/studio" className="btn btn-secondary"><Clapperboard aria-hidden /> Criar no Studio</Link>}
+        </div>
       </div>
       <div className="cluster" role="tablist" data-enter style={{ gap: 4, padding: 3, borderRadius: 12, border: "1px solid rgb(var(--c-border))", background: "rgb(var(--c-bg-surface))", alignSelf: "flex-start" }}>
         {ABAS.map(([k, l]) => <Link key={k} href={`/creatives?aba=${k}${q ? `&q=${encodeURIComponent(q)}` : ""}`} role="tab" aria-selected={aba === k} className="chip" data-active={aba === k} style={{ height: 30, border: 0 }}>{l}</Link>)}

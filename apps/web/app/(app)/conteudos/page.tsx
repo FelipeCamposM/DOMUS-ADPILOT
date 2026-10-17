@@ -8,7 +8,7 @@ import { gradeDoMes } from "@/modules/calendario/grade";
 
 export const metadata = { title: "Conteúdos programados" };
 
-export default async function ConteudosPage({ searchParams }: { searchParams: Promise<{ conta?: string; mes?: string }> }) {
+export default async function ConteudosPage({ searchParams }: { searchParams: Promise<{ conta?: string; mes?: string; item?: string }> }) {
   const ctx = await requireCtx();
   const sp = await searchParams;
   const contas = await contasInstagram(ctx.workspace.id);
@@ -27,7 +27,7 @@ export default async function ConteudosPage({ searchParams }: { searchParams: Pr
   return (
     <div className="page page-cheia">
       <Calendario conta={{ id: conta.id, username: conta.username }} contas={contas.map((c) => ({ id: c.id, username: c.username }))}
-        marcas={marcas.map((m) => ({ id: m.id, nome: m.nome }))} mes={mes} itens={itens} avulsos={avulsos} planos={planos} podeEditar={can(ctx, "editor")} />
+        marcas={marcas.map((m) => ({ id: m.id, nome: m.nome }))} mes={mes} itens={itens} avulsos={avulsos} planos={planos} podeEditar={can(ctx, "editor")} abrir={sp.item} />
     </div>
   );
 }

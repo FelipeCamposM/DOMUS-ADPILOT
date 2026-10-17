@@ -1,7 +1,7 @@
 "use client";
 
 import { gsap } from "gsap";
-import { ArrowUp, Check, Loader2, Square, X } from "lucide-react";
+import { ArrowUp, Check, Loader2, MousePointerClick, Square, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
@@ -19,7 +19,7 @@ const SUGESTOES = [
   "Aumente 20% o orçamento das campanhas com ROAS acima de 4.",
 ];
 const PROVIDERS = [{ v: "auto", l: "Auto" }, { v: "claude", l: "Claude" }, { v: "codex", l: "Codex" }] as const;
-const semBlocos = (s: string) => s.replace(/```domus-action[\s\S]*?(```|$)/g, "").trim();
+const semBlocos = (s: string) => s.replace(/```domus-(action|tela)[\s\S]*?(```|$)/g, "").trim();
 
 export function Chat({ inicial, podeEditar, sugestao, provedores }: {
   inicial: ChatState | null; podeEditar: boolean; sugestao?: string; provedores: { claude: number; codex: number };
@@ -136,7 +136,7 @@ export function Chat({ inicial, podeEditar, sugestao, provedores }: {
   );
 }
 
-export function Mensagem({ m, acoes, podeEditar, onDecidiu, semMeta }: { m: ChatMsg; acoes: ChatAction[]; podeEditar: boolean; onDecidiu: () => void; semMeta?: boolean }) {
+export function Mensagem({ m, acoes, podeEditar, onDecidiu, semMeta, nota }: { m: ChatMsg; acoes: ChatAction[]; podeEditar: boolean; onDecidiu: () => void; semMeta?: boolean; nota?: string }) {
   if (m.role === "user") return <div className="term-msg" data-msg={m.id}><div className="term-user">{m.content}</div></div>;
   if (m.role === "system") return <div className="term-msg term-sys" data-msg={m.id}>{m.content}</div>;
   const meta = m.meta as { account?: string; model?: string; outputTokens?: number; costUsd?: number | null; durationMs?: number; error?: string; switches?: string[] };
@@ -152,8 +152,9 @@ export function Mensagem({ m, acoes, podeEditar, onDecidiu, semMeta }: { m: Chat
               {m.status === "STREAMING" && <span className="caret" aria-hidden />}
             </div>
           ) : m.status === "STREAMING" ? (
-            <span className="subtle" style={{ display: "inline-flex", gap: 10, alignItems: "center" }}><span className="spinner-dots"><i /><i /><i /></span>Lendo as métricas do workspace…</span>
+            <span className="subtle" style={{ display: "inline-flex", gap: 10, alignItems: "center" }}><span className="spinner-dots"><i /><i /><i /></span>Pensando…</span>
           ) : null}
+          {nota && <div className="ai-nota" role="status"><MousePointerClick size={14} aria-hidden />{nota}</div>}
           {m.status === "ERROR" && <p className="error-text" style={{ marginTop: 6 }}>{meta.error ?? "Falha na resposta"}</p>}
           {acoes.length > 0 && <div className="stack" style={{ gap: 8, marginTop: 12 }}>{acoes.map((a) => <AcaoCard key={a.id} a={a} podeEditar={podeEditar} onDecidiu={onDecidiu} />)}</div>}
           {m.status === "DONE" && !semMeta && (
@@ -187,15 +188,15 @@ function AcaoCard({ a, podeEditar, onDecidiu }: { a: ChatAction; podeEditar: boo
   });
   return (
     <div ref={ref} className="action-card" data-status={status}>
-      <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-        <div style={{ flex: 1 }}>
+      <div className="action-card-row">
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 650 }}>{a.summary}</div>
           {a.reason && <div className="muted small" style={{ marginTop: 2 }}>{a.reason}</div>}
           {status === "FAILED" && a.error && <div className="error-text" style={{ marginTop: 4 }}>{a.error}</div>}
           {post && status === "EXECUTED" && <Link href="/conteudos" className="small" style={{ display: "inline-block", marginTop: 4, color: "rgb(var(--c-brand))" }}>Acompanhar em Conteúdos →</Link>}
         </div>
         {status === "PENDING_APPROVAL" && podeEditar ? (
-          <div className="cluster" style={{ gap: 6, flexWrap: "nowrap" }}>
+          <div className="cluster action-card-btns" style={{ gap: 6, flexWrap: "nowrap" }}>
             <button className="btn btn-ghost btn-xs" onClick={() => decidir(false)} disabled={pend}><X aria-hidden /> Cancelar</button>
             <button className="btn btn-primary btn-xs" onClick={() => decidir(true)} disabled={pend}>{pend ? <Loader2 className="animate-spin" aria-hidden /> : <Check aria-hidden />} Aprovar</button>
           </div>

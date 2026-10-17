@@ -2,6 +2,7 @@
 
 import { confirmar } from "../shell/confirmar";
 import { ArrowLeft, ArrowUp, ArrowUpRight, History, Loader2, Megaphone, Plus, Square, Target, Trash2, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import type { ChatMsg, ChatState } from "@/lib/ai";
 import { ago } from "@/lib/format";
@@ -9,6 +10,7 @@ import { toast } from "../shell/toast";
 import { apagarConversa, cancelarResposta, enviarMensagem, novaConversa } from "./actions";
 import { Mensagem } from "./Chat";
 import { Mascote } from "./Mascote";
+import { executarTela, lerTela, passosDaMensagem } from "./tela";
 
 interface Item { id: string; title: string; status: string; updated_at: string }
 
@@ -17,7 +19,7 @@ type Modo = "consultor" | "marketing";
 const MODOS: Record<Modo, { rotulo: string; titulo: string; sub: string; intro: string; placeholder: string; sugestoes: { t: string; d: string }[] }> = {
   consultor: {
     rotulo: "Tráfego", titulo: "Consultor de tráfego", sub: "Google Ads · Meta Ads · seus dados", placeholder: "Pergunte ao consultor…",
-    intro: "Sou seu consultor de tráfego pago. Vejo a tela que você tem aberta e os dados do workspace: tiro dúvidas e, num rascunho de campanha, faço os ajustes que você pedir (você aprova antes).",
+    intro: "Sou seu consultor de tráfego pago. Vejo a tela aberta e os dados do workspace: tiro dúvidas, preencho formulários da plataforma por você e, num rascunho de campanha, faço os ajustes que pedir (você aprova antes).",
     sugestoes: [
       { t: "Com R$ 5 por dia, como monto minha campanha no Google?", d: "Plano realista para orçamento pequeno" },
       { t: "Como estão minhas campanhas esta semana?", d: "Leio os números do workspace" },
@@ -27,11 +29,11 @@ const MODOS: Record<Modo, { rotulo: string; titulo: string; sub: string; intro: 
   },
   marketing: {
     rotulo: "Marketing", titulo: "Consultor de marketing", sub: "Instagram · conteúdo · suas marcas", placeholder: "Peça um post, um carrossel, ideias…",
-    intro: "Sou seu social media. Escrevo o post inteiro (arte, legenda e hashtags) com a identidade da sua marca. Você aprova com um clique e eu gero a arte e publico no Instagram sozinho.",
+    intro: "Sou seu social media. Escrevo o post inteiro (arte, legenda e hashtags) com a identidade da sua marca e publico no Instagram depois do seu clique. Também preencho as telas por você: Studio, Conteúdos, Marcas.",
     sugestoes: [
       { t: "Cria um post para hoje e publica assim que ficar pronto", d: "Escolho o tema, escrevo e publico" },
       { t: "Faz um carrossel ensinando algo útil para o meu público", d: "4 a 8 slides com gancho e chamada" },
-      { t: "Que datas comemorativas dessa semana combinam com a minha marca?", d: "Ideias para o calendário" },
+      { t: "Preenche a tela de nova imagem com um post para hoje", d: "Abro o Studio e deixo o briefing pronto" },
       { t: "Me dá 5 ganchos fortes para Reels sobre o meu produto", d: "Primeiros 2 segundos que prendem" },
     ],
   },
@@ -39,22 +41,6 @@ const MODOS: Record<Modo, { rotulo: string; titulo: string; sub: string; intro: 
 const lerModo = (): Modo => { try { return localStorage.getItem("adpilot:modo") === "marketing" ? "marketing" : "consultor"; } catch { return "consultor"; } };
 const lerSalvo = (m: Modo) => { try { return localStorage.getItem(`adpilot:${m}`); } catch { return null; } };
 const salvarConv = (m: Modo, id: string | null) => { try { if (id) localStorage.setItem(`adpilot:${m}`, id); else localStorage.removeItem(`adpilot:${m}`); } catch { /* sem storage: só não lembra a conversa */ } };
-
-/** Retrato da tela aberta: rota, título, texto visível e valores dos campos (o innerText não traz o que está digitado). */
-function lerTela() {
-  const main = document.getElementById("conteudo");
-  if (!main) return undefined;
-  const campos: string[] = [];
-  main.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>("input, textarea, select").forEach((el) => {
-    if (el instanceof HTMLInputElement && ["checkbox", "radio"].includes(el.type) && !el.checked) return;
-    const v = el instanceof HTMLSelectElement ? el.selectedOptions[0]?.text ?? "" : el.value;
-    if (!v.trim() || el.type === "password" || el.type === "hidden") return;
-    const rotulo = el.labels?.[0]?.textContent?.trim() || el.getAttribute("aria-label") || el.getAttribute("placeholder") || el.name || "campo";
-    campos.push(`${rotulo}: ${v.slice(0, 2000)}`);
-  });
-  const texto = `${main.innerText.replace(/\n{3,}/g, "\n\n").trim()}${campos.length ? `\n\nCampos preenchidos na tela:\n${campos.join("\n")}` : ""}`;
-  return { path: location.pathname + location.search, titulo: document.title, texto: texto.slice(0, 20_000) };
-}
 
 const saudacao = () => { const h = new Date().getHours(); return h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite"; };
 
@@ -73,11 +59,21 @@ export function Consultor({ podeEditar }: { podeEditar: boolean }) {
   const campo = useRef<HTMLTextAreaElement>(null);
   const rodando = st?.conversation.status === "RUNNING" || st?.messages.some((m) => m.status === "STREAMING");
   const escrevendo = st?.messages.some((m) => m.status === "STREAMING" && m.content);
+  const router = useRouter();
+  // respostas com bloco domus-tela agem na tela uma vez: só as que terminaram depois de a conversa abrir aqui
+  const convVista = useRef<string | null>(null);
+  const antigas = useRef(new Set<number>());
+  const [notas, setNotas] = useState<Record<number, string>>({});
 
   const carregar = useCallback(async (id: string) => {
     const r = await fetch(`/api/ai/conversations/${id}`, { cache: "no-store" });
     if (!r.ok) { if (r.status === 404) setSt(null); return; }
-    setSt((await r.json()) as ChatState);
+    const novo = (await r.json()) as ChatState;
+    if (convVista.current !== novo.conversation.id) {
+      convVista.current = novo.conversation.id;
+      antigas.current = new Set(novo.messages.filter((m) => m.status === "DONE").map((m) => m.id));
+    }
+    setSt(novo);
   }, []);
   const carregarHistorico = useCallback(async () => {
     const r = await fetch(`/api/ai/conversations?tipo=${modo}`, { cache: "no-store" });
@@ -116,6 +112,21 @@ export function Consultor({ podeEditar }: { podeEditar: boolean }) {
     return () => clearInterval(t);
   }, [st?.conversation.id, rodando, carregar]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    for (const m of st?.messages ?? []) {
+      if (m.role !== "assistant" || m.status !== "DONE" || antigas.current.has(m.id)) continue;
+      antigas.current.add(m.id);
+      const passos = passosDaMensagem(m.content);
+      if (!passos?.length) continue;
+      setNotas((n) => ({ ...n, [m.id]: "Mexendo na tela…" }));
+      void executarTela(passos, (href) => router.push(href)).then(({ feitos, falhas }) => {
+        const nota = `${feitos ? `Pronto: ${feitos} ${feitos === 1 ? "ajuste feito" : "ajustes feitos"} na tela. Revise e envie quando quiser.` : "Não consegui mexer na tela."}${falhas.length ? ` Não achei: ${falhas.slice(0, 4).join(", ")}.` : ""}`;
+        setNotas((n) => ({ ...n, [m.id]: nota }));
+        if (falhas.length && !feitos) toast.err("O consultor não conseguiu preencher a tela");
+      });
+    }
+  }, [st, router]);
+
   useEffect(() => { const el = lista.current; if (el) el.scrollTop = el.scrollHeight; }, [st?.messages.length, st?.messages.at(-1)?.content.length, vista]);
 
   // textarea cresce com o texto
@@ -141,7 +152,7 @@ export function Consultor({ podeEditar }: { podeEditar: boolean }) {
     });
   };
 
-  const nova = () => { salvar(null); setSt(null); setVista("conversa"); setTxt(""); setTimeout(() => campo.current?.focus(), 30); };
+  const nova = () => { salvar(null); setSt(null); convVista.current = null; setVista("conversa"); setTxt(""); setTimeout(() => campo.current?.focus(), 30); };
   const abrir = (id: string) => { salvar(id); setVista("conversa"); void carregar(id); };
   const verHistorico = () => { setVista("historico"); void carregarHistorico(); };
   const parar = () => st && start(async () => { const r = await cancelarResposta(st.conversation.id); if (!r.ok) toast.err(r.error); await carregar(st.conversation.id); });
@@ -228,7 +239,7 @@ export function Consultor({ podeEditar }: { podeEditar: boolean }) {
                   </div>
                 ) : (
                   <>
-                    {st.messages.map((m) => <Mensagem key={m.id} m={m} semMeta acoes={st.actions.filter((a) => a.message_id === m.id)} podeEditar={podeEditar} onDecidiu={() => void carregar(st.conversation.id)} />)}
+                    {st.messages.map((m) => <Mensagem key={m.id} m={m} nota={notas[m.id]} semMeta acoes={st.actions.filter((a) => a.message_id === m.id)} podeEditar={podeEditar} onDecidiu={() => void carregar(st.conversation.id)} />)}
                     {rodando && !st.messages.some((m) => m.status === "STREAMING") && (
                       <div className="term-msg"><div className="term-ai"><span className="cx-typing"><i /><i /><i /></span></div></div>
                     )}
@@ -248,7 +259,7 @@ export function Consultor({ podeEditar }: { podeEditar: boolean }) {
                     </button>
                   )}
                 </div>
-                <div className="cx-hint">Enter envia · Shift+Enter quebra linha · mudanças só com sua aprovação</div>
+                <div className="cx-hint">Enter envia · Shift+Enter quebra linha · nada é enviado ou publicado sem você</div>
               </footer>
             </>
           )}
