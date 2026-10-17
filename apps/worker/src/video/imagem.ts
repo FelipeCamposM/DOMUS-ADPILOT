@@ -36,6 +36,14 @@ ${b.estiloVisual !== "livre" ? `- ESTILO VISUAL OBRIGATÓRIO: ${ESTILOS[b.estilo
   Claymorphism: volumes "inflados" com várias box-shadow (externa suave + interna clara em cima e escura embaixo), cantos bem redondos, pastel.
   Editorial: fundo claro de papel, serifada grande, fios finos de 1px, uma única cor de destaque. Tech HUD: fundo escuro, grade sutil, neon, vidro.` : ""}
 ${REGRAS_CONTEXTO}
+- LOGO: se a pasta assets tiver logo.* (logo oficial), ela entra na arte com <img src="assets/logo…">, inteira, sem recolorir.
+  NUNCA desenhe logo, ícone ou símbolo da marca em CSS/SVG (nada de "casinha" ou quadradinho com inicial). Sem arquivo de logo,
+  o nome da marca vai só em texto.
+${b.estiloVisual === "clay" ? "" : `- Visual PLANO e limpo: tipografia forte, blocos de cor, ícones de linha, mockup simples de tela. PROIBIDO objeto pseudo-3D
+  feito em CSS (portas, casas, celulares "inflados", bolhas com sombra interna, clay, isométrico, vidro) e ilustração figurativa
+  (pessoas, mãos, objetos realistas), MESMO que o pedido descreva isso: traduza a ideia para uma versão plana e tipográfica.
+`}- NADA sobrepõe texto: ilustração, mockup e formas ficam em área própria, sem encostar em headline, apoio ou CTA.
+  Antes de responder, confira as caixas (top/left/width/height) de cada bloco para garantir que não se cruzam.
 - Nome do produto SEMPRE escrito exatamente “${b.produto}”. Para colorir parte do nome, divida sem repetir letras.
 - Use só fatos do briefing; não invente preço, prazo, estatística ou promessa.`;
 }

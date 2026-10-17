@@ -10,12 +10,27 @@ export const limparHashtags = (hs: unknown): string[] => [...new Set((Array.isAr
 
 export interface LegendaPayload { postId: string; dica?: string }
 
+/**
+ * Jeito de escrever legenda que não soa como IA (vale para legenda avulsa, calendário e consultor de marketing).
+ * Lista negra tirada de legendas reais que o cliente achou "robóticas".
+ */
+export const TEXTO_HUMANO = `Escreva como uma pessoa da marca falando com um cliente, não como agência nem como IA:
+- Português do dia a dia, frases de tamanhos variados, uma ideia por parágrafo. Pode começar frase com "E" ou "Mas".
+- Seja concreto: um exemplo real, uma situação do cliente, um detalhe do serviço. Nada de frase genérica que serviria para qualquer empresa.
+- PROIBIDO (soa robótico): "Não é X, é Y" / "X. Y também deveria ser." e outros paralelismos de efeito; listas de três adjetivos;
+  slogan solto no meio do texto; perguntas retóricas em sequência; travessão (—); palavras de anúncio como transforme, eleve,
+  potencialize, desbloqueie, alavanque, descubra, incrível, revolucionário, "no mundo de hoje", "sua porta para", "o próximo nível".
+- Gancho na 1ª linha que soe natural (uma observação ou situação real), não manchete de propaganda.
+- No máximo 1 emoji, e só se a marca usar. Chamada final simples e direta, uma só.
+- Feed: 300 a 700 caracteres antes das hashtags. Reels: até 300.`;
+
 const SISTEMA = `Você é social media sênior no Brasil e escreve legendas de Instagram em português do Brasil.
 Responda APENAS com um bloco \`\`\`json no formato: {"legenda": "texto da legenda SEM hashtags", "hashtags": ["#exemplo", "..."]}
 
 Regras:
-- Primeira linha é o gancho: curta, forte, faz parar o scroll (é o que aparece antes do "mais").
-- Corpo em parágrafos curtos, com quebras de linha; emojis com moderação, se combinarem com o tom da marca.
+- Primeira linha é o gancho (é o que aparece antes do "mais").
+- Corpo em parágrafos curtos, com quebras de linha.
+${TEXTO_HUMANO}
 - Termine com uma chamada para ação clara (comentar, salvar, compartilhar, link na bio, chamar no direct).
 - Reels: legenda mais curta e direta. Carrossel: convide a deslizar até o fim.
 - Hashtags: 8 a 15, misturando nicho, local (cidade/estado, se fizer sentido) e marca; nada genérico demais (#love, #instagood).

@@ -8,7 +8,7 @@ import { bloco, perguntarIA } from "../ai/ask";
 import { DATA_DIR } from "../env";
 import { lerPagina } from "../video/contexto";
 import { avisar } from "../whatsapp";
-import { limparHashtags } from "./legenda";
+import { limparHashtags, TEXTO_HUMANO } from "./legenda";
 
 /**
  * Calendário de conteúdo. A IA planeja o período numa chamada só (plano) e depois refaz só o que o usuário pedir
@@ -22,9 +22,13 @@ const quando = (d: Date) => d.toLocaleString("pt-BR", { timeZone: "America/Sao_P
 export const ROTEIROS = `Roteiro por formato (campo "roteiro"):
 - FEED (1 imagem 4:5): {"headline": texto grande da arte, até 60 caracteres, "apoio": até 140, "cta": até 40, "visual": composição da arte, até 300}
 - CARROSSEL (slides 4:5): {"slides": [{"headline": até 70, "apoio": até 160, "visual": até 250}] com 4 a 8 slides (1º = gancho, último = chamada), "cta": até 40}
-- REELS (vídeo 9:16 narrado): {"narracao": o texto falado, 35–45 palavras para 15 s ou 70–85 para 30 s, com gancho nos 2 primeiros segundos, "duracao": 15 ou 30, "visual": até 300, "cta": até 40}`;
+- REELS (vídeo 9:16 narrado): {"narracao": o texto falado, 35–45 palavras para 15 s ou 70–85 para 30 s, com gancho nos 2 primeiros segundos, "duracao": 15 ou 30, "visual": até 300, "cta": até 40}
+- "visual" descreve um layout limpo e plano: tipografia grande, blocos de cor da marca, a logo oficial, ícones de linha simples,
+  mockup simples de tela (site/celular) com cantos retos ou levemente arredondados. NUNCA peça 3D, clay, inflado, isométrico, vidro,
+  objetos "realistas" desenhados (portas, casas, mãos, pessoas) nem ícone/símbolo inventado para a marca. Texto nunca sobreposto por ilustração.`;
 
-export const REGRAS_POST = `- Legenda: gancho forte na 1ª linha, parágrafos curtos, chamada para ação no fim, SEM hashtags dentro. Reels: legenda mais curta.
+export const REGRAS_POST = `- Legenda: gancho na 1ª linha, parágrafos curtos, uma chamada no fim, SEM hashtags dentro.
+${TEXTO_HUMANO}
 - Hashtags: 8 a 15 por post (nicho + local, se fizer sentido + marca), sem acento nem espaço.
 - Use só fatos da marca, do site e do pedido. Não invente preço, prazo, número, depoimento nem garantia.
 - Tudo em português do Brasil.`;

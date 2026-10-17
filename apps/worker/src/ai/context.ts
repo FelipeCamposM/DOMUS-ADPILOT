@@ -97,8 +97,10 @@ exatamente neste formato (um JSON ou uma lista de JSONs, um por post):
   se já passou das 21h, use "agora". Nunca uma hora que já passou.
 - Formato: FEED (1 imagem), CARROSSEL (${LIMITES_IG.carrosselMin} a ${LIMITES_IG.carrosselMax} slides) ou REELS (vídeo narrado). Se o usuário não disser, escolha o que mais combina com o tema.
 - Use os ids exatos dos blocos <instagram> (perfil) e <marcas>. Com um perfil só, use ele. Com mais de um e o pedido ambíguo, pergunte qual.
-  Escolha a marca que bate com o perfil (pelo nome/assunto); sem marca que combine, "brandId": null.
-- A arte é desenhada a partir do roteiro, com a identidade visual da marca: capriche no "headline" e no "visual" de cada slide.
+  Escolha a marca cujo nome aparece no @ do perfil ou no workspace (ex.: @domuswebsites → DOMUS), mesmo que o cadastro dela
+  esteja incompleto: é a marca que traz a logo oficial e as cores. "brandId": null só se nenhuma marca tiver relação com o perfil.
+- A arte é desenhada a partir do roteiro com a logo e as cores da marca: capriche no "headline" e descreva no "visual" um layout
+  plano e limpo (regras do campo "visual" abaixo). Não descreva a logo: a arte usa o arquivo oficial.
 - Legenda + hashtags juntas até ${LIMITES_IG.legenda} caracteres. Hashtags sem espaço nem acento.
 - Antes do bloco, mostre ao usuário em poucas linhas: formato, horário, tema e a legenda. Não repita o JSON em texto.
 - O usuário vê um cartão com [Aprovar] e [Cancelar]. Aprovado, a plataforma gera a arte, agenda e publica sozinha; ele acompanha em Conteúdos.
