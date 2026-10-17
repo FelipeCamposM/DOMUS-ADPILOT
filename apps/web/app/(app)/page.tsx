@@ -15,7 +15,9 @@ export default async function Overview({ searchParams }: { searchParams: Promise
   const ctx = await requireCtx();
   const f = parseFiltro(await searchParams);
   const ws = ctx.workspace.id;
-  const opcoes = await opcoesFiltro(ws);
+  // tudo de uma vez (se não houver conta, as outras voltam vazias rápido)
+  const [opcoes, { atual, anterior }, pontos, todas] = await Promise.all([opcoesFiltro(ws), kpis(ws, f), serie(ws, f), campanhas(ws, f)]);
+  const top = todas.slice(0, 6);
 
   if (opcoes.contas.length === 0) {
     return (
@@ -33,9 +35,6 @@ export default async function Overview({ searchParams }: { searchParams: Promise
     );
   }
 
-  const { atual, anterior } = await kpis(ws, f);
-  const pontos = await serie(ws, f);
-  const top = (await campanhas(ws, f)).slice(0, 6);
 
   return (
     <div className="page">

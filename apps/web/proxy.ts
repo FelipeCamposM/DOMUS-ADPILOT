@@ -14,9 +14,11 @@ export async function proxy(req: NextRequest) {
       },
     },
   });
-  const { data } = await sb.auth.getUser();
+  // getClaims valida a assinatura do JWT localmente (chaves JWKS em cache) e renova a sessão se expirou; getUser ia ao
+  // Supabase Auth em toda navegação
+  const { data } = await sb.auth.getClaims();
   const publica = req.nextUrl.pathname.startsWith("/login") || req.nextUrl.pathname.startsWith("/auth");
-  if (!data.user && !publica) {
+  if (!data?.claims && !publica) {
     if (req.nextUrl.pathname.startsWith("/api/")) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
     const url = req.nextUrl.clone();
     url.pathname = "/login";

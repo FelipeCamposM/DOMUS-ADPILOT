@@ -1,4 +1,5 @@
 import { db, whatsappAvisos } from "@domus-ads/core";
+import { emailAdmins } from "./email";
 
 /**
  * WhatsApp via Wuzapi local (infra/whatsapp). Só o worker fala com ela (localhost):
@@ -56,6 +57,32 @@ export async function avisar(texto: string, falhar = false) {
   }
 }
 
+/**
+ * Chamado a cada heartbeat: se o número estava conectado e caiu (2 leituras seguidas, para não avisar por soluço),
+ * manda e-mail aos admins com o link para reconectar. Desconectar pela tela não avisa.
+ */
+let estavaConectado: boolean | null = null;
+let quedas = 0;
+let desconexaoManual = false;
+export async function vigiarQueda(st: EstadoWhatsapp | null) {
+  if (!st) return;
+  if (st.state === "open") { estavaConectado = true; quedas = 0; desconexaoManual = false; return; }
+  if (estavaConectado === null) {
+    // worker acabou de subir: o último estado gravado diz se estava conectado antes
+    const [w] = await db()<{ s: string | null }[]>`select info->'whatsapp'->>'state' as s from ads.worker_status order by last_seen desc limit 1`;
+    estavaConectado = w?.s === "open";
+  }
+  if (!estavaConectado || ++quedas < 2) return;
+  estavaConectado = false;
+  if (desconexaoManual) return;
+  const url = `${process.env.APP_PUBLIC_URL || process.env.APP_URL}/settings#whatsapp`;
+  const motivo = st.state === "off" ? `a Wuzapi está fora do ar (${st.erro ?? "Docker parado?"})` : "o número foi desconectado do WhatsApp";
+  await emailAdmins("WhatsApp do DOMUS desconectou", `<p>O WhatsApp dos avisos do DOMUS AdPilot caiu: ${motivo}.</p>
+    <p>Os avisos de publicação não chegam até reconectar.</p>
+    <p><a href="${url}">Reconectar agora</a> (clique no WhatsApp no topo da plataforma e leia o QR code).</p>`);
+  console.log(`WhatsApp caiu (${st.state}): e-mail enviado aos admins`);
+}
+
 const gravarInfo =(info: Record<string, unknown>) => db()`update ads.worker_status set info = info || ${db().json(info as never)} where id = (select id from ads.worker_status order by last_seen desc limit 1)`;
 export const gravarQr = (qr: string | null) => gravarInfo({ whatsappQr: qr });
 
@@ -63,6 +90,7 @@ export const gravarQr = (qr: string | null) => gravarInfo({ whatsappQr: qr });
 export async function acaoWhatsapp(acao: string, signal: AbortSignal, log: (m: string) => Promise<void>) {
   if (!URL_WZ || !TOKEN) throw new Error("WUZAPI_URL/WUZAPI_TOKEN não configurados no .env do worker");
   if (acao === "desconectar") {
+    desconexaoManual = true;
     await wz("POST", "/session/logout").catch(() => {});
     await gravarQr(null);
     return { ok: true };

@@ -3,7 +3,7 @@
 import { confirmar } from "../shell/confirmar";
 import { BellRing, Loader2, LogOut, QrCode, Send } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "../shell/toast";
 import { whatsappAcao } from "./ai-accounts";
 import { salvarWhatsappAvisos } from "./actions";
@@ -20,7 +20,8 @@ const mascara = (v: string) => {
 };
 
 /** WhatsApp dos avisos (Wuzapi no PC do worker): status, QR para conectar e desconectar. */
-export function Whatsapp({ estado, qr, erro, avisos, podeAdmin, workerOnline }: { estado: EstadoWhatsapp | null; qr: string | null; erro: string | null; avisos: string | null; podeAdmin: boolean; workerOnline: boolean }) {
+/** compacto = sem o campo do número (modal do topo); autoConectar = já pede o QR ao abrir. */
+export function Whatsapp({ estado, qr, erro, avisos, podeAdmin, workerOnline, compacto, autoConectar }: { estado: EstadoWhatsapp | null; qr: string | null; erro: string | null; avisos: string | null; podeAdmin: boolean; workerOnline: boolean; compacto?: boolean; autoConectar?: boolean }) {
   const inicial = mascara(avisos?.replace(/^55/, "") ?? "");
   const [num, setNum] = useState(inicial);
   const router = useRouter();
@@ -45,6 +46,13 @@ export function Whatsapp({ estado, qr, erro, avisos, podeAdmin, workerOnline }: 
     router.refresh();
   });
 
+  const pediu = useRef(false);
+  useEffect(() => {
+    if (!autoConectar || pediu.current || conectado || aguardando || !podeAdmin || !workerOnline || !estado || estado.state === "off") return;
+    pediu.current = true;
+    acao("conectar");
+  });
+
   const salvar = () => start(async () => {
     const r = await salvarWhatsappAvisos(num);
     if (r.ok) toast.ok("Número dos avisos salvo"); else toast.err(r.error ?? "Erro");
@@ -53,7 +61,7 @@ export function Whatsapp({ estado, qr, erro, avisos, podeAdmin, workerOnline }: 
 
   return (
     <>
-      {podeAdmin && (
+      {podeAdmin && !compacto && (
         <div className="cluster" style={{ alignItems: "flex-end" }}>
           <div className="field">
             <label className="label" htmlFor="wa-avisos"><BellRing size={13} aria-hidden style={{ verticalAlign: -2 }} /> Número que recebe os avisos</label>

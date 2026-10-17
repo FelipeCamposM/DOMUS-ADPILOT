@@ -3,6 +3,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
+import { iaPreferencias } from "@domus-ads/core";
 import { isAuthText, isLimitText, usageFromClaude, usageFromCodex, type Usage } from "./limits";
 
 export type AiProvider = "claude" | "codex";
@@ -64,12 +65,15 @@ export function cliEnv(provider: AiProvider, configDir: string): NodeJS.ProcessE
 }
 
 export async function runCli(i: RunInput): Promise<RunResult> {
+  // modelo/esforço escolhidos no topo da web; vazio = .env (AI_*_MODEL) ou padrão do CLI
+  const pref = (await iaPreferencias())[i.provider];
+  const modelo = pref.modelo || (i.provider === "claude" ? process.env.AI_CLAUDE_MODEL : process.env.AI_CODEX_MODEL);
   const args = i.provider === "claude"
     ? ["-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--tools", i.verArquivos ? "Read" : "", "--strict-mcp-config",
        "--system-prompt-file", i.systemPromptFile, ...(i.sessionId ? ["--resume", i.sessionId] : []),
-       ...(process.env.AI_CLAUDE_MODEL ? ["--model", process.env.AI_CLAUDE_MODEL] : [])]
+       ...(modelo ? ["--model", modelo] : []), ...(pref.esforco ? ["--effort", pref.esforco] : [])]
     : ["exec", ...(i.sessionId ? ["resume", i.sessionId] : []), ...CODEX_ISOLADO,
-       ...(process.env.AI_CODEX_MODEL ? ["-m", process.env.AI_CODEX_MODEL] : []),
+       ...(modelo ? ["-m", modelo] : []), ...(pref.esforco ? ["-c", `model_reasoning_effort="${pref.esforco}"`] : []),
        ...(i.verArquivos?.imagens.flatMap((img) => ["-i", img]) ?? []), "-"];
   const prompt = i.provider === "codex" && !i.sessionId ? `${readFileSync(i.systemPromptFile, "utf8")}\n\n${i.prompt}` : i.prompt;
 

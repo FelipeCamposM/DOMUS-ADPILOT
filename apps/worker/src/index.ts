@@ -13,7 +13,7 @@ import { arquivarExcesso, restaurar } from "./video/arquivo";
 import { gerarLegenda, type LegendaPayload } from "./instagram/legenda";
 import { publicarInstagram } from "./instagram/publicar";
 import { automatizarCalendario, expirarAtrasados, gerarCalendario, type CalendarioPayload } from "./instagram/calendario";
-import { acaoWhatsapp, avisar, estadoWhatsapp, gravarQr } from "./whatsapp";
+import { acaoWhatsapp, avisar, estadoWhatsapp, gravarQr, vigiarQueda } from "./whatsapp";
 
 /**
  * DOMUS Worker: roda no PC local, sem nenhuma porta aberta. Ele mesmo busca trabalho na fila (ads.jobs) com
@@ -108,6 +108,7 @@ async function loop() {
 async function heartbeat() {
   const [c] = await sql<{ n: number }[]>`select count(*)::int as n from ads.ai_accounts where status = 'ACTIVE'`;
   const info = { host: hostname(), pid: process.pid, node: process.version, concurrency: CONCURRENCY, running: ativos.size, aiAccounts: c?.n ?? 0, syncIntervalMin: SYNC_INTERVAL_MIN, autostart: await inicializacaoAtiva(), whatsapp: await estadoWhatsapp() };
+  await vigiarQueda(info.whatsapp).catch(() => {}); // antes de gravar: na subida lê o estado anterior
   await sql`insert into ads.worker_status (id, last_seen, info) values (${WORKER_ID}, now(), ${sql.json(info)})
             on conflict (id) do update set last_seen = now(), info = ads.worker_status.info || excluded.info`;
 }

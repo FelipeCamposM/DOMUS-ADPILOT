@@ -1,12 +1,14 @@
 "use client";
 
-import { AlertTriangle, Bell, Bot, Check, ChevronsUpDown, LogOut, Menu, Search } from "lucide-react";
+import { AlertTriangle, Bell, Bot, Check, ChevronsUpDown, LogOut, Menu, MessageCircle, Search } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, useTransition, type ReactNode } from "react";
 import { ago } from "@/lib/format";
 import { Consultor } from "../ai/Consultor";
 import { Motion } from "../motion/Motion";
+import { Whatsapp, type EstadoWhatsapp } from "../settings/Whatsapp";
+import { Dialog } from "./Dialog";
 import { sair, trocarWorkspace } from "./actions";
 import { CommandPalette } from "./CommandPalette";
 import { Popover } from "./Popover";
@@ -15,6 +17,7 @@ import { Confirmador } from "./confirmar";
 import { Toaster, toast } from "./toast";
 import { UsoIA } from "./UsoIA";
 import type { UsoContaIA } from "@/lib/queries";
+import type { IaPreferencias } from "@domus-ads/core";
 
 export interface ShellProps {
   children: ReactNode;
@@ -27,7 +30,10 @@ export interface ShellProps {
     falhas: { id: string; type: string; error: string | null; finished_at: string }[];
   };
   worker: { online: boolean; lastSeen: string | null };
+  whatsapp: { estado: EstadoWhatsapp | null; qr: string | null; erro: string | null };
+  admin: boolean;
   contasIA: UsoContaIA[];
+  iaPref: IaPreferencias;
 }
 
 export function Shell(p: ShellProps) {
@@ -35,6 +41,7 @@ export function Shell(p: ShellProps) {
   const [paleta, setPaleta] = useState(false);
   const [menu, setMenu] = useState<"ws" | "bell" | "user" | "ia" | null>(null);
   const [mobile, setMobile] = useState(false);
+  const [zap, setZap] = useState(false);
   const [pend, start] = useTransition();
   const fechar = useCallback(() => setMenu(null), []);
   const fecharPaleta = useCallback(() => setPaleta(false), []);
@@ -99,11 +106,19 @@ export function Shell(p: ShellProps) {
           </button>
 
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
-            <UsoIA contas={p.contasIA} aberto={menu === "ia"} onToggle={() => setMenu(menu === "ia" ? null : "ia")} onClose={fechar} />
+            <UsoIA contas={p.contasIA} pref={p.iaPref} podeEditar={p.admin} aberto={menu === "ia"} onToggle={() => setMenu(menu === "ia" ? null : "ia")} onClose={fechar} />
             <Link href="/settings#worker" className="chip" suppressHydrationWarning title={p.worker.lastSeen ? `Último sinal ${ago(p.worker.lastSeen)}` : "O worker nunca se conectou"}>
               <span className={`dot ${p.worker.online ? "on" : "err"}`} aria-hidden />
               Worker {p.worker.online ? "online" : "offline"}
             </Link>
+            {p.whatsapp.estado && (() => {
+              const on = p.whatsapp.estado.state === "open";
+              const conteudo = <><span className={`dot ${on ? "on" : "err"}`} aria-hidden /><MessageCircle aria-hidden /> {on ? "WhatsApp" : "WhatsApp desconectado"}</>;
+              const titulo = on ? `WhatsApp conectado${p.whatsapp.estado.numero ? ` · ${p.whatsapp.estado.numero}` : ""}` : "Clique para conectar com QR code";
+              return p.admin
+                ? <button className="chip" data-alerta={!on} onClick={() => setZap(true)} title={titulo}>{conteudo}</button>
+                : <Link href="/settings#whatsapp" className="chip" title={titulo}>{conteudo}</Link>;
+            })()}
 
             <div style={{ position: "relative" }}>
               <button className="chip" onClick={() => setMenu(menu === "bell" ? null : "bell")} aria-label={`Notificações (${total})`} style={{ position: "relative" }}>
@@ -142,6 +157,11 @@ export function Shell(p: ShellProps) {
         </header>
         <main className="content" id="conteudo">{p.children}</main>
       </div>
+      {p.admin && p.whatsapp.estado && (
+        <Dialog open={zap} onClose={() => setZap(false)} title="WhatsApp dos avisos">
+          {zap && <Whatsapp estado={p.whatsapp.estado} qr={p.whatsapp.qr} erro={p.whatsapp.erro} avisos={null} podeAdmin workerOnline={p.worker.online} compacto autoConectar />}
+        </Dialog>
+      )}
       <CommandPalette open={paleta} onClose={fecharPaleta} campanhas={p.campanhas} />
       <Consultor key={p.workspaceId} podeEditar={["editor", "admin", "owner"].includes(p.workspaces.find((w) => w.id === p.workspaceId)?.role ?? "")} />
       <Motion />

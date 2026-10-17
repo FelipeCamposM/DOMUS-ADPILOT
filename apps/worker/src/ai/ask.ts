@@ -1,4 +1,4 @@
-import { db, type Json } from "@domus-ads/core";
+import { db, iaPreferencias, type Json } from "@domus-ads/core";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { runCli, type AiProvider } from "./cli";
@@ -21,12 +21,13 @@ export async function perguntarIA(p: {
   const sysFile = join(p.cwd, "instrucoes.md");
   writeFileSync(sysFile, p.sistema, "utf8");
   const tentadas = new Set<string>();
+  const { conta: preferida } = await iaPreferencias();
   for (;;) {
     if (p.signal.aborted) throw new Error("Cancelado");
     const [conta] = await sql<{ id: string; provider: AiProvider; name: string; config_dir: string }[]>`
       select id, provider, name, config_dir from ads.ai_accounts
       where status = 'ACTIVE' and (limited_until is null or limited_until < now()) and not (id = any(${[...tentadas]}::uuid[]))
-      order by priority, created_at limit 1`;
+      order by id is not distinct from ${preferida}::uuid desc, priority, created_at limit 1`;
     if (!conta) throw new Error(tentadas.size ? "Todas as contas de IA falharam ou estão no limite." : "Nenhuma conta de IA ativa. Conecte uma em Configurações → Contas de IA.");
     tentadas.add(conta.id);
     await p.log(`IA: ${conta.provider} · ${conta.name}`);

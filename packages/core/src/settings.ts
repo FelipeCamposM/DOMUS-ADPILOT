@@ -18,6 +18,25 @@ export async function gravarSegredo(chave: string, valor: string | null, userId:
 /** Número (só dígitos, com DDI) que recebe os avisos da plataforma no WhatsApp. */
 export const whatsappAvisos = () => lerSegredo("whatsapp_avisos").catch(() => null);
 
+/**
+ * Escolha manual da IA (topo → menu das IAs). conta = id da conta preferida (null = rodízio por prioridade);
+ * modelo/esforço vazios = padrão do CLI. A conta escolhida no limite ou com erro cai no rodízio normal.
+ */
+export const ESFORCOS = ["low", "medium", "high", "xhigh", "max"] as const;
+const prefProvedor = z.object({ modelo: z.string().max(60).regex(/^[\w.\-]*$/, "Modelo inválido").default(""), esforco: z.enum(["", ...ESFORCOS]).default("") });
+export const iaPreferenciasSchema = z.object({
+  conta: z.string().uuid("Conta inválida").nullable().default(null),
+  claude: prefProvedor.default({ modelo: "", esforco: "" }),
+  codex: prefProvedor.default({ modelo: "", esforco: "" }),
+});
+export type IaPreferencias = z.infer<typeof iaPreferenciasSchema>;
+
+export async function iaPreferencias(): Promise<IaPreferencias> {
+  const v = await lerSegredo("ia_preferencias").catch(() => null);
+  const p = iaPreferenciasSchema.safeParse(v ? JSON.parse(v) : {});
+  return p.success ? p.data : iaPreferenciasSchema.parse({});
+}
+
 /** Chave do ElevenLabs: a cadastrada na tela tem prioridade; senão ELEVENLABS_API_KEY do .env. */
 export async function chaveElevenLabs(): Promise<string | null> {
   return (await lerSegredo("elevenlabs_api_key").catch(() => null)) ?? process.env.ELEVENLABS_API_KEY ?? null;

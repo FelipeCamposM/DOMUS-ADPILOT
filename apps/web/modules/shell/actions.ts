@@ -1,10 +1,12 @@
 "use server";
 
-import { db, enqueueJob } from "@domus-ads/core";
+import { audit, db, enqueueJob, gravarSegredo, iaPreferenciasSchema, type IaPreferencias } from "@domus-ads/core";
+import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { requireCtx, WS_COOKIE } from "@/lib/ctx";
+import { run } from "@/lib/action";
+import { isPlatformAdmin, requireCtx, WS_COOKIE } from "@/lib/ctx";
 import { supabase } from "@/lib/supabase";
 
 export async function trocarWorkspace(id: string) {
@@ -33,4 +35,20 @@ export async function statusJob(id: string): Promise<string | null> {
   await requireCtx();
   const [j] = await db()<{ status: string }[]>`select status from ads.jobs where id = ${z.string().uuid().parse(id)} and type = 'AI_USAGE'`;
   return j?.status ?? null;
+}
+
+/** Conta, modelo e esforço da IA escolhidos no menu das IAs do topo. Global (contas do worker): só admin da plataforma. */
+export async function salvarPreferenciasIA(pref: IaPreferencias) {
+  return run(async () => {
+    const ctx = await requireCtx();
+    if (!isPlatformAdmin(ctx)) throw new Error("Só administradores da plataforma escolhem a IA");
+    const p = iaPreferenciasSchema.parse(pref);
+    if (p.conta) {
+      const [c] = await db()<{ id: string }[]>`select id from ads.ai_accounts where id = ${p.conta}`;
+      if (!c) throw new Error("Conta de IA não encontrada");
+    }
+    await gravarSegredo("ia_preferencias", JSON.stringify(p), ctx.user.id);
+    await audit(db(), { workspaceId: null, actor: ctx.actor, action: "Escolher conta/modelo da IA", entityType: "settings", entityName: "ia_preferencias", after: p });
+    revalidatePath("/", "layout");
+  });
 }

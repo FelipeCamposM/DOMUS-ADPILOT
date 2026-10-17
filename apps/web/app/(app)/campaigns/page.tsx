@@ -13,10 +13,8 @@ export const metadata = { title: "Campanhas" };
 export default async function CampaignsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const ctx = await requireCtx();
   const f = parseFiltro(await searchParams);
-  const opcoes = await opcoesFiltro(ctx.workspace.id);
-  const linhas = await campanhas(ctx.workspace.id, f);
-  const rascunhos = await db()<{ id: string; name: string; status: string; source: string; updated_at: Date }[]>`
-    select id, name, status, source, updated_at from ads.campaign_drafts where workspace_id = ${ctx.workspace.id} and status <> 'PUBLISHED' order by updated_at desc limit 12`;
+  const [opcoes, linhas, rascunhos] = await Promise.all([opcoesFiltro(ctx.workspace.id), campanhas(ctx.workspace.id, f), db()<{ id: string; name: string; status: string; source: string; updated_at: Date }[]>`
+    select id, name, status, source, updated_at from ads.campaign_drafts where workspace_id = ${ctx.workspace.id} and status <> 'PUBLISHED' order by updated_at desc limit 12`]);
   return (
     <div className="page">
       <div className="page-head">

@@ -1,10 +1,11 @@
 "use client";
 
-import { ArrowUpRight, RefreshCw } from "lucide-react";
+import { ArrowUpRight, Pin, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type CSSProperties } from "react";
-import { atualizarUsoIA, statusJob } from "./actions";
+import { useState, useTransition, type CSSProperties } from "react";
+import type { IaPreferencias } from "@domus-ads/core";
+import { atualizarUsoIA, salvarPreferenciasIA, statusJob } from "./actions";
 import { toast } from "./toast";
 import { ago } from "@/lib/format";
 import type { UsoContaIA } from "@/lib/queries";
@@ -14,6 +15,12 @@ import { Popover } from "./Popover";
 type Janela = { pct: number; resets_at: string | null };
 const COR = { claude: "#D97757", codex: "#10A37F" } as const;
 const hora = (iso: string) => new Date(iso).toLocaleString("pt-BR", { weekday: "short", hour: "2-digit", minute: "2-digit" });
+// ponytail: lista fixa (modelos de out/2026); trocar aqui quando sair modelo novo
+const MODELOS = {
+  claude: [["", "Padrão do CLI"], ["claude-fable-5-1", "Fable 5.1"], ["claude-opus-5-5", "Opus 5.5"], ["claude-sonnet-5-5", "Sonnet 5.5"], ["claude-haiku-5-5", "Haiku 5.5"]],
+  codex: [["", "Padrão do CLI"], ["gpt-6-astra", "GPT-6 Astra"], ["gpt-5.6-sol", "GPT-5.6 Sol"], ["gpt-5.6-terra", "GPT-5.6 Terra"], ["gpt-5.6-luna", "GPT-5.6 Luna"]],
+} as const;
+const ESFORCO = [["", "Esforço padrão"], ["low", "Baixo"], ["medium", "Médio"], ["high", "Alto"], ["xhigh", "Muito alto"], ["max", "Máximo"]] as const;
 const nivel = (pct: number) => (pct >= 100 ? "cheio" : pct >= 80 ? "alto" : "ok");
 
 function Medidor({ rotulo, w, cor }: { rotulo: string; w?: Janela; cor: string }) {
@@ -33,9 +40,21 @@ function Medidor({ rotulo, w, cor }: { rotulo: string; w?: Janela; cor: string }
 }
 
 /** Botão no topo com o uso das assinaturas de IA (5 h e semana, lido no Claude/ChatGPT) e o gasto da plataforma em 24 h. */
-export function UsoIA({ contas, aberto, onToggle, onClose }: { contas: UsoContaIA[]; aberto: boolean; onToggle: () => void; onClose: () => void }) {
+export function UsoIA({ contas, pref: prefServidor, podeEditar, aberto, onToggle, onClose }: { contas: UsoContaIA[]; pref: IaPreferencias; podeEditar: boolean; aberto: boolean; onToggle: () => void; onClose: () => void }) {
   const router = useRouter();
   const [lendo, setLendo] = useState(false);
+  // muda na hora na tela; o servidor confirma (ou volta e mostra o erro)
+  const [pref, setPref] = useState(prefServidor);
+  const [salvando, start] = useTransition();
+  const mudar = (novo: IaPreferencias) => {
+    const antes = pref;
+    setPref(novo);
+    start(async () => {
+      const r = await salvarPreferenciasIA(novo);
+      if (!r.ok) { setPref(antes); toast.err(r.error); return; }
+      router.refresh();
+    });
+  };
   // pede a leitura ao worker e espera o job terminar (até ~40 s) para recarregar os números
   const atualizar = async () => {
     setLendo(true);
@@ -52,7 +71,8 @@ export function UsoIA({ contas, aberto, onToggle, onClose }: { contas: UsoContaI
   };
   const limitada = (c: UsoContaIA) => !!c.limited_until && new Date(c.limited_until) > new Date();
   const ativas = contas.filter((c) => c.status === "ACTIVE");
-  const livres = ativas.filter((c) => !limitada(c));
+  // a conta fixada (se livre) vem primeiro: é ela que a IA usa
+  const livres = ativas.filter((c) => !limitada(c)).sort((a, b) => Number(b.id === pref.conta) - Number(a.id === pref.conta));
   // um número por provedor: o da conta que a IA usa agora (a 1ª livre na ordem de prioridade; contas já vêm ordenadas)
   const emUso = (["claude", "codex"] as const).map((pv) => ({ pv, c: livres.find((c) => c.provider === pv) ?? null, tem: ativas.some((c) => c.provider === pv) })).filter((x) => x.tem);
   const pctDe = (c: UsoContaIA | null) => c?.usage?.five_hour?.pct;
@@ -85,6 +105,25 @@ export function UsoIA({ contas, aberto, onToggle, onClose }: { contas: UsoContaI
           </button>
         </div>
 
+        {podeEditar && contas.length > 0 && (
+          <div className="ia-escolha" aria-busy={salvando}>
+            {(["claude", "codex"] as const).filter((pv) => ativas.some((c) => c.provider === pv)).map((pv) => (
+              <div key={pv} className="ia-escolha-linha">
+                {pv === "codex" ? <OpenAILogo size={15} /> : <ClaudeLogo size={16} />}
+                <select className="input-sm" aria-label={`Modelo do ${pv === "codex" ? "ChatGPT" : "Claude"}`} value={pref[pv].modelo}
+                  onChange={(e) => mudar({ ...pref, [pv]: { ...pref[pv], modelo: e.target.value } })}>
+                  {MODELOS[pv].map(([v, r]) => <option key={v} value={v}>{r}</option>)}
+                </select>
+                <select className="input-sm" aria-label={`Esforço do ${pv === "codex" ? "ChatGPT" : "Claude"}`} value={pref[pv].esforco}
+                  onChange={(e) => mudar({ ...pref, [pv]: { ...pref[pv], esforco: e.target.value as IaPreferencias["claude"]["esforco"] } })}>
+                  {ESFORCO.map(([v, r]) => <option key={v} value={v}>{r}</option>)}
+                </select>
+              </div>
+            ))}
+            <span className="ia-escolha-dica">{pref.conta ? "Conta fixada: se ela bater o limite, a IA passa para a próxima sozinha." : "Automático: a IA usa a primeira conta livre por prioridade. Fixe uma conta abaixo."}</span>
+          </div>
+        )}
+
         {!contas.length && <div className="empty" style={{ padding: 24 }}>Nenhuma conta de IA conectada.</div>}
         <div className="ia-lista">
           {contas.map((c) => {
@@ -100,6 +139,13 @@ export function UsoIA({ contas, aberto, onToggle, onClose }: { contas: UsoContaI
                     <div className="ia-email">{c.email ?? nome}</div>
                   </div>
                   <span className="ia-status" data-s={status[0]} suppressHydrationWarning>{status[1]}</span>
+                  {podeEditar && c.status === "ACTIVE" && (
+                    <button type="button" className="ia-fixar" data-on={pref.conta === c.id} disabled={salvando}
+                      onClick={() => mudar({ ...pref, conta: pref.conta === c.id ? null : c.id })}
+                      title={pref.conta === c.id ? "Fixada: clique para voltar ao automático" : "Usar sempre esta conta"} aria-pressed={pref.conta === c.id}>
+                      <Pin size={13} aria-hidden /> {pref.conta === c.id ? "Fixada" : "Usar"}
+                    </button>
+                  )}
                 </div>
                 <div className="ia-medidores">
                   <Medidor rotulo="5 horas" w={c.usage?.five_hour} cor={cor} />

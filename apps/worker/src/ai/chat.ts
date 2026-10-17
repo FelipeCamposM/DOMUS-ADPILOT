@@ -1,4 +1,4 @@
-import { db, parseActionBlocks, toDecimal, type GoogleSearchSpec, type Json } from "@domus-ads/core";
+import { db, iaPreferencias, parseActionBlocks, toDecimal, type GoogleSearchSpec, type Json } from "@domus-ads/core";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { CONV_DIR } from "../env";
@@ -135,7 +135,7 @@ async function proximaConta(conversationId: string, pref: string, tentadas: Set<
       exists (select 1 from ads.ai_sessions s where s.conversation_id = ${conversationId} and s.ai_account_id = a.id) as tem_sessao
     from ads.ai_accounts a
     where a.status = 'ACTIVE' and (a.limited_until is null or a.limited_until < now()) and (${pref} = 'auto' or a.provider = ${pref})
-    order by tem_sessao desc, a.priority, a.created_at`;
+    order by a.id is not distinct from ${(await iaPreferencias()).conta}::uuid desc, tem_sessao desc, a.priority, a.created_at`;
   return contas.find((c) => !tentadas.has(c.id)) ?? null;
 }
 

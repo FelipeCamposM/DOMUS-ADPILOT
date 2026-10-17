@@ -23,15 +23,17 @@ export const WS_COOKIE = "ads_ws";
  * contra a lista de membros: o id que vem do cliente nunca é usado sem essa checagem).
  */
 export const requireCtx = cache(async (): Promise<Ctx> => {
-  const { data } = await (await supabase()).auth.getUser();
-  if (!data.user) redirect("/login");
+  // JWT validado localmente (assinatura + expiração), sem ida ao Supabase Auth a cada página
+  const { data } = await (await supabase()).auth.getClaims();
+  const claims = data?.claims;
+  if (!claims?.sub) redirect("/login");
   const workspaces = await db()<Workspace[]>`
     select w.id, w.name, w.slug, m.role from ads.workspace_members m join ads.workspaces w on w.id = m.workspace_id
-    where m.user_id = ${data.user.id} order by w.name`;
+    where m.user_id = ${claims.sub} order by w.name`;
   if (!workspaces.length) redirect("/login?erro=sem-workspace");
   const escolhido = (await cookies()).get(WS_COOKIE)?.value;
   const workspace = workspaces.find((w) => w.id === escolhido) ?? workspaces[0]!;
-  const user = { id: data.user.id, email: data.user.email ?? "" };
+  const user = { id: claims.sub, email: typeof claims.email === "string" ? claims.email : "" };
   return { user, actor: { userId: user.id, email: user.email }, workspaces, workspace };
 });
 

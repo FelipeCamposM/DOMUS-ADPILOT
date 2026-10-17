@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "@domus-ads/core";
+import { cache } from "react";
 import { z } from "zod";
 
 /** Filtros da URL (?provider=&account=&campaign=&days=). Tudo opcional; inválido cai no padrão. */
@@ -38,8 +39,7 @@ async function totais(ws: string, f: Filtro, since: string, until: string): Prom
 }
 
 export async function kpis(ws: string, f: Filtro) {
-  const atual = await totais(ws, f, f.since, f.until);
-  const anterior = await totais(ws, f, f.prevSince, f.prevUntil);
+  const [atual, anterior] = await Promise.all([totais(ws, f, f.since, f.until), totais(ws, f, f.prevSince, f.prevUntil)]);
   return { atual, anterior };
 }
 
@@ -86,14 +86,17 @@ export async function campanhas(ws: string, f: Filtro): Promise<CampanhaLinha[]>
     order by (c.status = 'ACTIVE') desc, coalesce(sum(m.spend), 0) desc, c.name`;
 }
 
-export async function opcoesFiltro(ws: string) {
+/** cache(): layout e página pedem a mesma coisa na mesma requisição; vai ao banco uma vez só. */
+export const opcoesFiltro = cache(async (ws: string) => {
   const sql = db();
-  const contas = await sql<{ id: string; name: string; provider: string }[]>`
-    select id, name, provider from ads.ad_accounts where workspace_id = ${ws} order by provider, name`;
-  const camps = await sql<{ id: string; name: string; ad_account_id: string }[]>`
-    select id, name, ad_account_id from ads.campaigns where workspace_id = ${ws} and status <> 'ARCHIVED' order by name`;
+  const [contas, camps] = await Promise.all([
+    sql<{ id: string; name: string; provider: string }[]>`
+    select id, name, provider from ads.ad_accounts where workspace_id = ${ws} order by provider, name`,
+    sql<{ id: string; name: string; ad_account_id: string }[]>`
+    select id, name, ad_account_id from ads.campaigns where workspace_id = ${ws} and status <> 'ARCHIVED' order by name`,
+  ]);
   return { contas, campanhas: camps };
-}
+});
 
 /** Contadores do topo (sininho): ações da IA aguardando aprovação e jobs que falharam nas últimas 24 h. */
 export async function notificacoes(ws: string) {
@@ -107,13 +110,13 @@ export async function notificacoes(ws: string) {
   return { acoes, falhas };
 }
 
-export async function workerOnline(): Promise<{ online: boolean; lastSeen: Date | null; info: Record<string, unknown> }> {
+export const workerOnline = cache(async (): Promise<{ online: boolean; lastSeen: Date | null; info: Record<string, unknown> }> => {
   const [w] = await db()<{ last_seen: Date; info: Record<string, unknown> }[]>`
     select last_seen, info from ads.worker_status order by last_seen desc limit 1`;
   // status do worker é decorativo no layout: dado estranho nunca pode derrubar a página
   const visto = w?.last_seen instanceof Date ? w.last_seen : null;
   return { online: !!visto && Date.now() - visto.getTime() < 90_000, lastSeen: visto, info: w?.info && typeof w.info === "object" ? w.info : {} };
-}
+});
 
 export interface UsoContaIA {
   id: string; provider: string; name: string; email: string | null; plan: string | null; status: string; limited_until: string | null;

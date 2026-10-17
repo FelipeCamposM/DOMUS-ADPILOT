@@ -8,20 +8,20 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
   const ctx = await requireCtx();
   const sp = await searchParams;
   const sql = db();
-  const conexoes = await sql<Omit<Conexao, "contas" | "perfis">[]>`
+  const [conexoes, contas, perfis] = await Promise.all([sql<Omit<Conexao, "contas" | "perfis">[]>`
     select k.id, k.provider, k.label, k.status, k.last_error, k.perfil,
       to_char(k.last_synced_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as last_synced_at,
       to_char(k.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as created_at,
       exists (select 1 from ads.jobs j where j.status in ('PENDING', 'RUNNING') and j.payload->>'connectionId' = k.id::text) as sincronizando
-    from ads.ad_connections k where k.workspace_id = ${ctx.workspace.id} order by k.created_at`;
-  const contas = await sql<(Conexao["contas"][number] & { connection_id: string })[]>`
+    from ads.ad_connections k where k.workspace_id = ${ctx.workspace.id} order by k.created_at`,
+  sql<(Conexao["contas"][number] & { connection_id: string })[]>`
     select a.id, a.connection_id, a.name, a.external_id, a.currency, a.timezone, a.status, count(c.id)::int as campanhas,
       count(c.id) filter (where c.status = 'ACTIVE')::int as ativas
     from ads.ad_accounts a left join ads.campaigns c on c.ad_account_id = a.id and c.status <> 'ARCHIVED'
-    where a.workspace_id = ${ctx.workspace.id} group by a.id order by a.name`;
-
-  const perfis = await sql<(Conexao["perfis"][number] & { connection_id: string })[]>`
-    select id, connection_id, username, nome, foto, seguidores, publicacoes from ads.instagram_accounts where workspace_id = ${ctx.workspace.id} order by username`;
+    where a.workspace_id = ${ctx.workspace.id} group by a.id order by a.name`,
+  sql<(Conexao["perfis"][number] & { connection_id: string })[]>`
+    select id, connection_id, username, nome, foto, seguidores, publicacoes from ads.instagram_accounts where workspace_id = ${ctx.workspace.id} order by username`,
+  ]);
 
   return (
     <div className="page">

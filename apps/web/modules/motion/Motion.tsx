@@ -6,7 +6,7 @@ import { useEffect } from "react";
 
 /**
  * Movimento da plataforma, declarativo por atributo (as páginas continuam Server Components):
- * - [data-enter]           entra em cascata a cada navegação (sobe + desfoca → nítido)
+ * - [data-enter]           entra em cascata a cada navegação (sobe e aparece)
  * - [data-enter="scale"]   entra crescendo de leve (cartões de destaque)
  * - .spotlight             luz que segue o mouse (--mx/--my), herdado do SIAPLUS
  * "Reduzir movimento" do sistema: nada anima, tudo aparece (tira html.anim).
@@ -25,10 +25,11 @@ export function Motion() {
       const els = gsap.utils.toArray<HTMLElement>("[data-enter]");
       const normais = els.filter((e) => e.dataset.enter !== "scale");
       const escala = els.filter((e) => e.dataset.enter === "scale");
-      gsap.fromTo(normais, { opacity: 0, y: 14, filter: "blur(6px)" },
-        { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.7, ease: "expo.out", stagger: 0.045, clearProps: "filter,transform" });
-      gsap.fromTo(escala, { opacity: 0, scale: 0.97, y: 8 },
-        { opacity: 1, scale: 1, y: 0, duration: 0.8, ease: "expo.out", stagger: 0.06, delay: 0.05, clearProps: "transform" });
+      // só opacity/transform (GPU): o blur repintava a página inteira e deixava a troca de aba arrastada
+      gsap.fromTo(normais, { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: 0.4, ease: "power3.out", stagger: { each: 0.03, amount: 0.2 }, clearProps: "transform" });
+      gsap.fromTo(escala, { opacity: 0, scale: 0.98 },
+        { opacity: 1, scale: 1, duration: 0.45, ease: "power3.out", stagger: { each: 0.04, amount: 0.2 }, clearProps: "transform" });
     });
     return () => ctx.revert();
   }, [path]);
