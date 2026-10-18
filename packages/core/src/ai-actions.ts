@@ -19,7 +19,7 @@ export const aiActionSchema = z.discriminatedUnion("type", [
   // rascunho de campanha (ainda não publicado): a IA devolve a campanha COMPLETA já ajustada
   z.object({ type: z.literal("UPDATE_DRAFT"), draftId: z.string().uuid(), spec: googleSearchSchema, reason: z.string().max(500).optional() }),
   // consultor de marketing: post completo (roteiro, legenda, hashtags). Aprovado, entra no calendário como APROVADO e a
-  // automação do calendário gera a arte, agenda e publica sozinha ("agora" = publica assim que a arte ficar pronta)
+  // automação do calendário gera a arte e pede o sim no WhatsApp; aprovada, agenda e publica sozinha ("agora" = assim que aprovar)
   itemCalSchema.omit({ dataHora: true }).extend({
     type: z.literal("CRIAR_POST_INSTAGRAM"),
     igAccountId: z.string().uuid("Perfil inválido"),

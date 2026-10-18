@@ -25,7 +25,7 @@ function proximoHorario() {
 const ETAPAS = [
   { t: "A IA escreve", d: "Arte, legenda e hashtags com a identidade da marca" },
   { t: "Você revisa", d: "Abre em Conteúdos: edite o que quiser e aprove" },
-  { t: "Publica sozinho", d: "Perto do horário a arte é gerada e vai para o Instagram" },
+  { t: "Publica sozinho", d: "A arte vai para o seu WhatsApp; com o seu “sim”, sai no horário" },
 ];
 
 /** Novo post do Instagram: escolhe imagem ou vídeo, diz o assunto e o horário; a IA escreve e, aprovado, a plataforma gera e publica. */

@@ -191,7 +191,7 @@ export function Settings(p: {
         <Armazenamento cfg={p.armazenamento} uso={p.uso} podeAdmin={p.podeOwnerIA} />
       </Secao>
 
-      <Secao id="calendario" icon={<CalendarClock size={16} aria-hidden />} titulo="Calendário automático" desc="Posts aprovados no calendário são gerados perto da hora e publicados sozinhos. Prazos, voz e estilo dos Reels.">
+      <Secao id="calendario" icon={<CalendarClock size={16} aria-hidden />} titulo="Calendário automático" desc="Post aprovado tem a arte gerada na hora e enviada no seu WhatsApp; com o seu “sim”, publica sozinho. Atraso máximo, voz e estilo dos Reels.">
         <PrazosCalendario cfg={p.calendario} podeAdmin={p.podeOwnerIA} />
       </Secao>
 

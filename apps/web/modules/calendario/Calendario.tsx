@@ -3,7 +3,7 @@
 import { confirmar } from "../shell/confirmar";
 import { faltasItem, FORMATOS_CAL, type FormatoCal, type Roteiro } from "@domus-ads/core/calendario";
 import { LIMITES_IG } from "@domus-ads/core/instagram-regras";
-import { AlertTriangle, ArrowDown, ArrowUp, CalendarRange, Check, CheckCheck, ChevronLeft, CircleDot, ChevronRight, Clapperboard, ExternalLink, GalleryHorizontal, ImageIcon, Loader2, Minus, Plus, RefreshCw, Sparkles, Trash2, Undo2, Wand2, X } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, CalendarRange, Check, CheckCheck, ChevronLeft, CircleDot, ChevronRight, Clapperboard, ExternalLink, GalleryHorizontal, ImageIcon, Loader2, MessageCircle, Minus, Plus, RefreshCw, Sparkles, Trash2, Undo2, Wand2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
@@ -12,12 +12,12 @@ import { DataPicker } from "../shell/DataPicker";
 import { Dialog } from "../shell/Dialog";
 import { toast } from "../shell/toast";
 import { gradeDoMes, somaDias } from "./grade";
-import { apagarPlanejamento, aprovarItens, descartarItem, novoItem, planejarPeriodo, refazerComIA, replanejar, salvarItem, voltarParaSugestao } from "./actions";
+import { apagarPlanejamento, aprovarArte, aprovarItens, descartarItem, novoItem, pedirMudanca, planejarPeriodo, refazerComIA, replanejar, salvarItem, voltarParaSugestao } from "./actions";
 
 const TZ = "America/Sao_Paulo";
 const ICONE: Record<FormatoCal, typeof ImageIcon> = { FEED: ImageIcon, CARROSSEL: GalleryHorizontal, REELS: Clapperboard };
 const ICONE_POST = { ...ICONE, STORY: CircleDot };
-const STATUS: Record<string, string> = { SUGERIDO: "Sugestão", APROVADO: "Aprovado", GERANDO: "Gerando arte", AGENDADO: "Agendado", PUBLICADO: "Publicado", FALHOU: "Falhou" };
+const STATUS: Record<string, string> = { SUGERIDO: "Sugestão", APROVADO: "Aprovado", GERANDO: "Gerando arte", REVISAO: "Aprovar arte", AGENDADO: "Agendado", PUBLICADO: "Publicado", FALHOU: "Falhou" };
 const SEMANA = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
 
 /** "2026-10-20" do horário de Brasília (a grade e o worker usam o mesmo fuso). */
@@ -49,7 +49,7 @@ export function Calendario({ conta, contas, marcas, mes, itens, avulsos, planos,
   const sugeridos = itens.filter((i) => i.status === "SUGERIDO" && !i.refazendo);
   const prontos = sugeridos.filter((i) => !faltasItem(i).length && Date.parse(i.data_hora) > Date.now() + 10 * 60_000);
   const trabalhando = planos.some((p) => p.status === "GERANDO") || itens.some((i) => i.refazendo);
-  const gerando = itens.some((i) => i.status === "GERANDO" || i.status === "AGENDADO");
+  const gerando = itens.some((i) => ["GERANDO", "REVISAO", "AGENDADO"].includes(i.status));
 
   // acompanha a IA (3 s) e a geração das artes (15 s) sem recarregar a página
   useEffect(() => {
@@ -101,7 +101,7 @@ export function Calendario({ conta, contas, marcas, mes, itens, avulsos, planos,
       {podeEditar && sugeridos.length > 0 && (
         <div className="cal-aviso" data-status="SUGERIDO">
           <Wand2 size={16} aria-hidden />
-          <span style={{ flex: 1 }}><b>{sugeridos.length} sugestão(ões)</b> esperando você. Clique num post para ajustar; o que for aprovado é gerado e publicado sozinho.</span>
+          <span style={{ flex: 1 }}><b>{sugeridos.length} sugestão(ões)</b> esperando você. Clique num post para ajustar; aprovado, a arte é gerada e vai para o seu WhatsApp, e com o seu “sim” ele publica sozinho.</span>
           {prontos.length > 0 && <button className="btn btn-primary btn-xs" disabled={pend} onClick={() => start(async () => {
             const r = await aprovarItens(prontos.map((i) => i.id));
             if (!r.ok) toast.err(r.error); else toast.ok(`${r.data.aprovados} post(s) aprovado(s)${r.data.motivo ? ` · ficou de fora ${r.data.motivo}` : ""}`);
@@ -293,8 +293,8 @@ function Editor({ item, podeEditar, onFechar }: { item: ItemTela; podeEditar: bo
       {(item.erro || item.refazendo) && <div className="cal-aviso" data-status={item.refazendo ? "GERANDO" : "FALHOU"}>{item.refazendo ? <Loader2 className="animate-spin" size={15} aria-hidden /> : <AlertTriangle size={15} aria-hidden />}<span>{item.refazendo ? "A IA está refazendo este post…" : item.erro}</span></div>}
       {item.status !== "SUGERIDO" && item.status !== "APROVADO" && (
         <div className="cal-aviso" data-status={item.status}>
-          {item.status === "GERANDO" ? <Loader2 className="animate-spin" size={15} aria-hidden /> : item.status === "FALHOU" ? <AlertTriangle size={15} aria-hidden /> : <Check size={15} aria-hidden />}
-          <span style={{ flex: 1 }}>{STATUS[item.status]}{item.status === "GERANDO" && item.etapa ? `: ${item.etapa}` : ""}{item.status === "AGENDADO" ? ": a arte está pronta e sai sozinha no horário." : ""}</span>
+          {item.status === "GERANDO" ? <Loader2 className="animate-spin" size={15} aria-hidden /> : item.status === "FALHOU" ? <AlertTriangle size={15} aria-hidden /> : item.status === "REVISAO" ? <MessageCircle size={15} aria-hidden /> : <Check size={15} aria-hidden />}
+          <span style={{ flex: 1 }}>{STATUS[item.status]}{item.status === "GERANDO" && item.etapa ? `: ${item.etapa}` : ""}{item.status === "AGENDADO" ? ": aprovado, sai sozinho no horário." : ""}{item.status === "REVISAO" ? ": a arte está pronta. Responda SIM no WhatsApp ou aprove aqui." : ""}</span>
           {item.project_id && <Link className="btn btn-ghost btn-xs" href={`/studio/${item.project_id}`}>Ver arte</Link>}
           {item.post_id && <Link className="btn btn-ghost btn-xs" href={`/instagram/publicar/${item.post_id}`}>Abrir publicação</Link>}
           {item.permalink && <a className="btn btn-ghost btn-xs" href={item.permalink} target="_blank" rel="noreferrer">No Instagram <ExternalLink aria-hidden /></a>}
@@ -367,21 +367,42 @@ function Editor({ item, podeEditar, onFechar }: { item: ItemTela; podeEditar: bo
         </div>
       )}
 
+      {podeEditar && item.status === "REVISAO" && (
+        <div className="cal-dica">
+          <Wand2 size={15} aria-hidden />
+          <input className="input-sm" maxLength={500} value={dica} onChange={(e) => setDica(e.target.value)} placeholder="O que mudar? Ex.: título mais curto, fale do app, outra chamada" aria-label="O que mudar no post" />
+          <button type="button" className="btn btn-ghost btn-xs" disabled={pend || dica.trim().length < 3} onClick={() => start(async () => {
+            const x = await pedirMudanca(item.id, dica);
+            if (!x.ok) return toast.err(x.error);
+            toast.ok("A IA está refazendo o post; a arte nova vai para o seu WhatsApp");
+            setDica("");
+            router.refresh();
+          })}><RefreshCw aria-hidden /> Pedir mudança</button>
+        </div>
+      )}
+
       <div className="cal-rodape">
-        {podeEditar && ["SUGERIDO", "APROVADO", "FALHOU"].includes(item.status) && (
+        {podeEditar && ["SUGERIDO", "APROVADO", "REVISAO", "FALHOU"].includes(item.status) && (
           <button className="btn btn-ghost btn-sm" disabled={pend} onClick={async () => (await confirmar("Descartar este post do calendário?")) && start(async () => { const x = await descartarItem(item.id); if (!x.ok) return toast.err(x.error); toast.ok("Post descartado"); onFechar(); router.refresh(); })}><Trash2 aria-hidden /> Descartar</button>
         )}
-        {podeEditar && (item.status === "APROVADO" || item.status === "FALHOU") && (
+        {podeEditar && ["APROVADO", "REVISAO", "FALHOU"].includes(item.status) && (
           <button className="btn btn-ghost btn-sm" disabled={pend} onClick={() => start(async () => { const x = await voltarParaSugestao(item.id); if (!x.ok) toast.err(x.error); router.refresh(); })}><Undo2 aria-hidden /> Voltar para sugestão</button>
         )}
         <span style={{ flex: 1 }} />
         {editavel && faltas.length > 0 && <span className="subtle caption"><AlertTriangle size={13} aria-hidden style={{ verticalAlign: -2 }} /> {faltas[0]}</span>}
         {editavel && <button className="btn btn-secondary btn-sm" disabled={pend || !sujo} onClick={() => start(async () => { if (await salvar()) toast.ok("Salvo"); router.refresh(); })}>Salvar</button>}
+        {podeEditar && item.status === "REVISAO" && (
+          <button className="btn btn-primary btn-sm" disabled={pend} onClick={() => start(async () => {
+            const x = await aprovarArte(item.id);
+            if (!x.ok) toast.err(x.error); else { toast.ok("Arte aprovada: o post é agendado em instantes"); onFechar(); }
+            router.refresh();
+          })}><Check aria-hidden /> Aprovar e agendar</button>
+        )}
         {editavel && item.status === "SUGERIDO" && (
           <button className="btn btn-primary btn-sm" disabled={pend || faltas.length > 0} onClick={() => start(async () => {
             if (sujo && !(await salvar())) return;
             const x = await aprovarItens([item.id]);
-            if (!x.ok) toast.err(x.error); else if (!x.data.aprovados) toast.err(x.data.motivo ?? "Não deu para aprovar"); else { toast.ok("Aprovado: a arte é gerada perto da hora e o post sai sozinho"); onFechar(); }
+            if (!x.ok) toast.err(x.error); else if (!x.data.aprovados) toast.err(x.data.motivo ?? "Não deu para aprovar"); else { toast.ok("Aprovado: a arte é gerada agora e vai para o seu WhatsApp aprovar"); onFechar(); }
             router.refresh();
           })}><Check aria-hidden /> {sujo ? "Salvar e aprovar" : "Aprovar"}</button>
         )}

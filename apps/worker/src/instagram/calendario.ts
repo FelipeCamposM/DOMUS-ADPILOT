@@ -1,19 +1,20 @@
 import {
   brandSchema, briefImagemSchema, briefSchema, configCalendario, db, enqueueJob, FORMATOS_CAL, hashtagsSchema, instagramDaConexao, itemCalSchema,
-  LIMITES_IG, roteiroSchema, type Brand, type ConfigCal, type CampoRefazer, type FormatoCal, type Json, type Roteiro,
+  lerArquivo, LIMITES_IG, roteiroSchema, type Brand, type ConfigCal, type CampoRefazer, type FormatoCal, type Json, type Roteiro,
 } from "@domus-ads/core";
-import { mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { bloco, perguntarIA } from "../ai/ask";
 import { DATA_DIR } from "../env";
 import { lerPagina } from "../video/contexto";
-import { avisar } from "../whatsapp";
+import { ffmpeg } from "../video/tools";
+import { avisar, enviarMidia } from "../whatsapp";
 import { limparHashtags, TEXTO_HUMANO } from "./legenda";
 
 /**
  * Calendário de conteúdo. A IA planeja o período numa chamada só (plano) e depois refaz só o que o usuário pedir
  * (um post ou um campo), com o mínimo de contexto, para gastar poucos tokens. A automação (automatizarCalendario)
- * gera a arte perto da hora, agenda a publicação e avisa no WhatsApp.
+ * gera a arte assim que o post é aprovado, manda para você aprovar no WhatsApp e só então agenda a publicação.
  */
 export type CalendarioPayload = { calendarioId: string } | { itemId: string; campo: CampoRefazer; dica?: string };
 
@@ -177,7 +178,7 @@ async function refazer(p: { itemId: string; campo: CampoRefazer; dica?: string }
       `Objetivo do período: ${it.cal_objetivo}`,
       `Outros temas do calendário (não repita): ${vizinhos.map((v) => v.tema).join(" · ").slice(0, 1500)}`,
       `<post_atual data="${quando(it.data_hora)}">\n${JSON.stringify(atual)}\n</post_atual>`,
-      `Refaça ${p.campo === "item" ? (p.dica?.trim() ? "o post inteiro seguindo o pedido do usuário" : "o post inteiro com outra ideia") : `só o campo "${p.campo}", coerente com o resto do post`}. Responda: ${formato}`,
+      `Refaça ${p.campo === "item" ? (p.dica?.trim() ? "o post seguindo o pedido do usuário (o que ele não pediu para mudar, mantenha)" : "o post inteiro com outra ideia") : `só o campo "${p.campo}", coerente com o resto do post`}. Responda: ${formato}`,
       p.dica?.trim() ? `<pedido_do_usuario>\n${p.dica.trim()}\n</pedido_do_usuario>` : "",
     ].filter(Boolean).join("\n\n");
     const j = await pedir(ctx.workspace_id, SISTEMA_AJUSTE, prompt, c, join(DATA_DIR, "calendario", it.id));
@@ -204,7 +205,7 @@ async function refazer(p: { itemId: string; campo: CampoRefazer; dica?: string }
   }
 }
 
-// ───────────── Automação: gerar perto da hora, agendar, acompanhar ─────────────
+// ───────────── Automação: gerar, aprovar no WhatsApp, agendar, acompanhar ─────────────
 
 interface Pronto { id: string; workspace_id: string; ig_account_id: string; brand_id: string | null; data_hora: Date; formato: FormatoCal; tema: string; objetivo: string; roteiro: Roteiro; legenda: string; hashtags: string[]; marca: string | null; ws_nome: string }
 
@@ -239,38 +240,42 @@ async function iniciar(i: Pronto, cfg: ConfigCal) {
   }
   if (!projeto) throw new Error("Projeto não foi criado");
   await sql`update ads.calendario_itens set project_id = ${projeto.id}, erro = null, updated_at = now() where id = ${i.id}`;
-  await avisar(`🎨 Gerando ${FORMATOS_CAL[i.formato].toLowerCase()} de ${quando(i.data_hora)}\n${i.tema}\nPublica sozinho no horário.`);
 }
 
 async function falhar(id: string, motivo: string, i: { formato: FormatoCal; data_hora: Date; tema: string }) {
-  await db()`update ads.calendario_itens set status = 'FALHOU', erro = ${motivo.slice(0, 1000)}, updated_at = now() where id = ${id}`;
+  await db()`update ads.calendario_itens set status = 'FALHOU', aprovacao = null, erro = ${motivo.slice(0, 1000)}, updated_at = now() where id = ${id}`;
   await avisar(`❌ ${FORMATOS_CAL[i.formato]} de ${quando(i.data_hora)} não vai sair\n${i.tema}\nMotivo: ${motivo.slice(0, 300)}\nVeja em Instagram → Calendário.`);
 }
 
-/** Passada de 1 em 1 minuto: começa a geração na antecedência certa, agenda o que ficou pronto e marca atrasos. */
+let rodando = false; // a passada também é chamada pela resposta do WhatsApp: nunca duas ao mesmo tempo
+
+/** Passada de 1 em 1 minuto: gera a arte do que foi aprovado, manda para aprovação no WhatsApp, agenda o aprovado e marca atrasos. */
 export async function automatizarCalendario() {
+  if (rodando) return;
+  rodando = true;
+  try { await passada(); } finally { rodando = false; }
+}
+
+async function passada() {
   const sql = db();
   const cfg = await configCalendario();
   const tolerancia = cfg.toleranciaH * 3_600_000;
-  const maxAnt = Math.max(...Object.values(cfg.antecedencia)) * 60_000;
 
-  // 1. aprovados chegando na hora: gera (ou desiste, se o horário passou da tolerância com o PC desligado)
+  // 1. aprovado (e a IA não está refazendo): gera já, para sobrar tempo de conferir a arte no WhatsApp
   const aprovados = await sql<Pronto[]>`
     select i.id, i.workspace_id, k.ig_account_id, k.brand_id, i.data_hora, i.formato, i.tema, i.objetivo, i.roteiro, i.legenda, i.hashtags, b.nome as marca, w.name as ws_nome
     from ads.calendario_itens i join ads.calendarios k on k.id = i.calendario_id join ads.workspaces w on w.id = i.workspace_id
     left join ads.brands b on b.id = k.brand_id
-    where i.status = 'APROVADO' and i.data_hora <= now() + make_interval(secs => ${maxAnt / 1000})`;
+    where i.status = 'APROVADO' and i.refazendo is null`;
   for (const i of aprovados) {
-    const t = i.data_hora.getTime();
-    if (Date.now() > t + tolerancia) { await falhar(i.id, `Passou ${cfg.toleranciaH} h do horário sem gerar (o PC estava desligado?)`, i); continue; }
-    if (Date.now() < t - cfg.antecedencia[i.formato] * 60_000) continue;
+    if (Date.now() > i.data_hora.getTime() + tolerancia) { await falhar(i.id, `Passou ${cfg.toleranciaH} h do horário sem gerar (o PC estava desligado?)`, i); continue; }
     // trava: só um passe pega o item
     const [ok] = await sql`update ads.calendario_itens set status = 'GERANDO', updated_at = now() where id = ${i.id} and status = 'APROVADO' returning id`;
     if (!ok) continue;
     try { await iniciar(i, cfg); } catch (e) { await falhar(i.id, `Não deu para começar a geração: ${(e as Error).message}`, i); }
   }
 
-  // 2. em geração: vídeo parou na revisão do roteiro → aprova sozinho; pronto → agenda; falhou → avisa
+  // 2. em geração: vídeo parou na revisão do roteiro → aprova sozinho; pronto → vai para a sua aprovação; falhou → avisa
   const gerando = await sql<(Pronto & { project_id: string; p_status: string | null; p_kind: string; p_erro: string | null; creative_id: string | null; ocupado: boolean })[]>`
     select i.id, i.workspace_id, k.ig_account_id, k.brand_id, i.data_hora, i.formato, i.tema, i.legenda, i.hashtags, i.project_id,
       p.status as p_status, p.kind as p_kind, p.error as p_erro, p.creative_id,
@@ -285,29 +290,142 @@ export async function automatizarCalendario() {
     } else if (i.p_status === "FAILED" || !i.p_status) {
       await falhar(i.id, i.p_erro ?? "A geração da arte falhou", i);
     } else if (i.p_status === "READY") {
-      await agendar(i, i.project_id, i.creative_id);
+      await sql`update ads.calendario_itens set status = 'REVISAO', aprovacao = null, erro = null, updated_at = now() where id = ${i.id} and status = 'GERANDO'`;
     }
   }
 
-  // 3. o que já foi para o Instagram acompanha o status da publicação
+  // 3. arte pronta esperando você: aprovado → agenda; sem resposta até passar da tolerância → não sai; e manda o próximo para o WhatsApp
+  const revisao = await sql<(Pronto & { project_id: string; creative_id: string | null; aprovacao: string | null; erro: string | null; updated_at: Date; username: string })[]>`
+    select i.id, i.workspace_id, k.ig_account_id, k.brand_id, i.data_hora, i.formato, i.tema, i.legenda, i.hashtags, i.project_id, i.aprovacao, i.erro, i.updated_at,
+      p.creative_id, a.username
+    from ads.calendario_itens i join ads.calendarios k on k.id = i.calendario_id join ads.instagram_accounts a on a.id = k.ig_account_id
+    left join ads.video_projects p on p.id = i.project_id
+    where i.status = 'REVISAO' order by i.data_hora`;
+  const esperando: (typeof revisao)[number][] = [];
+  for (const i of revisao) {
+    if (i.aprovacao === "APROVADA") {
+      const quandoPost = await agendar(i, i.project_id, i.creative_id);
+      if (quandoPost) await avisar(`✅ Agendado: ${FORMATOS_CAL[i.formato].toLowerCase()} sai ${quandoPost.getTime() <= Date.now() + 60_000 ? "agora" : quando(quandoPost)}.\n${i.tema}`);
+    } else if (Date.now() > i.data_hora.getTime() + tolerancia) {
+      await falhar(i.id, `Ficou sem aprovação até passar ${cfg.toleranciaH} h do horário`, i);
+    } else esperando.push(i);
+  }
+  // um por vez, o mais próximo do horário primeiro: assim "sim" e "não" nunca ficam ambíguos.
+  // Se o envio falhou (WhatsApp fora), tenta de novo em 15 min; dá para aprovar pela tela enquanto isso.
+  const proximo = esperando.find((i) => !i.aprovacao && (!i.erro || i.updated_at.getTime() < Date.now() - 15 * 60_000));
+  if (proximo && !esperando.some((i) => i.aprovacao === "ENVIADO" || i.aprovacao === "MUDANCA")) await pedirAprovacao(proximo, esperando.length - 1);
+
+  // 4. o que já foi para o Instagram acompanha o status da publicação
   await sql`update ads.calendario_itens i set status = p.status, erro = p.erro, updated_at = now()
     from ads.instagram_posts p where i.post_id = p.id and i.status = 'AGENDADO' and p.status in ('PUBLICADO', 'FALHOU')`;
 }
 
-/** Arte pronta: vira publicação AGENDADO no horário (ou já, se a geração atrasou dentro da tolerância). */
-async function agendar(i: Pronto, projectId: string, creativeId: string | null) {
+/** Ids das mídias prontas da arte, na ordem dos slides. */
+async function midiasDaArte(formato: FormatoCal, projectId: string, creativeId: string | null) {
+  if (formato === "REELS") return creativeId ? [creativeId] : [];
+  return (await db()<{ id: string }[]>`select id from ads.creatives where metadata->>'projectId' = ${projectId} and type = 'IMAGE' and status = 'READY'
+    order by (metadata->>'ordem')::int nulls last, created_at limit ${formato === "FEED" ? 1 : LIMITES_IG.carrosselMax}`).map((x) => x.id);
+}
+
+/** Arte aprovada: vira publicação AGENDADO no horário (ou já, se o horário passou dentro da tolerância). Devolve quando sai. */
+async function agendar(i: Pronto, projectId: string, creativeId: string | null): Promise<Date | null> {
   const sql = db();
-  const ids = i.formato === "REELS" ? (creativeId ? [creativeId] : [])
-    : (await sql<{ id: string }[]>`select id from ads.creatives where metadata->>'projectId' = ${projectId} and type = 'IMAGE' and status = 'READY'
-        order by (metadata->>'ordem')::int nulls last, created_at limit ${i.formato === "FEED" ? 1 : LIMITES_IG.carrosselMax}`).map((x) => x.id);
-  if (!ids.length || (i.formato === "CARROSSEL" && ids.length < LIMITES_IG.carrosselMin)) return falhar(i.id, "A arte ficou pronta sem as imagens necessárias", i);
+  const ids = await midiasDaArte(i.formato, projectId, creativeId);
+  if (!ids.length || (i.formato === "CARROSSEL" && ids.length < LIMITES_IG.carrosselMin)) { await falhar(i.id, "A arte ficou pronta sem as imagens necessárias", i); return null; }
+  const [trava] = await sql`update ads.calendario_itens set status = 'AGENDADO', aprovacao = null, erro = null, updated_at = now() where id = ${i.id} and status = 'REVISAO' returning id`;
+  if (!trava) return null;
   const legenda = [i.legenda, i.hashtags.join(" ")].filter(Boolean).join("\n\n").slice(0, LIMITES_IG.legenda);
   const quandoPost = new Date(Math.max(i.data_hora.getTime(), Date.now()));
   const [post] = await sql<{ id: string }[]>`
     insert into ads.instagram_posts (workspace_id, ig_account_id, brand_id, tipo, legenda, midias, status, agendado_para)
     values (${i.workspace_id}, ${i.ig_account_id}, ${i.brand_id}, ${i.formato}, ${legenda}, ${sql.json(ids.map((creativeId) => ({ creativeId })))}, 'AGENDADO', ${quandoPost})
     returning id`;
-  await sql`update ads.calendario_itens set status = 'AGENDADO', post_id = ${post!.id}, erro = null, updated_at = now() where id = ${i.id} and status = 'GERANDO'`;
+  await sql`update ads.calendario_itens set post_id = ${post!.id} where id = ${i.id}`;
+  return quandoPost;
+}
+
+const MAX_VIDEO_WHATSAPP = 15 * 1024 * 1024; // o WhatsApp recusa vídeo acima de 16 MB
+
+/** Manda a arte (imagens ou o vídeo) e o texto do post para o WhatsApp dos avisos e fica esperando o sim ou não. */
+async function pedirAprovacao(i: Pronto & { project_id: string; creative_id: string | null; username: string }, naFila: number) {
+  const sql = db();
+  const [trava] = await sql`update ads.calendario_itens set aprovacao = 'ENVIADO', erro = null, updated_at = now() where id = ${i.id} and status = 'REVISAO' and aprovacao is null returning id`;
+  if (!trava) return;
+  const pasta = join(DATA_DIR, "calendario", `whatsapp-${i.id}`);
+  mkdirSync(pasta, { recursive: true });
+  try {
+    const ids = await midiasDaArte(i.formato, i.project_id, i.creative_id);
+    const midias = await sql<{ id: string; type: string; storage: string; r2_key: string; thumbnail_key: string | null; arquivado: boolean; size_bytes: number | null }[]>`
+      select id, type, storage, r2_key, thumbnail_key, arquivado, size_bytes from ads.creatives where id = any(${ids}::uuid[]) and workspace_id = ${i.workspace_id}`;
+    let videoGrande = false;
+    for (const [n, m] of ids.map((id) => midias.find((x) => x.id === id)).filter((x) => !!x).entries()) {
+      if (m.type === "VIDEO" && (m.size_bytes ?? Infinity) <= MAX_VIDEO_WHATSAPP) {
+        await enviarMidia("video", await lerArquivo(m), "video/mp4");
+        continue;
+      }
+      const key = m.type === "VIDEO" ? m.thumbnail_key : m.r2_key;
+      if (!key) continue;
+      videoGrande ||= m.type === "VIDEO";
+      // WhatsApp só aceita PNG/JPEG: tudo vira JPEG leve
+      const orig = join(pasta, `o${n}`);
+      writeFileSync(orig, await lerArquivo({ storage: m.storage, r2_key: key, arquivado: m.arquivado }));
+      const r = await ffmpeg(["-i", orig, "-vf", "scale='min(1080,iw)':-2", "-frames:v", "1", "-q:v", "3", join(pasta, `m${n}.jpg`)], { timeoutMs: 60_000 });
+      if (r.code !== 0) throw new Error("não deu para preparar a imagem");
+      await enviarMidia("image", readFileSync(join(pasta, `m${n}.jpg`)), "image/jpeg", ids.length > 1 ? `${n + 1}/${ids.length}` : "");
+    }
+    const tipo = i.formato === "CARROSSEL" ? `Carrossel (${ids.length} slides)` : FORMATOS_CAL[i.formato];
+    await avisar([
+      `📝 *Post para aprovar* · ${tipo} · @${i.username}`,
+      `🗓 ${quando(i.data_hora)}`,
+      videoGrande ? "_O vídeo passa do limite do WhatsApp: acima vai a capa. Ele inteiro está em Conteúdos._" : "",
+      `*${i.tema}*`,
+      i.legenda,
+      i.hashtags.join(" "),
+      `Responda *SIM* para agendar ou *NÃO* para pedir uma mudança.${naFila > 0 ? `\n(depois deste, mais ${naFila} esperando)` : ""}`,
+    ].filter(Boolean).join("\n\n"), true);
+  } catch (e) {
+    await sql`update ads.calendario_itens set aprovacao = null, erro = ${`Não foi para o WhatsApp (${(e as Error).message.slice(0, 200)}). Aprove por aqui ou espere: tento de novo em 15 min.`}, updated_at = now()
+      where id = ${i.id} and aprovacao = 'ENVIADO'`;
+  } finally {
+    rmSync(pasta, { recursive: true, force: true });
+  }
+}
+
+const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ\u{1F3FB}-\u{1F3FF}]/gu, "").toLowerCase().replace(/\s+/g, " ").trim();
+const SIM = /^(sim|s|ss|si|ok|okay|pode|pode sim|pode postar|pode agendar|aprovo|aprova|aprovado|aprovada|manda|manda ver|bora|isso|beleza|blz|show|perfeito|top|👍|✅|👌)[\s!.]*$/u;
+const NAO = /^(nao|n|no|negativo|ainda nao|👎|❌)[\s!.]*$/u;
+
+/** "sim" / "não" / pedido de mudança ("não, muda X" vira o pedido "muda X"). */
+export function lerResposta(texto: string): { tipo: "sim" | "nao" } | { tipo: "pedido"; pedido: string } {
+  const t = norm(texto);
+  if (SIM.test(t)) return { tipo: "sim" };
+  if (NAO.test(t)) return { tipo: "nao" };
+  return { tipo: "pedido", pedido: texto.replace(/^\s*n(ã|a)o(?![\p{L}\p{N}])[\s,.!:;-]*/iu, "").trim().slice(0, 500) };
+}
+
+/** Mensagem do número dos avisos: sim agenda; não pergunta o que mudar; o pedido vai para a IA refazer o post e a arte. */
+export async function responderWhatsapp(texto: string) {
+  const sql = db();
+  const [i] = await sql<{ id: string; workspace_id: string; aprovacao: string }[]>`
+    select id, workspace_id, aprovacao from ads.calendario_itens where status = 'REVISAO' and aprovacao in ('ENVIADO', 'MUDANCA') order by updated_at desc limit 1`;
+  if (!i) return avisar("Não tem post esperando resposta agora. Quando a próxima arte ficar pronta, eu mando aqui.");
+  const r = lerResposta(texto);
+  if (i.aprovacao === "ENVIADO" && r.tipo === "sim") {
+    await sql`update ads.calendario_itens set aprovacao = 'APROVADA', updated_at = now() where id = ${i.id} and aprovacao = 'ENVIADO'`;
+    return automatizarCalendario(); // agenda e confirma agora (e já manda o próximo)
+  }
+  if (i.aprovacao === "ENVIADO" && r.tipo === "nao") {
+    await sql`update ads.calendario_itens set aprovacao = 'MUDANCA', updated_at = now() where id = ${i.id} and aprovacao = 'ENVIADO'`;
+    return avisar("O que você quer mudar? Pode escrever do seu jeito (ex.: título mais curto, falar do app, outra chamada no fim).");
+  }
+  // esperando o pedido, um "sim" ou "não" solto não é pedido
+  const pedido = r.tipo === "pedido" ? r.pedido : "";
+  if (pedido.length < 3) return avisar(i.aprovacao === "MUDANCA" ? "Me diga o que mudar no post (ex.: título mais curto, falar do app)." : "Não entendi. Responda *SIM* para agendar ou diga o que mudar no post.");
+  const [ok] = await sql`update ads.calendario_itens set status = 'APROVADO', aprovacao = null, project_id = null, refazendo = 'item', erro = null, updated_at = now()
+    where id = ${i.id} and status = 'REVISAO' returning id`;
+  if (!ok) return;
+  await enqueueJob(sql, { workspaceId: i.workspace_id, type: "AI_CALENDARIO", payload: { itemId: i.id, campo: "item", dica: pedido }, maxAttempts: 1 });
+  await avisar("✍️ Certo! A IA está refazendo o post com o seu pedido. Quando a arte nova ficar pronta, eu mando aqui de novo.");
 }
 
 /** Publicação agendada que passou da tolerância (PC desligado na hora): não sai atrasada demais; vira FALHOU e avisa. */

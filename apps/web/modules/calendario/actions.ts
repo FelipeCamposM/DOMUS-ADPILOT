@@ -138,15 +138,46 @@ export async function aprovarItens(ids: string[]) {
   });
 }
 
-/** Aprovado ou que falhou volta a ser sugestão (para editar e aprovar de novo). */
+/** Aprovado, esperando aprovação da arte ou que falhou volta a ser sugestão (para editar e aprovar de novo). */
 export async function voltarParaSugestao(id: string) {
   return run(async () => {
     const ctx = await requireCtx();
     requireRole(ctx, "editor");
     const i = await itemDoWorkspace(ctx, id);
-    const r = await db()`update ads.calendario_itens set status = 'SUGERIDO', project_id = null, post_id = null, erro = null, updated_at = now()
-      where id = ${i.id} and status in ('APROVADO', 'FALHOU')`;
+    const r = await db()`update ads.calendario_itens set status = 'SUGERIDO', aprovacao = null, project_id = null, post_id = null, erro = null, updated_at = now()
+      where id = ${i.id} and status in ('APROVADO', 'REVISAO', 'FALHOU')`;
     if (!r.count) throw new Error("Só dá para voltar posts aprovados ou que falharam");
+    revalidar();
+  });
+}
+
+/** Arte pronta aprovada pela tela (o mesmo que responder "sim" no WhatsApp): o worker agenda na próxima passada. */
+export async function aprovarArte(id: string) {
+  return run(async () => {
+    const ctx = await requireCtx();
+    requireRole(ctx, "editor");
+    const i = await itemDoWorkspace(ctx, id);
+    const sql = db();
+    const r = await sql`update ads.calendario_itens set aprovacao = 'APROVADA', erro = null, updated_at = now() where id = ${i.id} and status = 'REVISAO'`;
+    if (!r.count) throw new Error("Este post não está esperando aprovação");
+    await audit(sql, { workspaceId: ctx.workspace.id, actor: ctx.actor, action: "Aprovar arte do calendário", entityType: "calendario", entityId: i.id });
+    revalidar();
+  });
+}
+
+/** Arte pronta com pedido de mudança (o mesmo que responder "não" no WhatsApp): a IA refaz o post e a arte é gerada de novo. */
+export async function pedirMudanca(id: string, pedido: string) {
+  return run(async () => {
+    const ctx = await requireCtx();
+    requireRole(ctx, "editor");
+    const i = await itemDoWorkspace(ctx, id);
+    const d = z.string().trim().min(3, "Diga o que mudar").max(500, "Pedido muito longo (até 500 caracteres)").parse(pedido);
+    await workerOnline();
+    const sql = db();
+    const r = await sql`update ads.calendario_itens set status = 'APROVADO', aprovacao = null, project_id = null, refazendo = 'item', erro = null, updated_at = now()
+      where id = ${i.id} and status = 'REVISAO'`;
+    if (!r.count) throw new Error("Este post não está esperando aprovação");
+    await enqueueJob(sql, { workspaceId: ctx.workspace.id, type: "AI_CALENDARIO", payload: { itemId: i.id, campo: "item", dica: d }, createdBy: ctx.user.id, maxAttempts: 1 });
     revalidar();
   });
 }
@@ -156,7 +187,7 @@ export async function descartarItem(id: string) {
     const ctx = await requireCtx();
     requireRole(ctx, "editor");
     const i = await itemDoWorkspace(ctx, id);
-    const r = await db()`delete from ads.calendario_itens where id = ${i.id} and status in ('SUGERIDO', 'APROVADO', 'FALHOU')`;
+    const r = await db()`delete from ads.calendario_itens where id = ${i.id} and status in ('SUGERIDO', 'APROVADO', 'REVISAO', 'FALHOU')`;
     if (!r.count) throw new Error("Este post já está sendo gerado ou publicado");
     revalidar();
   });
@@ -200,7 +231,7 @@ const novoPostSchema = z.object({
 
 /**
  * "Novo post" do Studio: entra no planejamento do Studio (um por perfil + marca, para a arte usar a logo e as cores certas)
- * e a IA escreve roteiro, legenda e hashtags. Depois o usuário revisa e aprova em Conteúdos; aprovado, gera e publica sozinho.
+ * e a IA escreve roteiro, legenda e hashtags. Depois o usuário revisa e aprova em Conteúdos; aprovado, a arte vai para o WhatsApp e, com o sim, publica sozinho.
  */
 export async function novoPostIA(input: unknown) {
   return run(async () => {

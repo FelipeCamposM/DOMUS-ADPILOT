@@ -1240,6 +1240,7 @@ fieldset:disabled .chave { opacity: 0.6; cursor: default; }
 [data-status="SUGERIDO"] { --cor: rgb(var(--c-text-tertiary)); }
 [data-status="APROVADO"] { --cor: rgb(var(--c-brand)); }
 [data-status="GERANDO"] { --cor: rgb(var(--c-warning)); }
+[data-status="REVISAO"] { --cor: rgb(var(--c-warning)); }
 [data-status="AGENDADO"] { --cor: rgb(var(--c-info)); }
 [data-status="PUBLICADO"] { --cor: rgb(var(--c-success)); }
 [data-status="FALHOU"], [data-status="ERRO"] { --cor: rgb(var(--c-error)); }

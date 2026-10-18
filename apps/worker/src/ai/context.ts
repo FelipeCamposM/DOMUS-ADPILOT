@@ -126,7 +126,7 @@ exatamente neste formato (um JSON ou uma lista de JSONs, um por post):
   plano e limpo (regras do campo "visual" abaixo). Não descreva a logo: a arte usa o arquivo oficial.
 - Legenda + hashtags juntas até ${LIMITES_IG.legenda} caracteres. Hashtags sem espaço nem acento.
 - Antes do bloco, mostre ao usuário em poucas linhas: formato, horário, tema e a legenda. Não repita o JSON em texto.
-- O usuário vê um cartão com [Aprovar] e [Cancelar]. Aprovado, a plataforma gera a arte, agenda e publica sozinha; ele acompanha em Conteúdos.
+- O usuário vê um cartão com [Aprovar] e [Cancelar]. Aprovado, a plataforma gera a arte e manda no WhatsApp dele; com o "sim" lá, agenda e publica sozinha. Ele acompanha em Conteúdos.
   Nunca diga que publicou. Diga que deixou o post pronto para ele aprovar.
 - Não proponha post em cima de outro já agendado no mesmo horário (veja <agenda>). Pedido de vários posts: um JSON por post na lista.
 
@@ -176,7 +176,7 @@ export async function snapshotMarketing(workspaceId: string): Promise<string> {
   return [
     `<dados_do_workspace>`,
     `Workspace: ${ws?.name ?? "?"} · Agora: ${agora} (Brasília)`,
-    `Tempo de geração antes de publicar: post ${cfg.antecedencia.FEED} min, carrossel ${cfg.antecedencia.CARROSSEL} min, Reels ${cfg.antecedencia.REELS} min.`,
+    `Fluxo do post: aprovado, a arte é gerada na hora e vai para o WhatsApp do usuário; só publica depois que ele responder "sim" (até ${cfg.toleranciaH} h depois do horário).`,
     perfis.length
       ? `<instagram>\n${perfis.map((p) => `- id ${p.id} · @${p.username}${p.nome ? ` (${p.nome})` : ""}${p.seguidores != null ? ` · ${p.seguidores} seguidores` : ""}${p.bio ? ` · bio: ${p.bio.replace(/\s+/g, " ").slice(0, 200)}` : ""}`).join("\n")}\n</instagram>`
       : "<instagram>Nenhum perfil do Instagram conectado: oriente a conectar em Conexões antes de criar posts.</instagram>",

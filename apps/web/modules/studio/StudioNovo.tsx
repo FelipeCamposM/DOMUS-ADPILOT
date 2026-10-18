@@ -11,7 +11,7 @@ import { NewVideoForm } from "./NewVideoForm";
 type Aba = "post" | "video" | "imagem";
 const URL_ABA: Record<Aba, string> = { post: "/studio/novo?tipo=post", imagem: "/studio/novo?tipo=imagem", video: "/studio/novo" };
 const TITULO: Record<Aba, [string, string]> = {
-  post: ["Novo post", "Para o Instagram: a IA escreve, você aprova e ele publica sozinho no horário."],
+  post: ["Novo post", "Para o Instagram: a IA escreve, você aprova (também pelo WhatsApp) e ele publica sozinho no horário."],
   imagem: ["Nova imagem", "Arte avulsa para anúncio ou teste A/B: você aprova os conceitos e baixa o PNG."],
   video: ["Novo vídeo", "Vídeo narrado para anúncio ou Reels: você aprova o roteiro e baixa o MP4."],
 };

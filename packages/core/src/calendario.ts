@@ -67,17 +67,12 @@ export const pedidoCalSchema = z.object({
   .refine((p) => p.mix.FEED + p.mix.CARROSSEL + p.mix.REELS > 0, { message: "Escolha ao menos um post por semana", path: ["mix"] });
 export type PedidoCal = z.infer<typeof pedidoCalSchema>;
 
-/** Prazos do automático (Configurações → Calendário): antecedência da geração por formato e tolerância de atraso. */
+/** Configurações → Calendário: tolerância de atraso e voz/estilo dos Reels (a arte é gerada logo que o post é aprovado). */
 export const configCalSchema = z.object({
-  antecedencia: z.object({
-    FEED: z.number().int().min(5, "Mínimo 5 minutos").max(1440),
-    CARROSSEL: z.number().int().min(5, "Mínimo 5 minutos").max(1440),
-    REELS: z.number().int().min(15, "Vídeo: mínimo 15 minutos").max(1440),
-  }),
   toleranciaH: z.number().min(0.5, "Mínimo meia hora").max(24, "Máximo 24 horas"),
   // Reels do calendário: voz local e estilo visual
   voz: z.enum(Object.keys(VOZES) as [keyof typeof VOZES, ...(keyof typeof VOZES)[]], { message: "Voz inválida" }).default("pf_dora"),
   estiloVideo: z.enum(Object.keys(ESTILOS) as [EstiloVisual, ...EstiloVisual[]], { message: "Estilo inválido" }).default("hud"),
 });
 export type ConfigCal = z.infer<typeof configCalSchema>;
-export const CONFIG_CAL_PADRAO: ConfigCal = { antecedencia: { FEED: 15, CARROSSEL: 60, REELS: 180 }, toleranciaH: 3, voz: "pf_dora", estiloVideo: "hud" };
+export const CONFIG_CAL_PADRAO: ConfigCal = { toleranciaH: 3, voz: "pf_dora", estiloVideo: "hud" };

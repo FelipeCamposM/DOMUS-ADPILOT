@@ -12,11 +12,11 @@ import { inicializacaoAtiva, configurarInicializacao } from "./startup";
 import { arquivarExcesso, restaurar } from "./video/arquivo";
 import { gerarLegenda, type LegendaPayload } from "./instagram/legenda";
 import { publicarInstagram } from "./instagram/publicar";
-import { automatizarCalendario, expirarAtrasados, gerarCalendario, type CalendarioPayload } from "./instagram/calendario";
-import { acaoWhatsapp, avisar, estadoWhatsapp, gravarQr, vigiarQueda } from "./whatsapp";
+import { automatizarCalendario, expirarAtrasados, gerarCalendario, responderWhatsapp, type CalendarioPayload } from "./instagram/calendario";
+import { acaoWhatsapp, avisar, estadoWhatsapp, gravarQr, ouvirWhatsapp, vigiarQueda } from "./whatsapp";
 
 /**
- * DOMUS Worker: roda no PC local, sem nenhuma porta aberta. Ele mesmo busca trabalho na fila (ads.jobs) com
+ * DOMUS Worker: roda no PC local, sem porta aberta para fora (só o webhook do WhatsApp, em 127.0.0.1). Ele mesmo busca trabalho na fila (ads.jobs) com
  * FOR UPDATE SKIP LOCKED e grava progresso/resultado no banco; a web só lê. A web nunca manda comando de shell:
  * cada tipo de job tem um handler fixo aqui (allowlist).
  */
@@ -186,6 +186,7 @@ repetir(heartbeat, 30_000);
 repetir(agendarSyncs, 5 * 60_000);
 repetir(publicarAgendados, 30_000);
 repetir(automatizarCalendario, 60_000);
+ouvirWhatsapp(responderWhatsapp); // respostas "sim"/"não" das artes mandadas para aprovação
 repetir(async function usoDasContas() { await atualizarUsoContas((m) => console.log(`[${agora()}] ${m}`)); }, 5 * 60_000);
 repetir(async function arquivarNoDrive() { await arquivarExcesso((m) => console.log(`[${agora()}] arquivo: ${m}`)); }, 30 * 60_000);
 repetir(async function detectarContas() { await publicarDetectadas(await detectar()); }, 10 * 60_000);

@@ -181,7 +181,7 @@ function AcaoCard({ a, podeEditar, onDecidiu }: { a: ChatAction; podeEditar: boo
     if (!r.ok) { toast.err(r.error); setStatus("FAILED"); }
     else {
       setStatus(aprovar ? "EXECUTED" : "REJECTED");
-      toast.ok(!aprovar ? "Proposta cancelada" : post ? "Post aprovado: a arte começa a ser gerada e ele publica sozinho" : "Mudança aplicada e registrada na auditoria");
+      toast.ok(!aprovar ? "Proposta cancelada" : post ? "Post aprovado: a arte é gerada e vai para o seu WhatsApp aprovar" : "Mudança aplicada e registrada na auditoria");
       if (aprovar) gsap.fromTo(ref.current, { boxShadow: "0 0 0 0 rgb(168 85 255 / 0.7)" }, { boxShadow: "0 0 0 18px rgb(168 85 255 / 0)", duration: 0.9, ease: "power2.out" });
     }
     onDecidiu();

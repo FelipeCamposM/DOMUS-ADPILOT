@@ -1,9 +1,12 @@
 import { db, whatsappAvisos } from "@domus-ads/core";
+import { createHash } from "node:crypto";
+import { createServer } from "node:http";
 import { emailAdmins } from "./email";
 
 /**
  * WhatsApp via Wuzapi local (infra/whatsapp). Só o worker fala com ela (localhost):
  * o estado e o QR de conexão vão para ads.worker_status.info, e a tela de Configurações lê de lá.
+ * As respostas chegam pelo webhook da Wuzapi numa porta só do PC (127.0.0.1), num caminho secreto.
  */
 const URL_WZ = process.env.WUZAPI_URL;
 const ADMIN = process.env.WUZAPI_ADMIN_TOKEN ?? "";
@@ -37,24 +40,99 @@ export async function estadoWhatsapp(): Promise<EstadoWhatsapp | null> {
   }
 }
 
-/** Manda um aviso para o número de Configurações → WhatsApp. Nunca lança: aviso não pode derrubar publicação. */
-export async function avisar(texto: string, falhar = false) {
+let cacheJid: { para: string; jid: string } | null = null;
+/** Número dos avisos e o JID dele (o WhatsApp agora endereça por LID: mandar direto para o número dá "no LID found"). */
+async function destino() {
+  const para = await whatsappAvisos();
+  if (!URL_WZ || !TOKEN || !para) throw new Error("WhatsApp ou número dos avisos não configurado");
+  if (cacheJid?.para === para) return cacheJid;
+  const { Users } = await wz<{ Users: { IsInWhatsapp: boolean; JID: string }[] }>("POST", "/user/check", { Phone: [para] });
+  const jid = Users.find((u) => u.IsInWhatsapp)?.JID;
+  if (!jid) throw new Error(`O número ${para} não tem WhatsApp`);
+  return (cacheJid = { para, jid });
+}
+
+/** Envia para o número dos avisos e grava no histórico (Mensagens). Lança se falhar. */
+async function enviar(caminho: string, corpo: Record<string, string>, texto: string) {
   const para = await whatsappAvisos();
   const registrar = (erro: string | null) => db()`insert into ads.whatsapp_envios (para, texto, status, erro)
     values (${para ?? "—"}, ${texto}, ${erro ? "FALHOU" : "ENVIADO"}, ${erro})`.catch(() => {});
   try {
-    if (!URL_WZ || !TOKEN || !para) throw new Error("WhatsApp ou número dos avisos não configurado");
-    // o WhatsApp agora endereça por LID: mandar direto para o número dá "no LID found"
-    const { Users } = await wz<{ Users: { IsInWhatsapp: boolean; JID: string }[] }>("POST", "/user/check", { Phone: [para] });
-    const jid = Users.find((u) => u.IsInWhatsapp)?.JID;
-    if (!jid) throw new Error(`O número ${para} não tem WhatsApp`);
-    await wz("POST", "/chat/send/text", { Phone: jid, Body: texto });
+    const d = await destino();
+    await wz("POST", caminho, { Phone: d.jid, ...corpo });
     await registrar(null);
   } catch (e) {
     await registrar((e as Error).message);
+    throw e;
+  }
+}
+
+/** Manda um aviso para o número de Configurações → WhatsApp. Nunca lança: aviso não pode derrubar publicação. */
+export async function avisar(texto: string, falhar = false) {
+  try {
+    await enviar("/chat/send/text", { Body: texto }, texto);
+  } catch (e) {
     if (falhar) throw e;
     console.log(`aviso no WhatsApp não enviado: ${(e as Error).message}`);
   }
+}
+
+/** Imagem (PNG/JPEG) ou vídeo MP4 para o número dos avisos. Lança se falhar. */
+export const enviarMidia = (tipo: "image" | "video", arquivo: Buffer, mime: string, legenda = "") =>
+  enviar(`/chat/send/${tipo}`, { [tipo === "image" ? "Image" : "Video"]: `data:${mime};base64,${arquivo.toString("base64")}`, Caption: legenda },
+    `[${tipo === "image" ? "imagem" : "vídeo"}]${legenda ? ` ${legenda}` : ""}`);
+
+// ───────────── Respostas: webhook da Wuzapi → worker ─────────────
+
+const PORTA_HOOK = Number(process.env.WORKER_HOOK_PORT || 47392);
+const CAMINHO_HOOK = `/whatsapp/${createHash("sha256").update(`webhook:${TOKEN}`).digest("hex").slice(0, 32)}`;
+const LIMITE_HOOK = 20_000_000; // mídia recebida vem em base64: só o texto interessa
+/** Mesmo número com ou sem o 9 do celular brasileiro (o WhatsApp guarda alguns sem). */
+const mesmoNumero = (a: string, b: string) => a === b || (a.startsWith("55") && b.startsWith("55") && a.slice(0, 4) === b.slice(0, 4) && a.slice(-8) === b.slice(-8));
+
+type EventoMsg = { type?: string; jsonData?: string; event?: { Info?: Record<string, unknown>; Message?: { conversation?: string; extendedTextMessage?: { text?: string } } } };
+
+/** Texto que o número dos avisos mandou; o resto (grupos, outros contatos, mídia, o próprio envio) vira null. */
+async function textoDoDono(corpo: string, tipo: string): Promise<string | null> {
+  let j = JSON.parse(tipo.includes("json") ? corpo : new URLSearchParams(corpo).get("jsonData") ?? "{}") as EventoMsg;
+  if (typeof j.jsonData === "string") j = JSON.parse(j.jsonData) as EventoMsg;
+  const info = j.event?.Info ?? {};
+  if (j.type !== "Message" || info.IsFromMe || info.IsGroup) return null;
+  const texto = (j.event?.Message?.conversation ?? j.event?.Message?.extendedTextMessage?.text ?? "").trim();
+  if (!texto) return null;
+  const d = await destino();
+  const de = [info.Sender, info.SenderAlt, info.Chat, info.ChatAlt].map((x) => numeroDe(typeof x === "string" ? x : null)).filter((x): x is string => !!x);
+  if (!de.some((n) => [d.para, numeroDe(d.jid)].some((a) => a && mesmoNumero(n, a)))) {
+    console.log(`WhatsApp: mensagem de ${de.join(" / ") || "?"} ignorada (não é o número dos avisos)`);
+    return null;
+  }
+  return texto;
+}
+
+/** Aponta o webhook da Wuzapi para o worker (a cada subida e depois de conectar). Nunca lança. */
+async function registrarWebhook() {
+  if (!URL_WZ || !TOKEN) return;
+  await wz("POST", "/webhook", { webhookURL: `http://host.docker.internal:${PORTA_HOOK}${CAMINHO_HOOK}` })
+    .catch((e: Error) => console.log(`webhook do WhatsApp não registrado: ${e.message}`));
+}
+
+/** Escuta o que chega no WhatsApp e passa as mensagens do número dos avisos para `responder`. */
+export function ouvirWhatsapp(responder: (texto: string) => Promise<void>) {
+  if (!URL_WZ || !TOKEN) return;
+  createServer((req, res) => {
+    if (req.method !== "POST" || req.url !== CAMINHO_HOOK) { res.statusCode = 404; res.end(); req.resume(); return; }
+    const partes: Buffer[] = [];
+    let tam = 0;
+    req.on("data", (c: Buffer) => { tam += c.length; if (tam <= LIMITE_HOOK) partes.push(c); });
+    req.on("end", () => {
+      res.end("ok");
+      if (tam > LIMITE_HOOK) return;
+      void textoDoDono(Buffer.concat(partes).toString("utf8"), String(req.headers["content-type"] ?? ""))
+        .then((t) => (t ? responder(t) : undefined))
+        .catch((e: Error) => console.log(`WhatsApp: resposta não tratada: ${e.message}`));
+    });
+  }).on("error", (e) => console.log(`webhook do WhatsApp sem a porta ${PORTA_HOOK}: ${e.message}`)).listen(PORTA_HOOK, "127.0.0.1");
+  void registrarWebhook();
 }
 
 /**
@@ -110,7 +188,7 @@ export async function acaoWhatsapp(acao: string, signal: AbortSignal, log: (m: s
     for (let t = 0; t < 40 && !signal.aborted; t++) {
       await new Promise((ok) => setTimeout(ok, 3000));
       const st = await estadoWhatsapp();
-      if (st?.state === "open") { await gravarInfo({ whatsapp: st }); await log(`conectado: ${st.numero ?? ""}`); return { ok: true }; }
+      if (st?.state === "open") { await gravarInfo({ whatsapp: st }); await registrarWebhook(); await log(`conectado: ${st.numero ?? ""}`); return { ok: true }; }
       // a Wuzapi fecha o canal quando os QRs expiram: abre de novo
       if (st?.state === "close") { await conectar(); continue; }
       const qr = await wz<{ QRCode?: string }>("GET", "/session/qr").catch(() => null);
