@@ -1,5 +1,5 @@
 import { apagarArquivo, briefImagemSchema, ESTILOS, db, FORMATOS_IMAGEM, guardarArquivo, planoImagemSchema, r2Key, type BriefImagem, type ConceitoImagem, type Json, type PlanoImagem } from "@domus-ads/core";
-import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { DATA_DIR } from "../env";
 import { bloco, perguntarIA } from "../ai/ask";
@@ -26,8 +26,16 @@ ESTRUTURA OBRIGATÓRIA de cada documento:
   scripts externos além do GSAP, imagens externas. Fontes: Google Fonts (<link> para fonts.googleapis.com) ou do sistema.
   Formas, gradientes, ícones e ilustrações em CSS/SVG inline.
 
-DIREÇÃO DE ARTE:
+DIREÇÃO DE ARTE (nível de estúdio, não de template):
 - Um ponto focal claro, hierarquia forte: headline curta e grande, apoio curto, CTA com cara de botão. Pouco texto.
+- OCUPE O QUADRO INTEIRO: a composição se distribui na altura toda (topo, meio e base), sem faixa vazia maior que 10% da altura
+  e sem conteúdo espremido num canto. Faixa de cor só se tiver conteúdo dentro, centralizado nela.
+- Um VISUAL PROTAGONISTA grande (pelo menos 35% da área): número ou palavra gigante, mockup de tela com interface real,
+  gráfico/dado desenhado, composição tipográfica escultórica ou forma de cor recortada. NUNCA o visual principal é uma fileira de
+  cartões iguais com ícone, nem grade de fundo genérica: isso tem cara de template de Canva.
+- Escala no celular (arte de ${w}px): headline de ${Math.round(w * 0.085)}px ou mais, apoio de ${Math.round(w * 0.032)}px ou mais, CTA de ${Math.round(w * 0.034)}px ou mais,
+  nenhum texto abaixo de ${Math.round(w * 0.024)}px. Logo com pelo menos ${Math.round(w * 0.16)}px de largura.
+- Alinhamento numa grade clara (margens iguais, colunas), espaçamento consistente, no máximo 2 fontes e 3 cores principais.
 - Margem de segurança de 6%. ${b.formato === "9:16" ? "Deixe livres os 14% de cima e de baixo (interface do Stories/Reels)." : ""}
   ${b.formato === "1.91:1" ? "Formato horizontal de anúncio com link: composição em duas colunas (texto | visual)." : ""}
 - Contraste alto e legível no celular. Visual premium, não genérico de banco de imagens.
@@ -93,6 +101,19 @@ O cliente APROVOU ${slide ? "estes slides (numeração dentro do carrossel)" : "
 ${conceitos.map((c, i) => `${(slide?.inicio ?? 0) + i + 1}. Conceito: ${c.conceito}\n   Headline: ${c.headline}\n   Apoio: ${c.apoio || "-"}\n   CTA: ${c.cta || "-"}\n   Visual: ${c.visual || "-"}`).join("\n")}
 
 Para cada uma, escreva a linha "Conceito: <o conceito acima>" e logo depois um bloco \`\`\`html com o documento completo.`;
+
+/** Revisão visual: a IA vê o PNG que o próprio HTML gerou e corrige o que um diretor de arte reprovaria. */
+const promptRevisao = (html: string, w: number, h: number, slide: boolean) => `O arquivo revisao.png é a imagem (${w}×${h}) que este HTML gerou. Abra e olhe com olho de diretor de arte exigente:
+1. Espaço vazio: alguma faixa sem nada (mais de 10% da altura), metade da arte vazia ou conteúdo espremido num canto?
+2. Escala: headline pequena demais para ler no celular, texto miúdo, logo minúscula ou distorcida?
+3. Cara de template: o visual principal é uma fileira de cartões iguais com ícone, grade genérica, falta um protagonista forte?
+4. Acabamento: algo cortado, sobreposto, desalinhado, apertado na borda, contraste fraco?
+Se a arte já está no nível de um estúdio premium, responda só: OK
+Senão, devolva o documento completo corrigido num bloco \`\`\`html, com os MESMOS textos, marca e logo (melhore layout, escala e visual).${slide ? "\nÉ um slide de carrossel: mantenha o design system (fundo, cabeçalho, rodapé, fontes, cores e indicador i/N) para continuar igual aos outros slides." : ""}
+
+<index.html>
+${html}
+</index.html>`;
 
 /** Separa a resposta em pares (conceito, html). */
 function variacoesDe(texto: string): { conceito: string; html: string }[] {
@@ -194,7 +215,19 @@ export async function runImagem(payload: ImagemPayload, c: Ctx) {
       if (!html) continue;
 
       await etapa("RENDERING", `Gerando a imagem ${i + 1} de ${alvo.length}…`, 30 + Math.round((i / alvo.length) * 55));
-      const png = await capturar(pasta, html, c.signal);
+      let png = await capturar(pasta, html, c.signal);
+      if (modo !== "manual") {
+        // a IA olha o PNG pronto como diretor de arte e corrige uma vez (vazio, escala, cara de template, corte)
+        await etapa("RENDERING", `Conferindo a imagem ${i + 1} de ${alvo.length} como diretor de arte…`, 30 + Math.round(((i + 0.5) / alvo.length) * 55));
+        copyFileSync(png, join(pasta, "revisao.png"));
+        const r = await perguntarIA({ workspaceId: p.workspace_id, projetoId: p.id, sistema, prompt: promptRevisao(html, w, h, !!v.ordem), cwd: pasta, signal: c.signal, log: c.log, imagens: [...(ctx.imagens ?? []), "revisao.png"] });
+        const nova = /^\s*OK\b/i.test(r.text) ? "" : variacoesDe(r.text)[0]?.html ?? "";
+        if (nova && !violacoes(nova).length && !(await lint(pasta, nova)).length) {
+          html = nova;
+          png = await capturar(pasta, html, c.signal);
+          await c.log(`imagem ${i + 1}: corrigida na revisão visual`);
+        }
+      }
       const id = v.id ?? crypto.randomUUID();
       const key = r2Key(p.workspace_id, "images", `${id}-${Date.now().toString(36)}.png`);
       const storage = await guardarArquivo(key, png, "image/png");

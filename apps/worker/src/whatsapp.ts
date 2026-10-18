@@ -112,7 +112,8 @@ async function textoDoDono(corpo: string, tipo: string): Promise<string | null> 
 /** Aponta o webhook da Wuzapi para o worker (a cada subida e depois de conectar). Nunca lança. */
 async function registrarWebhook() {
   if (!URL_WZ || !TOKEN) return;
-  await wz("POST", "/webhook", { webhookURL: `http://host.docker.internal:${PORTA_HOOK}${CAMINHO_HOOK}` })
+  // sem "events" a Wuzapi zera a assinatura e descarta as mensagens ("Not subscribed")
+  await wz("POST", "/webhook", { webhookURL: `http://host.docker.internal:${PORTA_HOOK}${CAMINHO_HOOK}`, events: ["Message"] })
     .catch((e: Error) => console.log(`webhook do WhatsApp não registrado: ${e.message}`));
 }
 
