@@ -107,7 +107,8 @@ const promptRevisao = (html: string, w: number, h: number, slide: boolean) => `O
 1. Espaço vazio: alguma faixa sem nada (mais de 10% da altura), metade da arte vazia ou conteúdo espremido num canto?
 2. Escala: headline pequena demais para ler no celular, texto miúdo, logo minúscula ou distorcida?
 3. Cara de template: o visual principal é uma fileira de cartões iguais com ícone, grade genérica, falta um protagonista forte?
-4. Acabamento: algo cortado, sobreposto, desalinhado, apertado na borda, contraste fraco?
+4. Acabamento: algo cortado, sobreposto, desalinhado, apertado na borda, contraste fraco? Marcador/destaque atrás de uma palavra
+   encostando nas letras da linha de cima ou de baixo (precisa de folga)?
 Se a arte já está no nível de um estúdio premium, responda só: OK
 Senão, devolva o documento completo corrigido num bloco \`\`\`html, com os MESMOS textos, marca e logo (melhore layout, escala e visual).${slide ? "\nÉ um slide de carrossel: mantenha o design system (fundo, cabeçalho, rodapé, fontes, cores e indicador i/N) para continuar igual aos outros slides." : ""}
 
