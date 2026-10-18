@@ -1,7 +1,7 @@
 import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { MAX_SLIDES, planoImagemSchema } from "@domus-ads/core";
+import { chaveElevenLabs, db, MAX_SLIDES, planoImagemSchema, VOZES, vozesElevenLabs } from "@domus-ads/core";
 import { z } from "zod";
 import { can, requireCtx } from "@/lib/ctx";
 import { projeto, variacoes } from "@/lib/video";
@@ -32,6 +32,16 @@ export default async function ProjetoPage({ params }: { params: Promise<{ id: st
       </div>
     );
   }
+  // vozes para "Trocar voz": favoritas do ElevenLabs primeiro, depois o resto e as locais
+  const chave = await chaveElevenLabs();
+  const [eu] = await db()<{ vozes_favoritas: string[] }[]>`select vozes_favoritas from ads.workspace_members where workspace_id = ${ctx.workspace.id} and user_id = ${ctx.user.id}`;
+  const fav = eu?.vozes_favoritas ?? [];
+  const el = chave ? await vozesElevenLabs(chave).catch(() => []) : [];
+  const vozes = [
+    ...el.filter((v) => fav.includes(v.id)).map((v) => ({ id: `el:${v.id}`, nome: v.nome, fav: true })),
+    ...el.filter((v) => !fav.includes(v.id)).map((v) => ({ id: `el:${v.id}`, nome: v.nome, fav: false })),
+    ...Object.entries(VOZES).filter(([k]) => k !== "none").map(([id, nome]) => ({ id, nome: `${nome} · local`, fav: false })),
+  ];
   return (
     <div className="page">
       <div className="page-head">
@@ -43,6 +53,7 @@ export default async function ProjetoPage({ params }: { params: Promise<{ id: st
       </div>
       <ProjectView
         podeEditar={can(ctx, "editor")}
+        vozes={vozes}
         p={{
           id: p.id, title: p.title, status: p.status, step_detail: p.step_detail, error: p.error, progress: p.progress, thumb: p.thumb,
           brief: { formato: p.brief.formato, duracao: p.brief.duracao, voz: p.brief.voz, vozNome: p.brief.vozNome, musica: p.brief.musica, produto: p.brief.produto },

@@ -16,7 +16,7 @@ import { ttsPara } from "./tts";
 
 type Etapa = "SCRIPTING" | "VOICE" | "COMPOSING" | "RENDERING" | "MIXING" | "UPLOADING" | "READY";
 interface Ctx { signal: AbortSignal; log: (m: string) => Promise<void>; progress: (p: number) => Promise<void> }
-export interface VideoPayload { projectId: string; mode?: "full" | "rerender" | "adjust"; instruction?: string }
+export interface VideoPayload { projectId: string; mode?: "full" | "rerender" | "adjust" | "voz"; instruction?: string }
 
 const PROGRESSO: Record<Etapa, number> = { SCRIPTING: 5, VOICE: 20, COMPOSING: 32, RENDERING: 50, MIXING: 85, UPLOADING: 93, READY: 100 };
 
@@ -25,6 +25,7 @@ const PROGRESSO: Record<Etapa, number> = { SCRIPTING: 5, VOICE: 20, COMPOSING: 3
  * full: roteiro → voz → composição → render → mix → R2 → criativo.
  * rerender: storyboard editado pelo usuário → voz → composição nova → …
  * adjust: pedido em texto → a IA ajusta a composição atual → render → …
+ * voz: mesmo roteiro e visual, só a narração regravada com outra voz (tempos reajustados) → render → …
  */
 export async function runVideo(payload: VideoPayload, c: Ctx) {
   const sql = db();
@@ -140,16 +141,21 @@ export async function runVideo(payload: VideoPayload, c: Ctx) {
     //    "Livre": a IA escreve com o Motion Kit. Ajuste: a IA edita a composição atual.
     //    Tudo passa pela barreira de segurança, pelo lint e pelo QA (texto fora do quadro, sobreposto ou curto demais).
     const modelo = brief.estiloVisual !== "livre";
-    const porIA = !modelo || modo === "adjust";
-    await etapa("COMPOSING", modo === "adjust" ? "Ajustando a animação…" : modelo ? "Montando as cenas…" : "Criando a animação (Motion Kit + GSAP)…");
+    // troca de voz: cenas prontas remontam iguais com os tempos novos; animação livre a IA só reajusta os tempos
+    const ajuste = modo === "adjust" || (modo === "voz" && !!p.composition && !p.composition.includes("assets/cenas.js"));
+    const porIA = !modelo || ajuste;
+    const pedido = modo === "voz"
+      ? "A narração foi regravada com outra voz e os tempos das cenas mudaram (storyboard abaixo). Ajuste só os tempos das animações para casar com as cenas novas; não mude visual, textos, cores nem estilo."
+      : payload.instruction ?? "";
+    await etapa("COMPOSING", ajuste ? "Ajustando a animação…" : modelo ? "Montando as cenas…" : "Criando a animação (Motion Kit + GSAP)…");
     mkdirSync(join(pasta, "assets"), { recursive: true });
     writeFileSync(join(pasta, "assets", "motion-kit.js"), MOTION_KIT_JS, "utf8");
     writeFileSync(join(pasta, "assets", "cenas.js"), CENAS_JS, "utf8");
-    const deCenas = modo === "adjust" ? !!p.composition?.includes("assets/cenas.js") : modelo;
+    const deCenas = ajuste ? !!p.composition?.includes("assets/cenas.js") : modelo;
     const sistema = deCenas ? sistemaAjusteCenas(brief) : sistemaComposicao(brief);
     let html = !porIA
       ? montarComposicao({ sb, brief, brand: ctxCriativo.brand, w, h, assets: readdirSync(join(pasta, "assets")), rotulo: brief.produto })
-      : bloco((await ia(sistema, modo === "adjust" && p.composition ? promptAjuste(p.composition, sb, payload.instruction ?? "", ctxCriativo.texto) : promptComposicao(sb, ctxCriativo.texto, ritmo))).text, "html");
+      : bloco((await ia(sistema, ajuste && p.composition ? promptAjuste(p.composition, sb, pedido, ctxCriativo.texto) : promptComposicao(sb, ctxCriativo.texto, ritmo))).text, "html");
     const avisos: string[] = [];
     for (let rodada = 0; ; rodada++) {
       let erros = [...violacoes(html), ...(await lint(pasta, html))];

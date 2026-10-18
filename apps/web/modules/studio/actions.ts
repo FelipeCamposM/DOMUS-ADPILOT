@@ -175,6 +175,26 @@ export async function ajustarComIA(projectId: string, pedido: string) {
   });
 }
 
+/** Troca só a voz: mesmo roteiro e visual, narração regravada. Post do calendário volta para a aprovação no WhatsApp. */
+export async function trocarVoz(projectId: string, voz: string, vozNome: string) {
+  return run(async () => {
+    const ctx = await requireCtx();
+    requireRole(ctx, "editor");
+    const p = await doWorkspace(ctx, projectId);
+    if (p.ocupado) throw new Error("Este vídeo já está sendo gerado");
+    const v = z.object({ voz: briefSchema.shape.voz, vozNome: briefSchema.shape.vozNome }).parse({ voz, vozNome });
+    if (v.voz === "none") throw new Error("Escolha uma voz");
+    const [row] = await db()<{ composition: string | null }[]>`select composition from ads.video_projects where id = ${p.id} and kind = 'video'`;
+    if (!row?.composition) throw new Error("Gere o vídeo antes de trocar a voz");
+    await workerOnline();
+    await db()`update ads.video_projects set brief = brief || ${db().json(v)} where id = ${p.id}`;
+    await enfileirar(ctx, p.id, { mode: "voz" });
+    await db()`update ads.calendario_itens set status = 'GERANDO', aprovacao = null, updated_at = now() where project_id = ${p.id} and status = 'REVISAO'`;
+    await audit(db(), { workspaceId: ctx.workspace.id, actor: ctx.actor, action: "Trocar voz do vídeo", entityType: "video_project", entityId: p.id, entityName: p.title, after: v });
+    revalidatePath(`/studio/${p.id}`);
+  });
+}
+
 export async function gerarDeNovo(projectId: string) {
   return run(async () => {
     const ctx = await requireCtx();

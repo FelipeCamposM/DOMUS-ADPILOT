@@ -8,7 +8,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { Escolha } from "../motion/Escolha";
 import { BotaoPublicar } from "../instagram/BotaoPublicar";
 import { toast } from "../shell/toast";
-import { ajustarComIA, apagarVideo, cancelarVideo, gerarDeNovo, regerarComStoryboard } from "./actions";
+import { ajustarComIA, apagarVideo, cancelarVideo, gerarDeNovo, regerarComStoryboard, trocarVoz } from "./actions";
 
 interface Cena { start: number; end: number; headline: string; subtext?: string; narration?: string; animation?: string; tipo?: string; itens?: string[] }
 const TIPO: Record<string, string> = { abertura: "Abertura", titulo: "Título", lista: "Lista", numero: "Número", comparacao: "Antes/depois", produto: "Produto", citacao: "Depoimento", cta: "CTA" };
@@ -37,12 +37,13 @@ const MUSICAS: [string, string][] = [["none", "Sem música"], ["corporate", "Cor
 const VOZ: Record<string, string> = { pf_dora: "Dora", pm_alex: "Alex", pm_santa: "Santa", none: "sem voz" };
 const seg = (n: number) => `${n.toFixed(1).replace(".", ",")} s`;
 
-export function ProjectView({ p, podeEditar }: { p: ProjetoView; podeEditar: boolean }) {
+export function ProjectView({ p, podeEditar, vozes }: { p: ProjetoView; podeEditar: boolean; vozes: { id: string; nome: string; fav: boolean }[] }) {
   const router = useRouter();
   const [st, setSt] = useState({ status: p.status, step: p.step_detail, error: p.error, progress: p.progress });
   const [pend, start] = useTransition();
   const [cenas, setCenas] = useState(() => (p.storyboard?.scenes ?? []).map(editavel));
   const [pedido, setPedido] = useState("");
+  const [novaVoz, setNovaVoz] = useState(() => vozes.find((v) => v.fav && v.id !== p.brief.voz)?.id ?? "");
   const musicaOriginal = p.storyboard?.music?.tag ?? "none";
   const [musica, setMusica] = useState(musicaOriginal);
   const [paleta, setPaleta] = useState(p.paleta);
@@ -149,6 +150,23 @@ export function ProjectView({ p, podeEditar }: { p: ProjetoView; podeEditar: boo
               <span style={{ flex: 1 }} />
               <button className="btn btn-primary btn-sm" disabled={pend || rodando || pedido.trim().length < 3} onClick={() => acao(() => ajustarComIA(p.id, pedido), "Ajuste na fila: a narração é mantida", () => setPedido(""))}>
                 {pend ? <Loader2 className="animate-spin" aria-hidden /> : <><Wand2 aria-hidden /> Aplicar ajuste</>}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {podeEditar && p.creative && !revisao && vozes.length > 0 && (
+          <div className="panel" data-enter style={{ padding: 18, display: "flex", flexDirection: "column", gap: 10 }}>
+            <div className="panel-title" style={{ display: "flex", gap: 8, alignItems: "center" }}><AudioLines size={15} aria-hidden /> Trocar só a voz</div>
+            <span className="subtle caption">Mesmo roteiro, cores e animação; a narração é regravada e os tempos se ajustam. Agora: {VOZ[p.brief.voz] ?? (p.brief.vozNome || p.brief.voz)}.</span>
+            <div className="cluster" style={{ gap: 6 }}>
+              <select className="select" style={{ flex: 1, minWidth: 180 }} aria-label="Nova voz" value={novaVoz} onChange={(e) => setNovaVoz(e.target.value)} disabled={rodando}>
+                <option value="" disabled>Escolha a voz</option>
+                {vozes.map((v) => <option key={v.id} value={v.id} disabled={v.id === p.brief.voz}>{v.fav ? `⭐ ${v.nome}` : v.nome}</option>)}
+              </select>
+              <button className="btn btn-primary btn-sm" disabled={pend || rodando || !novaVoz || novaVoz === p.brief.voz}
+                onClick={() => acao(() => trocarVoz(p.id, novaVoz, novaVoz.startsWith("el:") ? vozes.find((v) => v.id === novaVoz)?.nome ?? "" : ""), "Regravando a narração com a voz nova")}>
+                {pend ? <Loader2 className="animate-spin" aria-hidden /> : <><AudioLines aria-hidden /> Trocar voz</>}
               </button>
             </div>
           </div>

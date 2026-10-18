@@ -44,8 +44,9 @@ ${b.estiloVisual !== "livre" ? `- ESTILO VISUAL OBRIGATÓRIO: ${ESTILOS[b.estilo
   Claymorphism: volumes "inflados" com várias box-shadow (externa suave + interna clara em cima e escura embaixo), cantos bem redondos, pastel.
   Editorial: fundo claro de papel, serifada grande, fios finos de 1px, uma única cor de destaque. Tech HUD: fundo escuro, grade sutil, neon, vidro.` : ""}
 ${REGRAS_CONTEXTO}
-- LOGO: se a pasta assets tiver logo.* (logo oficial), ela entra na arte com <img src="assets/logo…">, inteira, sem recolorir.
-  NUNCA desenhe logo, ícone ou símbolo da marca em CSS/SVG (nada de "casinha" ou quadradinho com inicial). Sem arquivo de logo,
+- LOGO: se a pasta assets tiver logo.* (logo oficial), ela entra em TODA arte com <img src="assets/logo…">, inteira, sem recolorir,
+  como assinatura fixa (canto superior esquerdo ou rodapé), sempre no mesmo lugar e tamanho; em fundo que brigue com ela, ponha
+  a logo sobre uma placa de cor sólida. Confira no PNG que ela aparece nítida. NUNCA desenhe logo, ícone ou símbolo da marca em CSS/SVG (nada de "casinha" ou quadradinho com inicial). Sem arquivo de logo,
   o nome da marca vai só em texto.
 ${b.estiloVisual === "clay" ? "" : `- Visual PLANO e limpo: tipografia forte, blocos de cor, ícones de linha, mockup simples de tela. PROIBIDO objeto pseudo-3D
   feito em CSS (portas, casas, celulares "inflados", bolhas com sombra interna, clay, isométrico, vidro) e ilustração figurativa
@@ -94,8 +95,8 @@ ${jaFeitas.length ? `Já existem estes; proponha diferentes: ${jaFeitas.join(" |
   "cta": "texto do botão", "visual": "layout, elementos, cores e tratamento visual em até 50 palavras" } ] }`;
 
 /** 2ª fase: desenha exatamente os conceitos aprovados. */
-const promptArtes = (b: BriefImagem, conceitos: ConceitoImagem[], contexto: string, slide?: { inicio: number; total: number; referencia: string | null }) => `${contexto ? `${contexto}\n\n` : ""}${briefingTexto(b)}
-${slide ? `\n${REGRAS_CARROSSEL(slide.total)}\n${slide.referencia ? `\n<slide_1_aprovado>\nReaproveite o MESMO CSS base, estrutura, fontes e elementos fixos deste slide (só o conteúdo muda):\n${slide.referencia}\n</slide_1_aprovado>\n` : ""}` : ""}
+const promptArtes = (b: BriefImagem, conceitos: ConceitoImagem[], contexto: string, slide?: { inicio: number; total: number; referencia: string | null }, padrao?: string | null) => `${contexto ? `${contexto}\n\n` : ""}${briefingTexto(b)}
+${padrao && !slide?.referencia ? `\n<padrao_da_marca>\nArte desta marca que o cliente já APROVOU. Siga o MESMO sistema visual (fontes, cores, posição e tamanho da logo, rodapé/assinatura,\ntratamento de destaque, margens) para o perfil ter cara de uma marca só; o layout e o visual protagonista mudam conforme o conteúdo novo.\n${padrao}\n</padrao_da_marca>\n` : ""}${slide ? `\n${REGRAS_CARROSSEL(slide.total)}\n${slide.referencia ? `\n<slide_1_aprovado>\nReaproveite o MESMO CSS base, estrutura, fontes e elementos fixos deste slide (só o conteúdo muda):\n${slide.referencia}\n</slide_1_aprovado>\n` : ""}` : ""}
 O cliente APROVOU ${slide ? "estes slides (numeração dentro do carrossel)" : "estes conceitos"}. Desenhe uma arte para cada um, na mesma ordem, usando os textos exatamente como estão
 (headline, apoio e CTA; campo vazio = não usar) e seguindo a descrição visual.
 ${conceitos.map((c, i) => `${(slide?.inicio ?? 0) + i + 1}. Conceito: ${c.conceito}\n   Headline: ${c.headline}\n   Apoio: ${c.apoio || "-"}\n   CTA: ${c.cta || "-"}\n   Visual: ${c.visual || "-"}`).join("\n")}
@@ -105,7 +106,8 @@ Para cada uma, escreva a linha "Conceito: <o conceito acima>" e logo depois um b
 /** Revisão visual: a IA vê o PNG que o próprio HTML gerou e corrige o que um diretor de arte reprovaria. */
 const promptRevisao = (html: string, w: number, h: number, slide: boolean) => `O arquivo revisao.png é a imagem (${w}×${h}) que este HTML gerou. Abra e olhe com olho de diretor de arte exigente:
 1. Espaço vazio: alguma faixa sem nada (mais de 10% da altura), metade da arte vazia ou conteúdo espremido num canto?
-2. Escala: headline pequena demais para ler no celular, texto miúdo, logo minúscula ou distorcida?
+2. Escala e marca: headline pequena demais para ler no celular, texto miúdo? A logo oficial aparece inteira, nítida e legível
+   (não minúscula, distorcida, cortada ou sumindo no fundo)?
 3. Cara de template: o visual principal é uma fileira de cartões iguais com ícone, grade genérica, falta um protagonista forte?
 4. Acabamento: algo cortado, sobreposto, desalinhado, apertado na borda, contraste fraco? Marcador/destaque atrás de uma palavra
    encostando nas letras da linha de cima ou de baixo (precisa de folga)?
@@ -182,8 +184,9 @@ export async function runImagem(payload: ImagemPayload, c: Ctx) {
       // render: os conceitos que o usuário aprovou (e talvez editou)
       const [row] = await sql<{ storyboard: unknown }[]>`select storyboard from ads.video_projects where id = ${p.id}`;
       const plano = planoImagemSchema.parse(row?.storyboard);
+      const padrao = await padraoDaMarca(p.id);
       if (!carrossel(b)) {
-        const r = await ia(promptArtes(b, plano.conceitos, ctx.texto));
+        const r = await ia(promptArtes(b, plano.conceitos, ctx.texto, undefined, padrao));
         alvo = variacoesDe(r.text).slice(0, plano.conceitos.length).map((v, i) => ({ id: null, ...v, conceito: plano.conceitos[i]?.conceito ?? v.conceito }));
       } else {
         // carrossel: lotes de 4 slides; do 2º lote em diante a IA recebe o slide 1 como referência de design
@@ -191,7 +194,7 @@ export async function runImagem(payload: ImagemPayload, c: Ctx) {
         for (let ini = 0; ini < total; ini += 4) {
           await etapa("COMPOSING", `Desenhando os slides ${ini + 1}–${Math.min(total, ini + 4)} de ${total}…`, 15 + Math.round((ini / total) * 15));
           const lote = plano.conceitos.slice(ini, ini + 4);
-          const r = await ia(promptArtes(b, lote, ctx.texto, { inicio: ini, total, referencia: alvo[0]?.html ?? null }));
+          const r = await ia(promptArtes(b, lote, ctx.texto, { inicio: ini, total, referencia: alvo[0]?.html ?? null }, padrao));
           variacoesDe(r.text).slice(0, lote.length).forEach((v, j) => alvo.push({ id: null, ...v, conceito: lote[j]!.conceito, ordem: ini + j + 1 }));
         }
         // o carrossel novo substitui o anterior (apagado só depois que o novo ficar pronto)
@@ -201,12 +204,16 @@ export async function runImagem(payload: ImagemPayload, c: Ctx) {
       if (!alvo.length) throw new Error("A IA não devolveu nenhuma arte em HTML");
     }
 
+    // logo oficial na pasta = logo obrigatória na arte (conferido aqui, não só pedido à IA)
+    const logo = readdirSync(join(pasta, "assets")).find((f) => /^logo\./.test(f));
+    const semLogo = (html: string) => (logo && modo !== "manual" && !html.includes(`assets/${logo}`)
+      ? [`Falta a logo oficial: coloque <img src="assets/${logo}"> inteira, visível, com pelo menos ${Math.round(w * 0.16)}px de largura (no topo ou na assinatura do rodapé).`] : []);
     const prontas: string[] = [];
     for (const [i, v] of alvo.entries()) {
       // barreira + lint, com até 2 correções pela IA
       let html = v.html;
       for (let rodada = 0; ; rodada++) {
-        const erros = [...violacoes(html), ...(await lint(pasta, html))];
+        const erros = [...violacoes(html), ...semLogo(html), ...(await lint(pasta, html))];
         if (!erros.length) break;
         if (modo === "manual") throw new Error(`A edição não passou na verificação: ${erros.slice(0, 2).join("; ")}`);
         if (rodada === 2) { await c.log(`variação ${i + 1} descartada: ${erros.slice(0, 2).join("; ")}`); html = ""; break; }
@@ -223,7 +230,7 @@ export async function runImagem(payload: ImagemPayload, c: Ctx) {
         copyFileSync(png, join(pasta, "revisao.png"));
         const r = await perguntarIA({ workspaceId: p.workspace_id, projetoId: p.id, sistema, prompt: promptRevisao(html, w, h, !!v.ordem), cwd: pasta, signal: c.signal, log: c.log, imagens: [...(ctx.imagens ?? []), "revisao.png"] });
         const nova = /^\s*OK\b/i.test(r.text) ? "" : variacoesDe(r.text)[0]?.html ?? "";
-        if (nova && !violacoes(nova).length && !(await lint(pasta, nova)).length) {
+        if (nova && !violacoes(nova).length && !semLogo(nova).length && !(await lint(pasta, nova)).length) {
           html = nova;
           png = await capturar(pasta, html, c.signal);
           await c.log(`imagem ${i + 1}: corrigida na revisão visual`);
@@ -257,6 +264,17 @@ export async function runImagem(payload: ImagemPayload, c: Ctx) {
     await sql`update ads.video_projects set status = 'FAILED', error = ${(e as Error).message.slice(0, 1000)}, updated_at = now() where id = ${p.id}`;
     throw e;
   }
+}
+
+/** Última arte desta marca aprovada por você no calendário (agendada ou publicada): vira o padrão visual das próximas. */
+async function padraoDaMarca(projectId: string): Promise<string | null> {
+  const [r] = await db()<{ html: string }[]>`
+    select c.metadata->>'composition' as html from ads.video_projects p
+    join ads.video_projects o on o.brand_id = p.brand_id and o.id <> p.id and o.kind = 'image'
+    join ads.calendario_itens i on i.project_id = o.id and i.status in ('AGENDADO', 'PUBLICADO')
+    join ads.creatives c on c.metadata->>'projectId' = o.id::text and c.type = 'IMAGE' and c.metadata ? 'composition'
+    where p.id = ${projectId} order by i.data_hora desc, (c.metadata->>'ordem')::int nulls first limit 1`;
+  return r?.html ?? null;
 }
 
 async function lint(pasta: string, html: string): Promise<string[]> {

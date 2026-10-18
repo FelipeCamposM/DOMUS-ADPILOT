@@ -1,6 +1,6 @@
 import {
-  brandSchema, briefImagemSchema, briefSchema, configCalendario, db, enqueueJob, FORMATOS_CAL, hashtagsSchema, instagramDaConexao, itemCalSchema,
-  lerArquivo, LIMITES_IG, roteiroSchema, type Brand, type ConfigCal, type CampoRefazer, type FormatoCal, type Json, type Roteiro,
+  brandSchema, briefImagemSchema, briefSchema, chaveElevenLabs, configCalendario, db, enqueueJob, FORMATOS_CAL, hashtagsSchema, instagramDaConexao, itemCalSchema,
+  lerArquivo, LIMITES_IG, roteiroSchema, vozesElevenLabs, type Brand, type ConfigCal, type CampoRefazer, type FormatoCal, type Json, type Roteiro,
 } from "@domus-ads/core";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -209,6 +209,15 @@ async function refazer(p: { itemId: string; campo: CampoRefazer; dica?: string }
 
 interface Pronto { id: string; workspace_id: string; ig_account_id: string; brand_id: string | null; data_hora: Date; formato: FormatoCal; tema: string; objetivo: string; roteiro: Roteiro; legenda: string; hashtags: string[]; marca: string | null; ws_nome: string }
 
+/** Voz dos Reels: a favorita do ElevenLabs (a última marcada, do dono primeiro); sem favorita ou sem chave, a voz local da config. */
+async function vozDosReels(workspaceId: string, padrao: string) {
+  const [m] = await db()<{ id: string }[]>`select vozes_favoritas[cardinality(vozes_favoritas)] as id from ads.workspace_members
+    where workspace_id = ${workspaceId} and cardinality(vozes_favoritas) > 0 order by case role when 'owner' then 0 when 'admin' then 1 else 2 end, created_at limit 1`;
+  const chave = m ? await chaveElevenLabs() : null;
+  if (!m || !chave) return { voz: padrao, vozNome: "" };
+  return { voz: `el:${m.id}`, vozNome: (await vozesElevenLabs(chave).catch(() => [])).find((v) => v.id === m.id)?.nome ?? "" };
+}
+
 /** Cria o projeto do Studio já com o conteúdo aprovado (sem revisão) e põe na fila. */
 async function iniciar(i: Pronto, cfg: ConfigCal) {
   const sql = db();
@@ -218,7 +227,7 @@ async function iniciar(i: Pronto, cfg: ConfigCal) {
   let projeto: { id: string } | undefined;
   if (i.formato === "REELS") {
     const brief = briefSchema.parse({
-      produto, objetivo, duracao: r.duracao, formato: "9:16", cta: r.cta, identidade: "workspace", estiloVisual: cfg.estiloVideo, voz: cfg.voz, musica: "auto",
+      produto, objetivo, duracao: r.duracao, formato: "9:16", cta: r.cta, identidade: "workspace", estiloVisual: cfg.estiloVideo, ...(await vozDosReels(i.workspace_id, cfg.voz)), musica: "auto",
       orientacao: `Tema: ${i.tema}\n\nRoteiro da narração (aprovado pelo cliente; mantenha as ideias e ajuste só para caber no tempo):\n${r.narracao}${r.visual ? `\n\nVisual: ${r.visual}` : ""}`.slice(0, 4000),
     });
     [projeto] = await sql<{ id: string }[]>`insert into ads.video_projects (workspace_id, brand_id, title, brief, status, step_detail)
@@ -263,9 +272,12 @@ async function passada() {
 
   // 1. aprovado (e a IA não está refazendo): gera já, para sobrar tempo de conferir a arte no WhatsApp
   const aprovados = await sql<Pronto[]>`
-    select i.id, i.workspace_id, k.ig_account_id, k.brand_id, i.data_hora, i.formato, i.tema, i.objetivo, i.roteiro, i.legenda, i.hashtags, b.nome as marca, w.name as ws_nome
+    select i.id, i.workspace_id, k.ig_account_id, b.id as brand_id, i.data_hora, i.formato, i.tema, i.objetivo, i.roteiro, i.legenda, i.hashtags, b.nome as marca, w.name as ws_nome
     from ads.calendario_itens i join ads.calendarios k on k.id = i.calendario_id join ads.workspaces w on w.id = i.workspace_id
-    left join ads.brands b on b.id = k.brand_id
+    join ads.instagram_accounts a on a.id = k.ig_account_id
+    -- calendário sem marca: a marca cujo nome está no @ do perfil (senão a mais antiga), para a arte nunca sair sem logo e cores
+    left join lateral (select b.id, b.nome from ads.brands b where b.workspace_id = i.workspace_id and (k.brand_id is null or b.id = k.brand_id)
+      order by position(lower(replace(b.nome, ' ', '')) in lower(a.username)) = 0, b.created_at limit 1) b on true
     where i.status = 'APROVADO' and i.refazendo is null`;
   for (const i of aprovados) {
     if (Date.now() > i.data_hora.getTime() + tolerancia) { await falhar(i.id, `Passou ${cfg.toleranciaH} h do horário sem gerar (o PC estava desligado?)`, i); continue; }

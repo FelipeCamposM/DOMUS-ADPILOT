@@ -30,6 +30,7 @@ export function PrazosCalendario({ cfg, podeAdmin }: { cfg: ConfigCal; podeAdmin
           <select id="voz" className="select" value={v.voz} onChange={(e) => setV({ ...v, voz: e.target.value as ConfigCal["voz"] })}>
             {Object.entries(VOZES).map(([k, n]) => <option key={k} value={k}>{n}</option>)}
           </select>
+          <span className="subtle caption">Com uma voz do ElevenLabs favoritada (⭐ no Studio), os Reels usam ela; esta é só a reserva.</span>
         </div>
         <div className="field">
           <label className="label" htmlFor="estilo">Estilo dos Reels</label>
