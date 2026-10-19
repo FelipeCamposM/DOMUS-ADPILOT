@@ -2,6 +2,8 @@ import { lookup } from "node:dns/promises";
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { isIP } from "node:net";
 import { basename, dirname, join } from "node:path";
+import puppeteer, { type Page } from "puppeteer-core";
+import { acharChrome } from "./qa";
 import { FFMPEG, FFPROBE, rodar } from "./tools";
 
 /**
@@ -12,6 +14,7 @@ import { FFMPEG, FFPROBE, rodar } from "./tools";
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36";
 // o Instagram só entrega título, descrição e og:image (foto do post ou do perfil) para robôs de prévia de link
 const UA_PREVIA = "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)";
+const UA_CEL = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
 const MAX_FOTOS = 6;
 
 /** Endereços que um link enviado pelo usuário nunca pode alcançar a partir do PC do worker (SSRF). */
@@ -173,7 +176,7 @@ export function papeis(cores: string[]): string[] {
   return [bg, destaques[0] ?? tx, tx, destaques[1] ?? destaques[0] ?? tx];
 }
 
-export interface Referencia { url: string; titulo: string; texto: string; fotos: { arquivo: string; dim: string; cores: string[] }[]; coresSite: string[]; aviso?: string }
+export interface Referencia { url: string; titulo: string; texto: string; fotos: { arquivo: string; dim: string; cores: string[] }[]; prints: { arquivo: string; dim: string; tela: string }[]; coresSite: string[]; aviso?: string }
 
 /** Lê um link: textos, até 6 fotos (salvas em `dir` como `<prefixo>-N.ext`) com a paleta de cada uma, e as cores do site. */
 export async function lerReferencia(url: string, dir: string, prefixo: string): Promise<Referencia> {
@@ -202,8 +205,9 @@ export async function lerReferencia(url: string, dir: string, prefixo: string): 
       // foto que não baixa não impede as outras
     }
   }
+  const prints = ig ? [] : await printsDaPagina(pag.url.href, dir, prefixo).catch(() => []);
   return {
-    url, titulo: g.titulo, coresSite, fotos,
+    url, titulo: g.titulo, coresSite, fotos, prints,
     texto: [g.descricao && `Descrição: ${g.descricao}`, !ig && g.texto && `Texto: ${g.texto}`].filter(Boolean).join("\n"),
     aviso: ig && /instagram\.com\/[^/]+\/?$/.test(u.href) && !/\/(p|reel)\//.test(u.pathname)
       ? "perfil do Instagram: sem login vêm só a bio e miniaturas pequenas dos últimos posts (boas para tirar a paleta, fracas para usar na arte). Para fotos grandes, cole links de posts (instagram.com/p/…) ou envie as imagens."
@@ -211,5 +215,58 @@ export async function lerReferencia(url: string, dir: string, prefixo: string): 
   };
 }
 
-/** Até 5 links http(s) escritos no meio de um texto (ex.: nas orientações). */
-export const linksDoTexto = (t: string) => [...new Set([...t.matchAll(/https?:\/\/[^\s<>"'`)\]]+/gi)].map((m) => m[0].replace(/[.,;:!?]+$/, "")))].slice(0, 5);
+/** Prints reais da página no Chrome sem cabeça: computador 1440×900, celular 390×844 @2x e o celular rolando (até 3 telas). Toda requisição da página passa pelo filtro de rede local. */
+async function printsDaPagina(url: string, dir: string, prefixo: string): Promise<Referencia["prints"]> {
+  const chrome = acharChrome();
+  if (!chrome) return [];
+  const hosts = new Map<string, Promise<boolean>>();
+  const publico = (h: string) => {
+    if (!hosts.has(h)) hosts.set(h, lookup(h, { all: true }).then((ips) => ips.length > 0 && !ips.some((x) => privado(x.address)), () => false));
+    return hosts.get(h)!;
+  };
+  const b = await puppeteer.launch({ executablePath: chrome, headless: true, args: ["--hide-scrollbars", "--mute-audio"] });
+  const out: Referencia["prints"] = [];
+  const abrir = async (page: Page, w: number, h: number, cel: boolean) => {
+    await page.setViewport({ width: w, height: h, deviceScaleFactor: cel ? 2 : 1, isMobile: cel, hasTouch: cel });
+    await page.setUserAgent({ userAgent: cel ? UA_CEL : UA });
+    // site com conexão sempre aberta (chat, analytics) nunca fica "ocioso": segue com o que carregou
+    await page.goto(url, { waitUntil: "networkidle2", timeout: 25_000 }).catch(() => {});
+    // rola até o fim (até 6000 px) para carregar imagens preguiçosas e animações de entrada, e volta ao topo
+    await page.evaluate(async () => {
+      for (let y = 0; y < Math.min(document.body.scrollHeight, 6000); y += 500) { window.scrollTo(0, y); await new Promise((r) => setTimeout(r, 150)); }
+      window.scrollTo(0, 0);
+    });
+    await new Promise((r) => setTimeout(r, 1500));
+  };
+  const salvar = async (page: Page, nome: string, tela: string, w: number, h: number, escala: number) => {
+    const arquivo = `${prefixo}-print-${nome}.png`;
+    await writeFile(join(dir, arquivo), await page.screenshot({ clip: { x: 0, y: 0, width: w, height: h }, captureBeyondViewport: true }));
+    out.push({ arquivo, dim: `${w * escala}x${h * escala}`, tela });
+  };
+  try {
+    const page = await b.newPage();
+    await page.setRequestInterception(true);
+    page.on("request", (r) => {
+      const u = new URL(r.url());
+      if (u.protocol === "data:" || u.protocol === "blob:") return void r.continue();
+      if (!/^https?:$/.test(u.protocol)) return void r.abort();
+      void publico(u.hostname).then((ok) => (ok ? r.continue() : r.abort()), () => r.abort());
+    });
+    await abrir(page, 1440, 900, false);
+    await salvar(page, "computador", "computador, primeira tela", 1440, 900, 1);
+    await abrir(page, 390, 844, true);
+    await salvar(page, "celular", "celular, primeira tela", 390, 844, 2);
+    const altura = await page.evaluate(() => document.documentElement.scrollHeight);
+    if (altura > 844 * 1.5) await salvar(page, "celular-rolando", "celular, página rolando (até 3 telas)", 390, Math.min(altura, 844 * 3), 2);
+  } finally {
+    await b.close();
+  }
+  return out;
+}
+
+// sem https: só domínios com TLD conhecido (evita "Node.js", "logo.png"); e-mail e @perfil ficam de fora
+const LINK = /https?:\/\/[^\s<>"'`)\]]+|(?<![@\w./-])(?:[a-z0-9-]+\.)+(?:com|net|org|io|app|dev|site|online|store|shop|tech|ai|br)\b(?:\/[^\s<>"'`)\]]*)?/gi;
+
+/** Até 5 links escritos no meio de um texto (ex.: nas orientações), com ou sem https:// ("castilhoadvogados.adv.br"). */
+export const linksDoTexto = (t: string) =>
+  [...new Set([...t.matchAll(LINK)].map((m) => m[0].replace(/[.,;:!?]+$/, "")).map((u) => (/^https?:/i.test(u) ? u : `https://${u}`)))].slice(0, 5);

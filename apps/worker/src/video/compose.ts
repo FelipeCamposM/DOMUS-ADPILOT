@@ -28,7 +28,7 @@ Regras:
   abertura = gancho (1ª cena) · titulo = uma ideia forte · lista = até 4 itens curtos em "itens" ·
   numero = um número de destaque em "numero" {"valor": 12, "prefixo": "", "sufixo": "h", "casas": 0} com a headline como rótulo (SÓ números que estejam no briefing) ·
   comparacao = antes/depois: "itens": ["como é hoje (ruim)", "como fica (bom)"] e, opcional, rótulos ["…", "…", "Antes", "Depois"] ·
-  produto = tela do produto num celular/navegador; use "asset": "assets/…" se houver print/imagem do produto marcado "COLOCAR NA ARTE" ·
+  produto = tela do produto num celular/navegador; use "asset": "assets/…" com o PRINT REAL da página (em <referencias_visuais>; celular no vertical, computador no deitado) ou a imagem do produto marcada "COLOCAR NA ARTE"; site/sistema real só aparece com print real ·
   citacao = depoimento (headline = a fala, subtext = quem disse; só se houver depoimento real no briefing) ·
   cta = chamada final (botão com o CTA do briefing).
   Varie os tipos; não repita o mesmo tipo em cenas seguidas.
@@ -119,7 +119,8 @@ ${REGRAS_CONTEXTO}
 /** Como usar identidade visual e anexos (vale para vídeo e imagem). */
 export const REGRAS_CONTEXTO = `- Identidade visual (quando vier no pedido): cores, fontes, tom e regras dela são obrigatórios.
 - Arquivos marcados "COLOCAR NA ARTE" entram com <img src="assets/…"> (object-fit: contain, sem distorcer) ou
-  <video src="assets/…" muted playsinline> como clip com data-start/data-duration. Print de tela vai num mockup
+  <video src="assets/…" muted playsinline> como clip com data-start/data-duration. Site ou sistema real só aparece pelo PRINT REAL
+  (em <referencias_visuais>), nunca por uma imitação desenhada. Print de tela vai num mockup
   (moldura, cantos arredondados, sombra). Arquivos "só inspiração" NÃO entram: servem de referência de estilo.
 - Antes de compor, abra e olhe cada imagem da pasta assets (leia o arquivo) para decidir cor, recorte e posição.
 - Só caminhos relativos "assets/<arquivo>" exatamente como listados; nada de ".." nem caminho absoluto.`;

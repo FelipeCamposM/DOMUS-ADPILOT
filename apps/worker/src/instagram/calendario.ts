@@ -26,7 +26,9 @@ export const ROTEIROS = `Roteiro por formato (campo "roteiro"):
 - REELS (vídeo 9:16 narrado): {"narracao": o texto falado, 35–45 palavras para 15 s ou 70–85 para 30 s, com gancho nos 2 primeiros segundos, "duracao": 15 ou 30, "visual": até 300, "cta": até 40}
 - "visual" descreve um layout limpo e plano: tipografia grande, blocos de cor da marca, a logo oficial, ícones de linha simples,
   mockup simples de tela (site/celular) com cantos retos ou levemente arredondados. NUNCA peça 3D, clay, inflado, isométrico, vidro,
-  objetos "realistas" desenhados (portas, casas, mãos, pessoas) nem ícone/símbolo inventado para a marca. Texto nunca sobreposto por ilustração.`;
+  objetos "realistas" desenhados (portas, casas, mãos, pessoas) nem ícone/símbolo inventado para a marca. Texto nunca sobreposto por ilustração.
+- Quando o post mostrar um site, sistema ou produto real (case, portfólio, o próprio site), escreva no "visual" o endereço dele
+  (ex.: "print de cliente.com.br no celular"): a arte e o vídeo usam o print real dessa página, nunca uma imitação.`;
 
 export const REGRAS_POST = `- Legenda: gancho na 1ª linha, parágrafos curtos, uma chamada no fim, SEM hashtags dentro.
 ${TEXTO_HUMANO}

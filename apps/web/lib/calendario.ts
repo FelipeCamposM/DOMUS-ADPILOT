@@ -4,7 +4,7 @@ import { db, roteiroSchema, type FormatoCal, type Roteiro } from "@domus-ads/cor
 export interface ItemTela {
   id: string; calendario_id: string; data_hora: string; formato: FormatoCal; tema: string; objetivo: string; roteiro: Roteiro; legenda: string; hashtags: string[];
   status: string; refazendo: string | null; erro: string | null; updated_at: string;
-  project_id: string | null; etapa: string | null; post_id: string | null; post_status: string | null; permalink: string | null; capa: string | null;
+  project_id: string | null; etapa: string | null; post_id: string | null; post_status: string | null; permalink: string | null; midias: { id: string; type: string }[];
 }
 export interface PlanoTela { id: string; inicio: string; fim: string; objetivo: string; status: string; erro: string | null; marca: string | null; itens: number; sugeridos: number }
 
@@ -17,9 +17,14 @@ export async function itensCalendario(workspaceId: string, contaId: string, de: 
     select i.id, i.calendario_id, ${sql.unsafe(ISO("i.data_hora"))} as data_hora, i.formato, i.tema, i.objetivo, i.roteiro, i.legenda, i.hashtags,
       i.status, i.refazendo, i.erro, ${sql.unsafe(ISO("i.updated_at"))} as updated_at, i.project_id, p.step_detail as etapa,
       i.post_id, x.status as post_status, x.permalink,
-      (select c.id::text from ads.creatives c where c.workspace_id = i.workspace_id and c.status = 'READY'
-        and (c.id = (x.midias->0->>'creativeId')::uuid or (x.id is null and c.metadata->>'projectId' = i.project_id::text))
-        order by (c.metadata->>'ordem')::int nulls last limit 1) as capa
+      -- o que vai (ou foi) para o Instagram: as mídias da publicação; antes dela, as artes do projeto (vídeo atual ou slides em ordem)
+      coalesce(
+        (select jsonb_agg(jsonb_build_object('id', c.id, 'type', c.type) order by m.n) from jsonb_array_elements(x.midias) with ordinality m(v, n)
+          join ads.creatives c on c.id = (m.v->>'creativeId')::uuid and c.workspace_id = i.workspace_id and c.status = 'READY'),
+        (select jsonb_agg(jsonb_build_object('id', c.id, 'type', c.type) order by (c.metadata->>'ordem')::int nulls last, c.created_at) from ads.creatives c
+          where c.workspace_id = i.workspace_id and c.status = 'READY' and x.id is null
+            and (c.id = p.creative_id or (i.formato <> 'REELS' and c.type = 'IMAGE' and c.metadata->>'projectId' = i.project_id::text))),
+        '[]') as midias
     from ads.calendario_itens i join ads.calendarios k on k.id = i.calendario_id
     left join ads.video_projects p on p.id = i.project_id left join ads.instagram_posts x on x.id = i.post_id
     where i.workspace_id = ${workspaceId} and k.ig_account_id = ${contaId} and i.data_hora >= ${de} and i.data_hora < ${ate}

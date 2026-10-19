@@ -1268,7 +1268,9 @@ fieldset:disabled .chave { opacity: 0.6; cursor: default; }
 .cal-dica > svg { color: rgb(var(--c-glow)); flex: none; }
 .cal-dica input { flex: 1; min-width: 0; }
 .cal-rodape { position: sticky; bottom: -18px; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: -18px; padding: 10px 0 18px; border-top: 1px solid rgb(var(--c-border)); background: rgb(var(--c-bg-surface)); }
-.cal-capa { width: 100%; max-height: 220px; object-fit: contain; border-radius: var(--radius-md); background: rgb(var(--c-bg-inset)); }
+/* artes do post: carrossel rola de lado; vídeo toca ali mesmo */
+.cal-midias { display: flex; gap: 8px; overflow-x: auto; scroll-snap-type: x mandatory; justify-content: safe center; }
+.cal-capa { flex: none; height: 280px; width: auto; max-width: 100%; object-fit: contain; scroll-snap-align: start; border-radius: var(--radius-md); background: rgb(var(--c-bg-inset)); }
 .cal-status { height: 26px; border-color: color-mix(in srgb, var(--cor) 50%, transparent); color: var(--cor); }
 /* a página do calendário ocupa a altura da tela: a grade divide o espaço em 6 semanas e cada dia rola por dentro */
 .page.page-cheia { height: 100%; min-height: 620px; padding-block: 20px; gap: 0; }

@@ -151,6 +151,30 @@ export async function voltarParaSugestao(id: string) {
   });
 }
 
+/** Muda só o horário de um post já aprovado (gerando, esperando aprovação ou agendado); a publicação agendada vai junto. */
+export async function mudarHorario(id: string, dataHora: string) {
+  return run(async () => {
+    const ctx = await requireCtx();
+    requireRole(ctx, "editor");
+    const i = await itemDoWorkspace(ctx, id);
+    const d = new Date(z.string().datetime({ offset: true, message: "Data inválida" }).parse(dataHora));
+    if (d.getTime() < Date.now() + 10 * 60_000) throw new Error("Escolha um horário daqui a pelo menos 10 minutos");
+    if (d.getTime() > Date.now() + 75 * 86_400_000) throw new Error("Agende para no máximo 75 dias à frente");
+    await db().begin(async (tx) => {
+      const [r] = await tx<{ post_id: string | null }[]>`update ads.calendario_itens set data_hora = ${d}, updated_at = now()
+        where id = ${i.id} and status in ('APROVADO', 'GERANDO', 'REVISAO', 'AGENDADO', 'FALHOU') returning post_id`;
+      if (!r) throw new Error("Este post já foi publicado; para mudar o horário de uma sugestão, edite e salve");
+      if (r.post_id) {
+        const p = await tx`update ads.instagram_posts set agendado_para = ${d}, updated_at = now() where id = ${r.post_id} and status = 'AGENDADO'`;
+        if (!p.count) throw new Error("A publicação já começou a sair; não dá mais para mudar o horário");
+      }
+    });
+    await audit(db(), { workspaceId: ctx.workspace.id, actor: ctx.actor, action: "Mudar horário do post do calendário", entityType: "calendario", entityId: i.id, before: { dataHora: i.data_hora }, after: { dataHora: d } });
+    revalidar();
+    revalidatePath("/instagram", "layout");
+  });
+}
+
 /** Arte pronta aprovada pela tela (o mesmo que responder "sim" no WhatsApp): o worker agenda na próxima passada. */
 export async function aprovarArte(id: string) {
   return run(async () => {

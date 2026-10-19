@@ -22,8 +22,8 @@ export async function contextoCriativo(projectId: string, workspaceId: string, p
   const [w] = await sql<{ name: string; brand: unknown }[]>`
     select b.nome as name, b.brand from ads.video_projects p join ads.brands b on b.id = p.brand_id where p.id = ${projectId} and b.workspace_id = ${workspaceId}`;
   const marca = brandSchema.parse(w?.brand ?? {});
-  const [p] = await sql<{ assets: unknown; links: unknown; orientacao: string | null; identidade: string | null }[]>`
-    select assets, links, brief->>'orientacao' as orientacao, brief->>'identidade' as identidade from ads.video_projects where id = ${projectId}`;
+  const [p] = await sql<{ assets: unknown; links: unknown; orientacao: string | null; identidade: string | null; storyboard: string | null }[]>`
+    select assets, links, brief->>'orientacao' as orientacao, brief->>'identidade' as identidade, storyboard::text as storyboard from ads.video_projects where id = ${projectId}`;
   const anexos = anexosSchema.parse({ assets: p?.assets ?? [], links: p?.links ?? [] });
   const marcaPreenchida = !!(marca.cores.length || marca.logoId || marca.sobre);
   // sem marca configurada, as referências mandam mesmo com "workspace" escolhido
@@ -59,9 +59,9 @@ export async function contextoCriativo(projectId: string, workspaceId: string, p
     if (c && c.id !== brand.logoId) await preparar(c, a.uso, a.nota, `anexo-${i + 1}.${ext(c)}`);
   }
 
-  // links do campo Links + os escritos nas orientações ("pegue as fotos de https://…")
+  // links do campo Links + os escritos nas orientações ou no visual dos slides ("prints de cliente.com.br"): o site vira print real
   const notas = new Map(anexos.links.map((l) => [l.url, l.nota]));
-  const urls = [...new Set([...anexos.links.map((l) => l.url), ...linksDoTexto(p?.orientacao ?? "")])].slice(0, 6);
+  const urls = [...new Set([...anexos.links.map((l) => l.url), ...linksDoTexto(`${p?.orientacao ?? ""}\n${p?.storyboard ?? ""}`)])].slice(0, 6);
   const refs: Referencia[] = [];
   const blocosLinks: string[] = [];
   for (const [i, url] of urls.entries()) {
@@ -71,6 +71,7 @@ export async function contextoCriativo(projectId: string, workspaceId: string, p
       refs.push(r);
       await guardarReferencias(workspaceId, projectId, dirAssets, r);
       const linhasRef = [
+        r.prints.length && `PRINTS REAIS desta página, tirados agora (COLOCAR NA ARTE sempre que a peça mostrar este site/produto: dentro do mockup de celular ou notebook; nunca desenhe uma imitação da página):\n${r.prints.map((f) => `  - assets/${f.arquivo} · ${f.tela} · ${f.dim} px`).join("\n")}`,
         r.titulo && `Título: ${r.titulo}`,
         r.texto,
         r.fotos.length && `Fotos baixadas desta página (do próprio cliente; abra e OLHE cada uma):\n${r.fotos.map((f) => `  - assets/${f.arquivo} · ${f.dim} px · cores: ${f.cores.join(" ") || "?"}`).join("\n")}`,
@@ -78,8 +79,8 @@ export async function contextoCriativo(projectId: string, workspaceId: string, p
         r.aviso && `Atenção: ${r.aviso}`,
       ].filter(Boolean);
       blocosLinks.push(`${cab}\n${linhasRef.join("\n")}`);
-      for (const f of r.fotos) if (imagens.length < MAX_IMAGENS_IA) imagens.push(`assets/${f.arquivo}`);
-      await log(`referência ${url}: ${r.fotos.length} foto(s), ${r.coresSite.length} cor(es) do site${r.aviso ? ` (${r.aviso})` : ""}`);
+      for (const f of [...r.prints, ...r.fotos]) if (imagens.length < MAX_IMAGENS_IA) imagens.push(`assets/${f.arquivo}`);
+      await log(`referência ${url}: ${r.prints.length} print(s), ${r.fotos.length} foto(s), ${r.coresSite.length} cor(es) do site${r.aviso ? ` (${r.aviso})` : ""}`);
     } catch (e) {
       await log(`link ignorado (${url}): ${(e as Error).message}`);
       blocosLinks.push(`${cab} [não foi possível ler a página]`);
@@ -132,7 +133,7 @@ ${blocosLinks.join("\n\n")}
  */
 async function guardarReferencias(workspaceId: string, projectId: string, dir: string, r: Referencia) {
   const sql = db();
-  for (const f of r.fotos) {
+  for (const f of [...r.prints, ...r.fotos]) {
     const origem = join(dir, f.arquivo);
     const bytes = (await stat(origem)).size;
     const key = r2Key(workspaceId, "images", `ref-${projectId}-${f.arquivo}`);

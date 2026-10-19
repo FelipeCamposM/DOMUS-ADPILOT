@@ -3,7 +3,7 @@
 import { confirmar } from "../shell/confirmar";
 import { faltasItem, FORMATOS_CAL, type FormatoCal, type Roteiro } from "@domus-ads/core/calendario";
 import { LIMITES_IG } from "@domus-ads/core/instagram-regras";
-import { AlertTriangle, ArrowDown, ArrowUp, CalendarRange, Check, CheckCheck, ChevronLeft, CircleDot, ChevronRight, Clapperboard, ExternalLink, GalleryHorizontal, ImageIcon, Loader2, MessageCircle, Minus, Plus, RefreshCw, Sparkles, Trash2, Undo2, Wand2, X } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, CalendarClock, CalendarRange, Check, CheckCheck, ChevronLeft, CircleDot, ChevronRight, Clapperboard, ExternalLink, GalleryHorizontal, ImageIcon, Loader2, MessageCircle, Minus, Plus, RefreshCw, Sparkles, Trash2, Undo2, Wand2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
@@ -12,7 +12,7 @@ import { DataPicker } from "../shell/DataPicker";
 import { Dialog } from "../shell/Dialog";
 import { toast } from "../shell/toast";
 import { gradeDoMes, somaDias } from "./grade";
-import { apagarPlanejamento, aprovarArte, aprovarItens, descartarItem, novoItem, pedirMudanca, planejarPeriodo, refazerComIA, replanejar, salvarItem, voltarParaSugestao } from "./actions";
+import { apagarPlanejamento, aprovarArte, aprovarItens, descartarItem, mudarHorario, novoItem, pedirMudanca, planejarPeriodo, refazerComIA, replanejar, salvarItem, voltarParaSugestao } from "./actions";
 
 const TZ = "America/Sao_Paulo";
 const ICONE: Record<FormatoCal, typeof ImageIcon> = { FEED: ImageIcon, CARROSSEL: GalleryHorizontal, REELS: Clapperboard };
@@ -262,6 +262,9 @@ function Editor({ item, podeEditar, onFechar }: { item: ItemTela; podeEditar: bo
   const [pend, start] = useTransition();
   const [v, setV] = useState({ dataHora: paraInput(item.data_hora), formato: item.formato, tema: item.tema, objetivo: item.objetivo, roteiro: item.roteiro, legenda: item.legenda, hashtags: item.hashtags.join(" ") });
   const [dica, setDica] = useState("");
+  const [quando, setQuando] = useState(paraInput(item.data_hora));
+  // depois de aprovado o post não é mais editável, mas o horário ainda muda até a publicação começar
+  const soHorario = podeEditar && ["GERANDO", "REVISAO", "AGENDADO", "FALHOU"].includes(item.status) && (!item.post_status || item.post_status === "AGENDADO");
   const editavel = podeEditar && (item.status === "SUGERIDO" || item.status === "APROVADO") && !item.refazendo;
   const r = v.roteiro;
   const setR = (x: Partial<Roteiro>) => setV({ ...v, roteiro: { ...r, ...x } });
@@ -300,7 +303,25 @@ function Editor({ item, podeEditar, onFechar }: { item: ItemTela; podeEditar: bo
           {item.permalink && <a className="btn btn-ghost btn-xs" href={item.permalink} target="_blank" rel="noreferrer">No Instagram <ExternalLink aria-hidden /></a>}
         </div>
       )}
-      {item.capa && <img className="cal-capa" src={`/api/creatives/${item.capa}/file`} alt="Arte do post" />}
+      {item.midias.length > 0 && (
+        <div className="cal-midias">
+          {item.midias.map((m, n) => m.type === "VIDEO"
+            ? <video key={m.id} className="cal-capa" src={`/api/creatives/${m.id}/file`} poster={`/api/creatives/${m.id}/file?kind=thumb`} controls playsInline preload="metadata" />
+            : <img key={m.id} className="cal-capa" src={`/api/creatives/${m.id}/file`} alt={item.midias.length > 1 ? `Slide ${n + 1}` : "Arte do post"} />)}
+        </div>
+      )}
+      {soHorario && (
+        <div className="cal-dica">
+          <CalendarClock size={15} aria-hidden />
+          <DataPicker hora value={quando} min={hojeBr()} onChange={setQuando} ariaLabel="Novo horário (Brasília)" />
+          <button type="button" className="btn btn-ghost btn-xs" disabled={pend || quando === paraInput(item.data_hora)} onClick={() => start(async () => {
+            const x = await mudarHorario(item.id, deInput(quando));
+            if (!x.ok) return toast.err(x.error);
+            toast.ok("Horário alterado");
+            router.refresh();
+          })}><Check aria-hidden /> Mudar horário</button>
+        </div>
+      )}
 
       <fieldset disabled={!editavel || pend} className="cal-campos">
         <div className="cluster" style={{ gap: 10 }}>

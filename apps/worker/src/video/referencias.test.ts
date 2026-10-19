@@ -38,5 +38,6 @@ describe("referências visuais", () => {
 
   it("acha links escritos nas orientações", () => {
     expect(linksDoTexto("use as fotos de https://www.yourcookies.com, e o insta https://instagram.com/yourcookies.")).toEqual(["https://www.yourcookies.com", "https://instagram.com/yourcookies"]);
+    expect(linksDoTexto("Prints reais de castilhoadvogados.adv.br em mockup; logo.png, Node.js, oi@domus.com.br e @domus.com ficam de fora")).toEqual(["https://castilhoadvogados.adv.br"]);
   });
 });
