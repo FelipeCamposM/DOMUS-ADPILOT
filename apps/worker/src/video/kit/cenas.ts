@@ -224,7 +224,7 @@ h1,h2,p,blockquote,ul{margin:0}
 .mock-nav{width:calc(var(--u)*80*var(--k));aspect-ratio:16/10;border-radius:calc(var(--u)*2.4);padding:calc(var(--u)*3.2) calc(var(--u)*1.2) calc(var(--u)*1.2)}
 .mock-tela{width:100%;height:100%;border-radius:calc(var(--u)*4.4);overflow:hidden;position:relative}
 .mock-nav .mock-tela{border-radius:calc(var(--u)*1.2)}
-.mock-tela img{width:100%;height:100%;object-fit:cover;object-position:top;display:block}
+.mock-tela img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 0%;display:block}
 .esqueleto{position:absolute;inset:0;padding:12%;display:flex;flex-direction:column;gap:7%}
 .esqueleto i{display:block;height:6%;border-radius:99px;opacity:.5}.esqueleto i.curto{width:60%}
 .esqueleto b{display:block;flex:1;border-radius:calc(var(--u)*2);opacity:.35}

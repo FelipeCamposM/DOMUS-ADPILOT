@@ -141,7 +141,11 @@ export const CENAS_JS = String.raw`(function () {
       tl.to(o, { v: v, duration: 1.4, ease: "power3.out", onUpdate: function () { alvo.textContent = pre + o.v.toFixed(cs).replace(".", ",").replace(/\B(?=(\d{3})+(?!\d))/g, ".") + suf; } }, t);
       t += .35;
     });
-    papel("mock").forEach(function (mk) { tl.fromTo(mk, de("mock"), para({ duration: M.dur * 1.15 }), t); t += .3; flutuar(mk, tl, t + .8, t1); });
+    papel("mock").forEach(function (mk) {
+      tl.fromTo(mk, de("mock"), para({ duration: M.dur * 1.15 }), t); t += .3; flutuar(mk, tl, t + .8, t1);
+      // print da página (absoluto, não estica o aparelho): rola de cima para baixo como alguém navegando; print curto quase não mexe
+      $$(".mock-tela img", mk).forEach(function (im) { if (t1 - t > 2) tl.fromTo(im, { objectPosition: "50% 0%" }, { objectPosition: "50% 100%", duration: t1 - t - 1.4, ease: "power1.inOut" }, t + .9); });
+    });
     papel("sub").forEach(function (s) { tl.fromTo(s, de("sub"), para(), t); t += .2; });
     papel("quote").forEach(function (q) { tl.fromTo(q, de("pulo"), para({ ease: M.pulo }), t - .1); });
     var itens = papel("item");
