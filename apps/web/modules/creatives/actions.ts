@@ -1,6 +1,6 @@
 "use server";
 
-import { apagarArquivo, audit, db, MUSICA_TAGS, r2Key, r2Presign, SFX_CATEGORIAS, storageAtual, tamanhoArquivo } from "@domus-ads/core";
+import { apagarArquivo, audit, db, MAX_FONTE_MB, MUSICA_TAGS, r2Key, r2Presign, SFX_CATEGORIAS, storageAtual, tamanhoArquivo } from "@domus-ads/core";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { run } from "@/lib/action";
@@ -16,7 +16,7 @@ const uploadSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("IMAGE"), tags: z.tuple([z.literal("asset")]).default(["asset"]), mime: z.string().regex(/^image\/(png|jpe?g|webp|gif|svg\+xml)$/, "Envie PNG, JPG, WEBP, GIF ou SVG"),
     license: z.string().trim().max(200).default(""), size: z.number().int().positive().max(25 * MB, "Imagem acima de 25 MB") }),
   z.object({ type: z.literal("VIDEO"), tags: z.tuple([z.literal("asset")]).default(["asset"]), mime: z.string().regex(/^video\/(mp4|webm|quicktime)$/, "Envie MP4, WEBM ou MOV"),
-    license: z.string().trim().max(200).default(""), size: z.number().int().positive().max(300 * MB, "Vídeo acima de 300 MB") }),
+    license: z.string().trim().max(200).default(""), size: z.number().int().positive().max(MAX_FONTE_MB * MB, `Vídeo acima de ${MAX_FONTE_MB / 1024} GB`) }),
 ]).and(z.object({
   name: z.string().trim().min(1, "Arquivo sem nome").max(120),
   durationMs: z.number().int().positive().max(3_600_000).nullable(),

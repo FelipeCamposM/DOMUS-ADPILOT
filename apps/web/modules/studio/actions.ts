@@ -1,6 +1,6 @@
 "use server";
 
-import { anexosSchema, apagarArquivo, audit, briefImagemSchema, briefSchema, db, enqueueJob, MUSICA_TAGS, paletaSchema, planoImagemSchema, storyboardSchema, violacoes, type Json } from "@domus-ads/core";
+import { anexosSchema, apagarArquivo, audit, briefEdicaoSchema, briefImagemSchema, briefSchema, db, enqueueJob, MAX_FONTE_S, MUSICA_TAGS, paletaSchema, planoEdicaoSchema, planoImagemSchema, reescrever, storyboardSchema, violacoes, type Json } from "@domus-ads/core";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { run } from "@/lib/action";
@@ -290,6 +290,89 @@ export async function salvarEdicao(projectId: string, creativeId: string, html: 
     await workerOnline();
     await enfileirar(ctx, p.id, { mode: "manual", creativeId, html: doc });
     await audit(db(), { workspaceId: ctx.workspace.id, actor: ctx.actor, action: "Editar imagem no editor visual", entityType: "creative", entityId: creativeId, entityName: p.title });
+    revalidatePath(`/studio/${p.id}`);
+  });
+}
+
+/**
+ * Editar meu vídeo: o vídeo já enviado vira projeto de edição; o worker transcreve, corta as pausas e planeja as animações
+ * (para revisão). Do calendário: o post de Reels passa a usar este vídeo (legenda e animações aprovadas sozinhas; a arte
+ * pronta vai para a aprovação no WhatsApp como as outras).
+ */
+export async function criarEdicao(input: { brief: unknown; marcaId?: string | null; calendarioItemId?: string | null }) {
+  return run(async () => {
+    const ctx = await requireCtx();
+    requireRole(ctx, "editor");
+    const brief = briefEdicaoSchema.parse(input.brief);
+    const sql = db();
+    const [v] = await sql<{ duration_ms: number | null }[]>`
+      select duration_ms from ads.creatives where id = ${brief.videoId} and workspace_id = ${ctx.workspace.id} and type = 'VIDEO' and status = 'READY'`;
+    if (!v) throw new Error("O vídeo enviado não foi encontrado. Envie de novo.");
+    if (v.duration_ms && v.duration_ms > (MAX_FONTE_S + 1) * 1000) throw new Error(`O vídeo passa de ${MAX_FONTE_S / 60} minutos: corte antes de enviar`);
+    const itemId = input.calendarioItemId ? uuid.parse(input.calendarioItemId) : null;
+    const marca = brief.identidade === "workspace" ? await marcaDoWorkspace(ctx.workspace.id, input.marcaId) : null;
+    await workerOnline();
+    const id = await sql.begin(async (tx) => {
+      const [p] = await tx<{ id: string }[]>`
+        insert into ads.video_projects (workspace_id, brand_id, kind, title, brief, status, created_by)
+        values (${ctx.workspace.id}, ${marca}, 'edit', ${brief.produto}, ${tx.json(brief as unknown as Json)}, 'NEW', ${ctx.user.id}) returning id`;
+      if (itemId) {
+        const r = await tx`update ads.calendario_itens set project_id = ${p!.id}, status = 'GERANDO', aprovacao = null, refazendo = null, erro = null, updated_at = now()
+          where id = ${itemId} and workspace_id = ${ctx.workspace.id} and formato = 'REELS' and status in ('SUGERIDO', 'APROVADO', 'REVISAO', 'FALHOU') and refazendo is null`;
+        if (!r.count) throw new Error("Este post não aceita vídeo agora (só Reels que ainda não foram agendados nem estão sendo gerados)");
+      }
+      return p!.id;
+    });
+    await enfileirar(ctx, id, { mode: "full" });
+    await audit(sql, { workspaceId: ctx.workspace.id, actor: ctx.actor, action: "Editar vídeo enviado", entityType: "video_project", entityId: id, entityName: brief.produto, after: { rede: brief.rede, legenda: brief.estiloLegenda, calendario: itemId } });
+    revalidatePath("/studio");
+    if (itemId) revalidatePath("/conteudos");
+    return id;
+  });
+}
+
+const revisaoEdicaoSchema = z.object({
+  // blocos da legenda que mudaram (índices das palavras do plano atual); texto vazio apaga o trecho da legenda
+  legendas: z.array(z.object({ i0: z.number().int().min(0), i1: z.number().int().min(0), texto: z.string().trim().max(200, "Trecho da legenda muito longo") })).max(2000),
+  overlays: z.array(z.object({
+    texto: z.string().trim().min(1, "Animação sem texto").max(90, "Texto da animação muito longo"),
+    sub: z.string().trim().max(140, "Texto de apoio muito longo"),
+    itens: z.array(z.string().trim().min(1, "Item vazio").max(60, "Item muito longo")).max(4).optional(),
+    remover: z.boolean(),
+  })).max(40),
+  estiloLegenda: briefEdicaoSchema.shape.estiloLegenda,
+  rede: briefEdicaoSchema.shape.rede,
+  legendasLigadas: z.boolean(),
+});
+
+/** Aprova a edição (legenda corrigida, animações, estilo e rede) e gera o vídeo. Também serve para refazer com outro estilo. */
+export async function aprovarEdicao(projectId: string, input: unknown) {
+  return run(async () => {
+    const ctx = await requireCtx();
+    requireRole(ctx, "editor");
+    const p = await doWorkspace(ctx, projectId);
+    if (p.ocupado) throw new Error("Este vídeo já está sendo gerado");
+    const e = revisaoEdicaoSchema.parse(input);
+    const [row] = await db()<{ storyboard: unknown; brief: unknown }[]>`select storyboard, brief from ads.video_projects where id = ${p.id} and kind = 'edit'`;
+    const plano = planoEdicaoSchema.safeParse(row?.storyboard);
+    if (!row || !plano.success) throw new Error("Esta edição ainda não tem transcrição. Espere o worker terminar.");
+    if (e.overlays.length !== plano.data.overlays.length) throw new Error("As animações mudaram. Recarregue a página.");
+    // trechos de trás para frente: os índices dos anteriores não mudam
+    const trechos = [...e.legendas].sort((a, b) => b.i0 - a.i0);
+    let palavras = plano.data.palavras;
+    let limite = palavras.length;
+    for (const t of trechos) {
+      if (t.i1 < t.i0 || t.i1 >= limite) throw new Error("A legenda mudou. Recarregue a página.");
+      palavras = reescrever(palavras, t.i0, t.i1, t.texto);
+      limite = t.i0;
+    }
+    const overlays = plano.data.overlays.flatMap((o, i) => (e.overlays[i]!.remover ? [] : [{ ...o, texto: e.overlays[i]!.texto, sub: e.overlays[i]!.sub, ...(o.itens ? { itens: e.overlays[i]!.itens ?? o.itens } : {}) }]));
+    const novo = planoEdicaoSchema.parse({ ...plano.data, palavras, overlays });
+    const brief = briefEdicaoSchema.parse({ ...(row.brief as object), estiloLegenda: e.estiloLegenda, rede: e.rede, legendas: e.legendasLigadas });
+    await workerOnline();
+    await db()`update ads.video_projects set storyboard = ${db().json(novo as unknown as Json)}, brief = ${db().json(brief as unknown as Json)} where id = ${p.id}`;
+    await enfileirar(ctx, p.id, { mode: "render" });
+    await audit(db(), { workspaceId: ctx.workspace.id, actor: ctx.actor, action: "Aprovar edição do vídeo", entityType: "video_project", entityId: p.id, entityName: p.title, after: { legenda: e.estiloLegenda, rede: e.rede, trechosEditados: e.legendas.length } });
     revalidatePath(`/studio/${p.id}`);
   });
 }

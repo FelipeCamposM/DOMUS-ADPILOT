@@ -1,12 +1,13 @@
 import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { chaveElevenLabs, db, MAX_SLIDES, planoImagemSchema, VOZES, vozesElevenLabs } from "@domus-ads/core";
+import { briefEdicaoSchema, chaveElevenLabs, db, MAX_SLIDES, planoEdicaoSchema, planoImagemSchema, REDES, VOZES, vozesElevenLabs } from "@domus-ads/core";
 import { z } from "zod";
 import { can, requireCtx } from "@/lib/ctx";
 import { projeto, variacoes } from "@/lib/video";
 import { ImageProjectView } from "@/modules/studio/ImageProjectView";
 import { ProjectView } from "@/modules/studio/ProjectView";
+import { EditProjectView } from "@/modules/studio/edicao/EditProjectView";
 import { Consumo } from "@/modules/studio/Consumo";
 
 export default async function ProjetoPage({ params }: { params: Promise<{ id: string }> }) {
@@ -28,6 +29,26 @@ export default async function ProjetoPage({ params }: { params: Promise<{ id: st
         </div>
         <ImageProjectView id={p.id} status={p.status} step={p.step_detail} error={p.error} progress={p.progress} formato={b.formato}
           variacoes={await variacoes(ctx.workspace.id, p.id)} conceitos={planoImagemSchema.safeParse(p.storyboard).data?.conceitos ?? []} carrossel={b.tipo === "carrossel"} maxSlides={MAX_SLIDES} podeEditar={can(ctx, "editor")} />
+        <Consumo workspaceId={ctx.workspace.id} projetoId={p.id} />
+      </div>
+    );
+  }
+  if (p.kind === "edit") {
+    const brief = briefEdicaoSchema.parse(p.brief);
+    return (
+      <div className="page">
+        <div className="page-head">
+          <div>
+            <Link href="/studio" className="eyebrow" data-enter style={{ textDecoration: "none" }}><ChevronLeft size={12} aria-hidden /> Studio</Link>
+            <h1 className="page-title" data-enter>{p.title}</h1>
+            <p className="subtle small" data-enter>Vídeo enviado · {brief.formato} · {REDES[brief.rede]}</p>
+          </div>
+        </div>
+        <EditProjectView podeEditar={can(ctx, "editor")} p={{
+          id: p.id, status: p.status, step_detail: p.step_detail, error: p.error, progress: p.progress, brief,
+          plano: planoEdicaoSchema.safeParse(p.storyboard).data ?? null,
+          creative: p.creative ? { id: p.creative.id, duration_ms: p.creative.duration_ms, size_bytes: p.creative.size_bytes, avisos: p.creative.metadata.avisos ?? [] } : null,
+        }} />
         <Consumo workspaceId={ctx.workspace.id} projetoId={p.id} />
       </div>
     );

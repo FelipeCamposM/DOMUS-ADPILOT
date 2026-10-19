@@ -2,7 +2,7 @@ import "server-only";
 import { db, type Brief, type PaletaProjeto, type Storyboard } from "@domus-ads/core";
 
 export interface ProjetoLinha {
-  kind: "video" | "image"; id: string; title: string; status: string; step_detail: string | null; error: string | null; creative_id: string | null;
+  kind: "video" | "image" | "edit"; id: string; title: string; status: string; step_detail: string | null; error: string | null; creative_id: string | null;
   brief: Brief; created_at: Date; updated_at: Date; progress: number | null; thumb: boolean;
 }
 

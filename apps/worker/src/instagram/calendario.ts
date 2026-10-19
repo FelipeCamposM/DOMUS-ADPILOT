@@ -298,9 +298,10 @@ async function passada() {
     where i.status = 'GERANDO' and i.project_id is not null`;
   for (const i of gerando) {
     if (i.ocupado) continue;
-    if (i.p_status === "REVIEW" && i.p_kind === "video") {
-      const [ok] = await sql`update ads.video_projects set status = 'QUEUED', step_detail = 'Calendário: roteiro aprovado, gerando o vídeo…', updated_at = now() where id = ${i.project_id} and status = 'REVIEW' returning id`;
-      if (ok) await enqueueJob(sql, { workspaceId: i.workspace_id, type: "GENERATE_VIDEO", payload: { projectId: i.project_id, mode: "rerender" }, maxAttempts: 1 });
+    if (i.p_status === "REVIEW" && i.p_kind !== "image") {
+      // vídeo: roteiro aprovado sozinho · vídeo do cliente (edição): legenda e animações aprovadas sozinhas (a arte pronta vai para a aprovação)
+      const [ok] = await sql`update ads.video_projects set status = 'QUEUED', step_detail = 'Calendário: aprovado, gerando o vídeo…', updated_at = now() where id = ${i.project_id} and status = 'REVIEW' returning id`;
+      if (ok) await enqueueJob(sql, { workspaceId: i.workspace_id, type: "GENERATE_VIDEO", payload: { projectId: i.project_id, mode: i.p_kind === "edit" ? "render" : "rerender" }, maxAttempts: 1 });
     } else if (i.p_status === "FAILED" || !i.p_status) {
       await falhar(i.id, i.p_erro ?? "A geração da arte falhou", i);
     } else if (i.p_status === "READY") {
@@ -420,8 +421,10 @@ export function lerResposta(texto: string): { tipo: "sim" | "nao" } | { tipo: "p
 /** Mensagem do número dos avisos: sim agenda; não pergunta o que mudar; o pedido vai para a IA refazer o post e a arte. */
 export async function responderWhatsapp(texto: string) {
   const sql = db();
-  const [i] = await sql<{ id: string; workspace_id: string; aprovacao: string }[]>`
-    select id, workspace_id, aprovacao from ads.calendario_itens where status = 'REVISAO' and aprovacao in ('ENVIADO', 'MUDANCA') order by updated_at desc limit 1`;
+  const [i] = await sql<{ id: string; workspace_id: string; aprovacao: string; project_id: string | null; editado: boolean }[]>`
+    select i.id, i.workspace_id, i.aprovacao, i.project_id, coalesce(p.kind = 'edit', false) as editado
+    from ads.calendario_itens i left join ads.video_projects p on p.id = i.project_id
+    where i.status = 'REVISAO' and i.aprovacao in ('ENVIADO', 'MUDANCA') order by i.updated_at desc limit 1`;
   if (!i) return avisar("Não tem post esperando resposta agora. Quando a próxima arte ficar pronta, eu mando aqui.");
   const r = lerResposta(texto);
   if (i.aprovacao === "ENVIADO" && r.tipo === "sim") {
@@ -435,11 +438,30 @@ export async function responderWhatsapp(texto: string) {
   // esperando o pedido, um "sim" ou "não" solto não é pedido
   const pedido = r.tipo === "pedido" ? r.pedido : "";
   if (pedido.length < 3) return avisar(i.aprovacao === "MUDANCA" ? "Me diga o que mudar no post (ex.: título mais curto, falar do app)." : "Não entendi. Responda *SIM* para agendar ou diga o que mudar no post.");
+  if (i.editado && i.project_id) {
+    // vídeo enviado pelo cliente: o pedido vira ajuste da edição (o vídeo dele fica; muda legenda, animação, efeito)
+    if (!(await ajustarEdicao(i.id, i.project_id, i.workspace_id, pedido))) return;
+    return avisar("✍️ Certo! Estou ajustando o seu vídeo com o pedido. Quando ficar pronto, eu mando aqui de novo.");
+  }
   const [ok] = await sql`update ads.calendario_itens set status = 'APROVADO', aprovacao = null, project_id = null, refazendo = 'item', erro = null, updated_at = now()
     where id = ${i.id} and status = 'REVISAO' returning id`;
   if (!ok) return;
   await enqueueJob(sql, { workspaceId: i.workspace_id, type: "AI_CALENDARIO", payload: { itemId: i.id, campo: "item", dica: pedido }, maxAttempts: 1 });
   await avisar("✍️ Certo! A IA está refazendo o post com o seu pedido. Quando a arte nova ficar pronta, eu mando aqui de novo.");
+}
+
+/** Pedido de mudança num Reels feito do vídeo do cliente: ajusta a edição e o post volta a "gerando" (depois, aprovação de novo). */
+export async function ajustarEdicao(itemId: string, projectId: string, workspaceId: string, pedido: string): Promise<boolean> {
+  const sql = db();
+  return sql.begin(async (tx) => {
+    const [ok] = await tx`update ads.calendario_itens set status = 'GERANDO', aprovacao = null, erro = null, updated_at = now() where id = ${itemId} and status = 'REVISAO' returning id`;
+    if (!ok) return false;
+    const [p] = await tx`update ads.video_projects set status = 'QUEUED', step_detail = 'Calendário: ajustando com o seu pedido…', error = null, updated_at = now()
+      where id = ${projectId} and status in ('READY', 'FAILED') returning id`;
+    if (!p) throw new Error("O vídeo ainda está sendo gerado");
+    await enqueueJob(tx, { workspaceId, type: "GENERATE_VIDEO", payload: { projectId, mode: "adjust", instruction: pedido.slice(0, 2000) }, maxAttempts: 1 });
+    return true;
+  });
 }
 
 /** Publicação agendada que passou da tolerância (PC desligado na hora): não sai atrasada demais; vira FALHOU e avisa. */

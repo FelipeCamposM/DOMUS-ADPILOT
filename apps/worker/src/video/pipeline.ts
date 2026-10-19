@@ -13,10 +13,11 @@ import { MOTION_KIT_JS } from "./kit/motion-kit";
 import { revisarComposicao } from "./qa";
 import { gerarTrilha } from "./music";
 import { ttsPara } from "./tts";
+import { runEdicao } from "./editar";
 
 type Etapa = "SCRIPTING" | "VOICE" | "COMPOSING" | "RENDERING" | "MIXING" | "UPLOADING" | "READY";
-interface Ctx { signal: AbortSignal; log: (m: string) => Promise<void>; progress: (p: number) => Promise<void> }
-export interface VideoPayload { projectId: string; mode?: "full" | "rerender" | "adjust" | "voz"; instruction?: string }
+export interface Ctx { signal: AbortSignal; log: (m: string) => Promise<void>; progress: (p: number) => Promise<void> }
+export interface VideoPayload { projectId: string; mode?: "full" | "rerender" | "render" | "adjust" | "voz"; instruction?: string }
 
 const PROGRESSO: Record<Etapa, number> = { SCRIPTING: 5, VOICE: 20, COMPOSING: 32, RENDERING: 50, MIXING: 85, UPLOADING: 93, READY: 100 };
 
@@ -29,9 +30,10 @@ const PROGRESSO: Record<Etapa, number> = { SCRIPTING: 5, VOICE: 20, COMPOSING: 3
  */
 export async function runVideo(payload: VideoPayload, c: Ctx) {
   const sql = db();
-  const [p] = await sql<{ id: string; workspace_id: string; title: string; brief: Brief; storyboard: Storyboard | null; composition: string | null; creative_id: string | null; paleta: unknown }[]>`
-    select id, workspace_id, title, brief, storyboard, composition, creative_id, paleta from ads.video_projects where id = ${payload.projectId}`;
+  const [p] = await sql<{ id: string; kind: string; workspace_id: string; title: string; brief: Brief; storyboard: Storyboard | null; composition: string | null; creative_id: string | null; paleta: unknown }[]>`
+    select id, kind, workspace_id, title, brief, storyboard, composition, creative_id, paleta from ads.video_projects where id = ${payload.projectId}`;
   if (!p) throw new Error("Projeto de vídeo não encontrado");
+  if (p.kind === "edit") return runEdicao(payload, c); // vídeo enviado pelo usuário
   const brief = briefSchema.parse(p.brief);
   const [w, h] = FORMATOS[brief.formato];
   const pasta = join(DATA_DIR, "videos", p.id);
@@ -184,44 +186,55 @@ export async function runVideo(payload: VideoPayload, c: Ctx) {
     const sfx = await Promise.all(sb.sfx.map(async (e, i) => ({ ...e, file: await arquivoSfx(p.workspace_id, e.effect, i, pasta) })));
     const final = join(pasta, "final.mp4");
     await mixar({ video: mudo, saida: final, duracao: sb.duration, vozes, sfx, musica: musica ? { file: musica.file, volume: musica.volume } : null, signal: c.signal });
-    const thumb = join(pasta, "thumb.jpg");
-    const t = Math.min(sb.duration - 0.1, Math.max(0.5, (sb.scenes[0]?.end ?? 2) * 0.75));
-    await ffmpeg(["-ss", String(t), "-i", final, "-frames:v", "1", "-q:v", "3", thumb]);
-
     // 6. Armazenamento (PC ou R2, conforme STORAGE) + criativo; o banco guarda só a chave e onde ela está
     await etapa("UPLOADING", "Enviando para o armazenamento…");
-    const id = p.creative_id ?? crypto.randomUUID();
-    const versao = Date.now().toString(36);
-    const kVideo = r2Key(p.workspace_id, "videos", `${id}-${versao}.mp4`);
-    const kThumb = r2Key(p.workspace_id, "thumbnails", `${id}-${versao}.jpg`);
-    const size = statSync(final).size;
-    const [antigo] = p.creative_id ? await sql<{ storage: string; r2_key: string | null; thumbnail_key: string | null }[]>`select storage, r2_key, thumbnail_key from ads.creatives where id = ${p.creative_id}` : [];
-    const storage = await guardarArquivo(kVideo, final, "video/mp4");
-    if (existsSync(thumb)) await guardarArquivo(kThumb, thumb, "image/jpeg");
     const meta = { projectId: p.id, brief, storyboard: sb, voice: brief.voz, music: musica?.nome ?? null, avisos };
-    const dur = Math.round((await duracao(final)) * 1000);
-    if (p.creative_id) {
-      await sql`update ads.creatives set name = ${sb.title}, storage = ${storage}, r2_key = ${kVideo}, thumbnail_key = ${existsSync(thumb) ? kThumb : null}, size_bytes = ${size},
-        width = ${w}, height = ${h}, duration_ms = ${dur}, status = 'READY', metadata = ${sql.json(meta as unknown as Json)}, updated_at = now() where id = ${id}`;
-    } else {
-      await sql`insert into ads.creatives (id, workspace_id, name, type, status, storage, r2_key, thumbnail_key, mime, size_bytes, width, height, duration_ms, metadata)
-        values (${id}, ${p.workspace_id}, ${sb.title}, 'VIDEO', 'READY', ${storage}, ${kVideo}, ${existsSync(thumb) ? kThumb : null}, 'video/mp4', ${size}, ${w}, ${h}, ${dur}, ${sql.json(meta as unknown as Json)})`;
-    }
-    await sql`update ads.video_projects set status = 'READY', step_detail = ${meta.avisos[0] ?? "Pronto"}, creative_id = ${id}, error = null, updated_at = now() where id = ${p.id}`;
+    const r2 = await salvarVideo({ p, pasta, final, titulo: sb.title, w, h, meta, thumbEm: Math.min(sb.duration - 0.1, Math.max(0.5, (sb.scenes[0]?.end ?? 2) * 0.75)) });
     await c.progress(100);
-    // versão anterior deste vídeo (ajuste/novo render) não fica ocupando espaço
-    for (const k of [antigo?.r2_key, antigo?.thumbnail_key]) if (antigo && k && k !== kVideo && k !== kThumb) await apagarArquivo(antigo.storage, k).catch(() => {});
-    // libera disco: fica só o que serve para ajustar depois (narrações e composição)
-    for (const f of ["render.mp4", "final.mp4", "thumb.jpg"]) rmSync(join(pasta, f), { force: true });
-    return { creativeId: id, duracao: dur / 1000, tamanho: size };
+    return r2;
   } catch (e) {
     await sql`update ads.video_projects set status = 'FAILED', error = ${(e as Error).message.slice(0, 1000)}, updated_at = now() where id = ${p.id}`;
     throw e;
   }
 }
 
+/**
+ * Guarda o MP4 final (PC ou R2) com a miniatura e cria/atualiza o criativo do projeto (que fica READY).
+ * A versão anterior deste vídeo não fica ocupando espaço; na pasta fica só o que serve para ajustar depois.
+ */
+export async function salvarVideo(o: {
+  p: { id: string; workspace_id: string; creative_id: string | null }; pasta: string; final: string; titulo: string; w: number; h: number;
+  meta: Record<string, unknown> & { avisos: string[] }; thumbEm: number;
+}) {
+  const sql = db();
+  const { p, final } = o;
+  const thumb = join(o.pasta, "thumb.jpg");
+  await ffmpeg(["-ss", String(o.thumbEm), "-i", final, "-frames:v", "1", "-q:v", "3", thumb]);
+  const id = p.creative_id ?? crypto.randomUUID();
+  const versao = Date.now().toString(36);
+  const kVideo = r2Key(p.workspace_id, "videos", `${id}-${versao}.mp4`);
+  const kThumb = r2Key(p.workspace_id, "thumbnails", `${id}-${versao}.jpg`);
+  const size = statSync(final).size;
+  const [antigo] = p.creative_id ? await sql<{ storage: string; r2_key: string | null; thumbnail_key: string | null }[]>`select storage, r2_key, thumbnail_key from ads.creatives where id = ${p.creative_id}` : [];
+  const storage = await guardarArquivo(kVideo, final, "video/mp4");
+  if (existsSync(thumb)) await guardarArquivo(kThumb, thumb, "image/jpeg");
+  const dur = Math.round((await duracao(final)) * 1000);
+  const meta = sql.json(o.meta as unknown as Json);
+  if (antigo) {
+    await sql`update ads.creatives set name = ${o.titulo}, storage = ${storage}, r2_key = ${kVideo}, thumbnail_key = ${existsSync(thumb) ? kThumb : null}, size_bytes = ${size},
+      width = ${o.w}, height = ${o.h}, duration_ms = ${dur}, status = 'READY', metadata = ${meta}, updated_at = now() where id = ${id}`;
+  } else {
+    await sql`insert into ads.creatives (id, workspace_id, name, type, status, storage, r2_key, thumbnail_key, mime, size_bytes, width, height, duration_ms, metadata)
+      values (${id}, ${p.workspace_id}, ${o.titulo}, 'VIDEO', 'READY', ${storage}, ${kVideo}, ${existsSync(thumb) ? kThumb : null}, 'video/mp4', ${size}, ${o.w}, ${o.h}, ${dur}, ${meta})`;
+  }
+  await sql`update ads.video_projects set status = 'READY', step_detail = ${o.meta.avisos[0] ?? "Pronto"}, creative_id = ${id}, error = null, updated_at = now() where id = ${p.id}`;
+  for (const k of [antigo?.r2_key, antigo?.thumbnail_key]) if (antigo && k && k !== kVideo && k !== kThumb) await apagarArquivo(antigo.storage, k).catch(() => {});
+  for (const f of ["render.mp4", "final.mp4", "thumb.jpg"]) rmSync(join(o.pasta, f), { force: true });
+  return { creativeId: id, duracao: dur / 1000, tamanho: size };
+}
+
 /** Grava o index.html e roda o lint da HyperFrames; devolve só os erros (avisos não travam o render). */
-async function lint(pasta: string, html: string): Promise<string[]> {
+export async function lint(pasta: string, html: string): Promise<string[]> {
   writeFileSync(join(pasta, "index.html"), html, "utf8");
   const r = await hyperframes(["lint", pasta, "--json"], { cwd: pasta, timeoutMs: 120_000 });
   try {
@@ -232,7 +245,7 @@ async function lint(pasta: string, html: string): Promise<string[]> {
   }
 }
 
-async function mixar(m: {
+export async function mixar(m: {
   video: string; saida: string; duracao: number; signal: AbortSignal;
   vozes: { file: string; start: number }[]; sfx: { file: string; time: number; volume: number }[]; musica: { file: string; volume: number } | null;
 }) {

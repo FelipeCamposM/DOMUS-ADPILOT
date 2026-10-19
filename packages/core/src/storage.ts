@@ -1,4 +1,7 @@
+import { createWriteStream } from "node:fs";
 import { copyFile, mkdir, readFile, rm, stat } from "node:fs/promises";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { dirname, resolve, sep } from "node:path";
 import type { Sql } from "./db";
 import { enqueueJob } from "./jobs";
@@ -71,6 +74,16 @@ export async function lerArquivo(c: { storage: string; r2_key: string; arquivado
   const r = await fetch(await r2Presign(c.r2_key, "GET", 600));
   if (!r.ok) throw new Error(`R2 GET ${r.status}`);
   return Buffer.from(await r.arrayBuffer());
+}
+
+/** Copia um arquivo (de qualquer lugar) para o disco sem passar tudo pela memória: vídeos grandes enviados pelo usuário. */
+export async function baixarArquivo(c: { storage: string; r2_key: string; arquivado?: boolean }, destino: string): Promise<void> {
+  await mkdir(dirname(destino), { recursive: true });
+  if (c.arquivado) return copyFile(caminhoDrive(c.r2_key), destino);
+  if (c.storage === "local") return copyFile(caminhoLocal(c.r2_key), destino);
+  const r = await fetch(await r2Presign(c.r2_key, "GET", 3600));
+  if (!r.ok || !r.body) throw new Error(`R2 GET ${r.status}`);
+  await pipeline(Readable.fromWeb(r.body as import("node:stream/web").ReadableStream), createWriteStream(destino));
 }
 
 /** Apaga de onde estiver; a cópia do Drive só some quando quem apaga é o worker (a Vercel não enxerga o Drive). */

@@ -198,6 +198,19 @@ export async function pedirMudanca(id: string, pedido: string) {
     const d = z.string().trim().min(3, "Diga o que mudar").max(500, "Pedido muito longo (até 500 caracteres)").parse(pedido);
     await workerOnline();
     const sql = db();
+    // Reels feito do vídeo do cliente: o pedido ajusta a edição (o vídeo dele fica); senão a IA refaz o post todo
+    const [ed] = await sql<{ id: string }[]>`select p.id from ads.calendario_itens i join ads.video_projects p on p.id = i.project_id where i.id = ${i.id} and p.kind = 'edit'`;
+    if (ed) {
+      await sql.begin(async (tx) => {
+        const [ok] = await tx`update ads.calendario_itens set status = 'GERANDO', aprovacao = null, erro = null, updated_at = now() where id = ${i.id} and status = 'REVISAO' returning id`;
+        if (!ok) throw new Error("Este post não está esperando aprovação");
+        const [p] = await tx`update ads.video_projects set status = 'QUEUED', step_detail = 'Ajustando com o seu pedido…', error = null, updated_at = now() where id = ${ed.id} and status in ('READY', 'FAILED') returning id`;
+        if (!p) throw new Error("O vídeo ainda está sendo gerado");
+        await enqueueJob(tx, { workspaceId: ctx.workspace.id, type: "GENERATE_VIDEO", payload: { projectId: ed.id, mode: "adjust", instruction: d }, createdBy: ctx.user.id, maxAttempts: 1 });
+      });
+      revalidar();
+      return;
+    }
     const r = await sql`update ads.calendario_itens set status = 'APROVADO', aprovacao = null, project_id = null, refazendo = 'item', erro = null, updated_at = now()
       where id = ${i.id} and status = 'REVISAO'`;
     if (!r.count) throw new Error("Este post não está esperando aprovação");

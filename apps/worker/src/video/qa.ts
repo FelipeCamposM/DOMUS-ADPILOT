@@ -12,26 +12,29 @@ import puppeteer from "puppeteer-core";
  *  - texto que fica pouco tempo para ser lido (mínimo por número de palavras).
  * Só conta o que persiste por 2 amostras seguidas (ignora o meio de uma entrada/saída).
  */
-export async function revisarComposicao(pasta: string, o: { w: number; h: number; total: number }): Promise<string[]> {
+export async function revisarComposicao(pasta: string, o: { w: number; h: number; total: number; zonas?: { x0: number; y0: number; x1: number; y1: number; rotulo: string }[] }): Promise<string[]> {
   const chrome = acharChrome();
   if (!chrome) return []; // sem Chrome conhecido: não trava o vídeo (o lint já passou)
   const b = await puppeteer.launch({ executablePath: chrome, headless: true, args: ["--allow-file-access-from-files", "--disable-web-security", "--hide-scrollbars"] });
   try {
     const pg = await b.newPage();
     await pg.setViewport({ width: o.w, height: o.h });
+    // o QA mede só o texto: vídeo de fundo (edição) não carrega, senão a página nunca fica ociosa
+    await pg.setRequestInterception(true);
+    pg.on("request", (q) => void (q.resourceType() === "media" ? q.abort() : q.continue()));
     await pg.goto(pathToFileURL(join(pasta, "index.html")).href, { waitUntil: "networkidle0", timeout: 60_000 });
     await pg.waitForFunction(() => !!(window as unknown as { __timelines?: Record<string, unknown> }).__timelines?.main, { timeout: 20_000 });
     await pg.evaluate(() => document.fonts.ready.then(() => new Promise((ok) => setTimeout(ok, 300))));
     // o tsx/esbuild embrulha funções com __name(...) para preservar nomes; a página precisa dessa função também
     await pg.evaluate("window.__name = window.__name || ((f) => f)");
-    return await pg.evaluate(medir, o.w, o.h, o.total);
+    return await pg.evaluate(medir, o.w, o.h, o.total, o.zonas ?? null);
   } finally {
     await b.close();
   }
 }
 
 /** Roda DENTRO do navegador (serializada pelo puppeteer): nada de imports aqui. */
-function medir(W: number, H: number, T: number): string[] {
+function medir(W: number, H: number, T: number, zonas: { x0: number; y0: number; x1: number; y1: number; rotulo: string }[] | null): string[] {
   type Tl = { seek: (t: number, s?: boolean) => void };
   const tl = (window as unknown as { __timelines: Record<string, Tl> }).__timelines.main!;
   const vertical = H / W > 1.2;
@@ -91,10 +94,13 @@ function medir(W: number, H: number, T: number): string[] {
       if (op < 0.6 || r.width < 2 || r.height < 2) { fora.delete(e); continue; }
       vis.push({ e, r });
       const margemV = vertical ? { t: H * 0.06, b: H * 0.08 } : { t: 0, b: 0 };
-      const saiu = r.left < -2 || r.right > W + 2 || r.top < margemV.t - 2 || r.bottom > H - margemV.b + 2;
+      // com as zonas da rede (edição): a interface do app é o limite; sem elas, as margens genéricas do vertical
+      const zona = zonas?.find((z) => Math.min(r.right, z.x1) - Math.max(r.left, z.x0) > 4 && Math.min(r.bottom, z.y1) - Math.max(r.top, z.y0) > 4);
+      const saiu = r.left < -2 || r.right > W + 2 || (zonas ? !!zona : r.top < margemV.t - 2 || r.bottom > H - margemV.b + 2);
       if (saiu) {
         const n = (fora.get(e) ?? 0) + 1; fora.set(e, n);
-        if (n === 2) problemas.push(`Texto “${nome(e)}” sai do quadro${vertical ? " ou entra na faixa da interface do Reels" : ""} em ${fmt(t)} (caixa ${Math.round(r.left)},${Math.round(r.top)} até ${Math.round(r.right)},${Math.round(r.bottom)} num quadro ${W}×${H})`);
+        if (n === 2) problemas.push(zona ? `Texto “${nome(e)}” fica em cima de “${zona.rotulo}” (interface da rede) em ${fmt(t)}`
+          : `Texto “${nome(e)}” sai do quadro${vertical ? " ou entra na faixa da interface do Reels" : ""} em ${fmt(t)} (caixa ${Math.round(r.left)},${Math.round(r.top)} até ${Math.round(r.right)},${Math.round(r.bottom)} num quadro ${W}×${H})`);
       } else fora.delete(e);
     }
     for (let i = 0; i < vis.length; i++) for (let j = i + 1; j < vis.length; j++) {
@@ -111,7 +117,7 @@ function medir(W: number, H: number, T: number): string[] {
   for (const [e, c] of corrida) {
     if (c.max <= 0) continue;
     const palavras = (e.innerText || "").trim().split(/\s+/).filter(Boolean).length;
-    const legenda = !!e.closest(".leg");
+    const legenda = !!e.closest(".leg,.lg");
     const minimo = legenda ? 0.7 : Math.min(3, Math.max(1, 0.25 * palavras + 0.5));
     const terminouNoFim = c.ini >= 0; // ainda visível no último quadro: não é "curto demais"
     if (!terminouNoFim && palavras >= 2 && c.max + 0.05 < minimo) problemas.push(`Texto “${nome(e)}” fica só ${fmt(c.max)} visível (mínimo para ler: ${fmt(minimo)})`);

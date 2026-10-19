@@ -10,6 +10,7 @@ export * from "./providers";
 export * from "./setup";
 export * from "./r2";
 export * from "./video";
+export * from "./edicao";
 export * from "./storage";
 export * from "./brand";
 export * from "./settings";

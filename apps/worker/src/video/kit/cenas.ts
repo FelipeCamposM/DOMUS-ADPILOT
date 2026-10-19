@@ -97,7 +97,7 @@ export function blocosLegenda(c: Cena): { s: number; e: number; txt: string[]; p
 }
 
 /** Cores [fundo, destaque, texto, destaque 2] e fontes que as cenas prontas usam: as da marca, completadas pelo estilo. */
-export function paletaCenas(brief: Brief, brand: Brand) {
+export function paletaCenas(brief: Pick<Brief, "estiloVisual">, brand: Brand) {
   const est = (brief.estiloVisual === "livre" ? "hud" : brief.estiloVisual) as Estilo;
   const pad = PADRAO[est];
   const cores = brand.cores.map((c) => c.hex);

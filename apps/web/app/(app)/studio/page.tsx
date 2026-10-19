@@ -1,4 +1,4 @@
-import { ArrowRight, Clapperboard, ImageIcon, Send } from "lucide-react";
+import { ArrowRight, Clapperboard, ImageIcon, Scissors, Send } from "lucide-react";
 import Link from "next/link";
 import { can, requireCtx } from "@/lib/ctx";
 import { ago } from "@/lib/format";
@@ -13,6 +13,7 @@ const CRIAR = [
   { href: "/studio/novo?tipo=post", icone: Send, titulo: "Novo post", sub: "Instagram · imagem ou vídeo", desc: "A IA escreve arte, legenda e hashtags. Você aprova no WhatsApp e ele publica sozinho no horário.", destaque: true },
   { href: "/studio/novo?tipo=imagem", icone: ImageIcon, titulo: "Imagem avulsa", sub: "Anúncio · teste A/B · carrossel", desc: "Conceitos para você aprovar e PNGs prontos para baixar ou usar em campanhas." },
   { href: "/studio/novo", icone: Clapperboard, titulo: "Vídeo avulso", sub: "Anúncio · Reels · Stories", desc: "Roteiro, narração, música e animação. Você aprova o roteiro e recebe o MP4." },
+  { href: "/studio/novo?tipo=edicao", icone: Scissors, titulo: "Editar meu vídeo", sub: "Legenda · cortes · animações 3D", desc: "Envie o seu vídeo: a IA corta as pausas, legenda palavra por palavra e anima por cima." },
 ] as const;
 
 const FILTROS = [["todos", "Todos"], ["voce", "Esperando você"], ["producao", "Em produção"], ["prontos", "Prontos"], ["falhas", "Com erro"]] as const;
@@ -64,8 +65,8 @@ export default async function StudioPage({ searchParams }: { searchParams: Promi
         <div className="studio-grid">
           {lista.map((p) => (
             <VideoCard key={p.id} href={`/studio/${p.id}`} creativeId={p.creative_id} thumb={p.thumb} titulo={p.title} status={p.status} progress={p.progress}
-              formato={p.brief.formato} kind={p.kind}
-              sub={p.kind === "image" ? `Imagem · ${p.brief.formato.replace(".", ",")} · ${ago(p.updated_at)}` : `Vídeo · ${p.brief.formato} · ${p.brief.duracao} s · ${ago(p.updated_at)}`} />
+              formato={p.brief.formato} kind={p.kind === "image" ? "image" : "video"}
+              sub={p.kind === "image" ? `Imagem · ${p.brief.formato.replace(".", ",")} · ${ago(p.updated_at)}` : p.kind === "edit" ? `Edição · ${p.brief.formato} · ${ago(p.updated_at)}` : `Vídeo · ${p.brief.formato} · ${p.brief.duracao} s · ${ago(p.updated_at)}`} />
           ))}
         </div>
       )}

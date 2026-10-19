@@ -299,6 +299,7 @@ function Editor({ item, podeEditar, onFechar }: { item: ItemTela; podeEditar: bo
           {item.status === "GERANDO" ? <Loader2 className="animate-spin" size={15} aria-hidden /> : item.status === "FALHOU" ? <AlertTriangle size={15} aria-hidden /> : item.status === "REVISAO" ? <MessageCircle size={15} aria-hidden /> : <Check size={15} aria-hidden />}
           <span style={{ flex: 1 }}>{STATUS[item.status]}{item.status === "GERANDO" && item.etapa ? `: ${item.etapa}` : ""}{item.status === "AGENDADO" ? ": aprovado, sai sozinho no horário." : ""}{item.status === "REVISAO" ? ": a arte está pronta. Responda SIM no WhatsApp ou aprove aqui." : ""}</span>
           {item.project_id && <Link className="btn btn-ghost btn-xs" href={`/studio/${item.project_id}`}>Ver arte</Link>}
+          {podeEditar && item.formato === "REELS" && ["REVISAO", "FALHOU"].includes(item.status) && <Link className="btn btn-ghost btn-xs" href={`/studio/novo?tipo=edicao&item=${item.id}`}>Usar meu vídeo</Link>}
           {item.post_id && <Link className="btn btn-ghost btn-xs" href={`/instagram/publicar/${item.post_id}`}>Abrir publicação</Link>}
           {item.permalink && <a className="btn btn-ghost btn-xs" href={item.permalink} target="_blank" rel="noreferrer">No Instagram <ExternalLink aria-hidden /></a>}
         </div>
@@ -341,7 +342,9 @@ function Editor({ item, podeEditar, onFechar }: { item: ItemTela; podeEditar: bo
           <input id="ed-obj" className="input-sm" maxLength={300} value={v.objetivo} onChange={(e) => setV({ ...v, objetivo: e.target.value })} placeholder="Ex.: gerar salvamentos, levar ao link da bio" /></div>
 
         <div className="cal-bloco">
-          <div className="cal-rotulo"><b>{v.formato === "REELS" ? "Roteiro do vídeo" : v.formato === "CARROSSEL" ? "Slides" : "Arte"}</b>{refazerBtn("roteiro")}</div>
+          <div className="cal-rotulo"><b>{v.formato === "REELS" ? "Roteiro do vídeo" : v.formato === "CARROSSEL" ? "Slides" : "Arte"}</b>
+            {podeEditar && item.formato === "REELS" && (item.status === "SUGERIDO" || item.status === "APROVADO") && !item.refazendo && <Link className="btn btn-ghost btn-xs" href={`/studio/novo?tipo=edicao&item=${item.id}`} title="Em vez de a IA criar o vídeo, use um vídeo seu (legenda e animações automáticas)">Usar meu vídeo</Link>}
+            {refazerBtn("roteiro")}</div>
           {v.formato === "FEED" && <>
             <input className="input-sm" maxLength={120} value={r.headline} onChange={(e) => setR({ headline: e.target.value })} placeholder="Título grande da arte" aria-label="Título da arte" />
             <input className="input-sm" maxLength={200} value={r.apoio} onChange={(e) => setR({ apoio: e.target.value })} placeholder="Texto de apoio" aria-label="Texto de apoio" />
