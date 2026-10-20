@@ -4,7 +4,7 @@ import { z } from "zod";
 export const FORMATOS = { "9:16": [1080, 1920], "1:1": [1080, 1080], "16:9": [1920, 1080], "4:5": [1080, 1350] } as const;
 export type Formato = keyof typeof FORMATOS;
 export const DURACOES = [10, 15, 20, 30, 45, 60] as const;
-export const SFX_CATEGORIAS = ["whoosh", "impact", "click", "pop", "notification", "typing", "success", "transition", "bass", "interface"] as const;
+export const SFX_CATEGORIAS = ["whoosh", "impact", "click", "pop", "notification", "typing", "success", "transition", "bass", "interface", "paper"] as const;
 export const MUSICA_TAGS = ["corporate", "technology", "dark", "energetic", "emotional", "minimal", "premium"] as const;
 /** Vozes locais (Kokoro, pt-BR). "none" = sem narração. */
 export const ehVozLocal = (v: string) => v in VOZES;
@@ -56,8 +56,34 @@ export const briefSchema = z.object({
   estiloVisual: z.enum(Object.keys(ESTILOS) as [EstiloVisual, ...EstiloVisual[]], { message: "Estilo inválido" }).default("hud"),
   legendas: z.coerce.boolean().default(true),
   identidade: z.enum(IDENTIDADES).default("workspace"),
+  // estilo salvo (modo Livre): a IA repete a linguagem visual de um vídeo aprovado
+  estiloSalvo: z.string().uuid("Estilo inválido").nullable().default(null),
 }).refine(temObjetivo, MSG_OBJETIVO);
 export type Brief = z.infer<typeof briefSchema>;
+
+/** Efeitos sonoros e climas de música: o que pedir ao ElevenLabs quando a biblioteca não tem (o gerado fica salvo). */
+export const PROMPT_SFX: Record<(typeof SFX_CATEGORIAS)[number], { nome: string; prompt: string; dur: number }> = {
+  whoosh: { nome: "Whoosh", prompt: "quick clean airy whoosh swoosh for motion graphics transition, modern, no reverb tail", dur: 0.8 },
+  impact: { nome: "Impacto", prompt: "punchy cinematic impact hit with subtle low boom, short, clean for social video", dur: 1.2 },
+  click: { nome: "Clique", prompt: "crisp UI mouse click, single, clean, close mic", dur: 0.5 },
+  pop: { nome: "Pop", prompt: "soft playful bubble pop for text appearing, single, clean", dur: 0.5 },
+  notification: { nome: "Notificação", prompt: "pleasant smartphone notification chime, two notes, modern app", dur: 1 },
+  typing: { nome: "Digitação", prompt: "fast light keyboard typing, a few keystrokes, modern laptop", dur: 1.5 },
+  success: { nome: "Sucesso", prompt: "bright positive success chime, ascending notes, app achievement", dur: 1.2 },
+  transition: { nome: "Transição", prompt: "smooth riser into soft swoosh transition for video scene change", dur: 1.5 },
+  bass: { nome: "Grave", prompt: "deep sub bass drop hit, cinematic, short tail", dur: 1.5 },
+  interface: { nome: "Interface", prompt: "subtle futuristic interface blip, soft digital UI sound", dur: 0.6 },
+  paper: { nome: "Papel", prompt: "paper cutout being placed on a table, light paper rustle and tap, stop motion feel", dur: 0.7 },
+};
+export const PROMPT_MUSICA: Record<(typeof MUSICA_TAGS)[number], { nome: string; prompt: string }> = {
+  corporate: { nome: "Corporativa", prompt: "uplifting modern corporate background music, light piano and plucks, soft drums, positive and clean" },
+  technology: { nome: "Tecnologia", prompt: "modern tech product launch background music, pulsing synths, tight electronic drums, confident" },
+  dark: { nome: "Dark", prompt: "dark moody cinematic background, deep pads, slow pulse, tension without being scary" },
+  energetic: { nome: "Energética", prompt: "energetic upbeat social media background track, punchy drums, bright synths, fun and fast" },
+  emotional: { nome: "Emocional", prompt: "warm emotional background music, soft piano and strings, hopeful and gentle" },
+  minimal: { nome: "Minimalista", prompt: "minimal playful background music, light plucks, claps and marimba, quirky and clean, good under voice" },
+  premium: { nome: "Premium", prompt: "premium elegant background music, smooth chords, subtle beat, sophisticated brand film feel" },
+};
 
 /** Imagens: formatos de feed/stories e o 1,91:1 dos anúncios com link da Meta. */
 export const FORMATOS_IMAGEM = { "1:1": [1080, 1080], "4:5": [1080, 1350], "9:16": [1080, 1920], "1.91:1": [1200, 628] } as const;

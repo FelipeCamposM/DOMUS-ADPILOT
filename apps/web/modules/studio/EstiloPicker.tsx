@@ -1,6 +1,6 @@
 "use client";
 
-import { Sparkles } from "lucide-react";
+import { Sparkles, X } from "lucide-react";
 import { Escolha } from "../motion/Escolha";
 
 export type Estilo = "hud" | "clay" | "editorial" | "livre";
@@ -11,16 +11,37 @@ const ESTILOS: { v: Estilo; nome: string; desc: string }[] = [
   { v: "livre", nome: "Livre (IA)", desc: "A IA cria do zero" },
 ];
 
-/** Cartões de estilo com uma miniatura desenhada em CSS de cada um (dá para "ver" o estilo antes de gerar). */
-export function EstiloPicker({ valor, onChange, semLivre = false }: { valor: Estilo; onChange: (v: Estilo) => void; semLivre?: boolean }) {
+export interface EstiloSalvo { id: string; nome: string; descricao: string; capaId: string | null }
+
+/**
+ * Cartões de estilo com uma miniatura desenhada em CSS de cada um (dá para "ver" o estilo antes de gerar). Estilos
+ * salvos (vídeos do modo Livre que o cliente aprovou) aparecem depois, com a capa do vídeo de origem.
+ */
+export function EstiloPicker({ valor, onChange, semLivre = false, salvos = [], salvo = null, onSalvo, onApagar }: {
+  valor: Estilo; onChange: (v: Estilo) => void; semLivre?: boolean;
+  salvos?: EstiloSalvo[]; salvo?: string | null; onSalvo?: (id: string | null) => void; onApagar?: (id: string) => void;
+}) {
+  const atual = salvo ? `s:${salvo}` : valor;
+  const escolherSalvo = (id: string) => { onChange("livre"); onSalvo?.(id); };
   return (
-    <Escolha valor={valor} className="kpis" style={{ gridTemplateColumns: "repeat(2, 1fr)", gap: 8 }}>
+    <Escolha valor={atual} className="kpis" style={{ gridTemplateColumns: "repeat(2, 1fr)", gap: 8 }}>
       {ESTILOS.filter((e) => !semLivre || e.v !== "livre").map((e) => (
-        <button key={e.v} data-opt={e.v} type="button" className="panel" aria-pressed={valor === e.v} onClick={() => onChange(e.v)}
+        <button key={e.v} data-opt={e.v} type="button" className="panel" aria-pressed={atual === e.v} onClick={() => { onSalvo?.(null); onChange(e.v); }}
           style={{ padding: 8, display: "flex", gap: 10, alignItems: "center", textAlign: "left", cursor: "pointer" }}>
           <Miniatura estilo={e.v} />
           <span style={{ minWidth: 0 }}><b style={{ fontWeight: 600, fontSize: 13 }}>{e.nome}</b><br /><span className="subtle" style={{ fontSize: 11 }}>{e.desc}</span></span>
         </button>
+      ))}
+      {salvos.map((e) => (
+        <div key={e.id} data-opt={`s:${e.id}`} role="button" tabIndex={0} className="panel estilo-salvo" aria-pressed={atual === `s:${e.id}`} title={e.descricao}
+          onClick={() => escolherSalvo(e.id)} onKeyDown={(k) => { if (k.key === "Enter" || k.key === " ") { k.preventDefault(); escolherSalvo(e.id); } }}
+          style={{ padding: 8, display: "flex", gap: 10, alignItems: "center", textAlign: "left", cursor: "pointer", position: "relative" }}>
+          <span aria-hidden style={{ width: 46, height: 58, borderRadius: 8, flex: "none", overflow: "hidden", background: "conic-gradient(from 210deg,#A855FF,#22D3EE,#F472B6,#A855FF)" }}>
+            {e.capaId && <img src={`/api/creatives/${e.capaId}/file?kind=thumb`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />}
+          </span>
+          <span style={{ minWidth: 0 }}><b style={{ fontWeight: 600, fontSize: 13 }}>{e.nome}</b><br /><span className="subtle" style={{ fontSize: 11 }}>Estilo salvo · a IA repete este visual</span></span>
+          {onApagar && <button type="button" className="btn btn-ghost btn-xs estilo-apagar" aria-label={`Apagar o estilo ${e.nome}`} onClick={(k) => { k.stopPropagation(); onApagar(e.id); }}><X aria-hidden /></button>}
+        </div>
       ))}
     </Escolha>
   );

@@ -130,7 +130,7 @@ export async function runVideo(payload: VideoPayload, c: Ctx) {
     let musica: { file: string; volume: number; nome: string } | null = null;
     let ritmo: { bpm: number; batidas: number[]; compassos: number[] } | null = null;
     if (sb.music) {
-      const lib = await arquivoMusica(p.workspace_id, sb.music.tag, pasta);
+      const lib = await arquivoMusica(p.workspace_id, sb.music.tag, pasta, `${brief.estilo}`.slice(0, 200));
       if (lib) musica = { file: lib.file, volume: sb.music.volume, nome: lib.name };
       else {
         const t = gerarTrilha(sb.music.tag, sb.duration, join(pasta, "trilha.wav"), p.id.charCodeAt(0) + p.id.charCodeAt(1));
@@ -154,10 +154,13 @@ export async function runVideo(payload: VideoPayload, c: Ctx) {
     writeFileSync(join(pasta, "assets", "motion-kit.js"), MOTION_KIT_JS, "utf8");
     writeFileSync(join(pasta, "assets", "cenas.js"), CENAS_JS, "utf8");
     const deCenas = ajuste ? !!p.composition?.includes("assets/cenas.js") : modelo;
-    // Livre: uma direção de arte que o workspace não usou nos últimos vídeos (a composição guarda qual foi)
-    const direcao = deCenas ? undefined : await escolherDirecao(p.workspace_id, p.id);
-    if (direcao) await c.log(`Direção de arte: ${direcao.nome}`);
-    const sistema = deCenas ? sistemaAjusteCenas(brief) : sistemaComposicao(brief, direcao, ajuste);
+    // Livre: estilo salvo (repete a linguagem de um vídeo aprovado) ou uma direção de arte que o workspace não usou nos
+    // últimos vídeos (a composição guarda qual foi)
+    const [salvo] = !deCenas && brief.estiloSalvo ? await sql<{ nome: string; descricao: string; referencia: string }[]>`
+      select nome, descricao, referencia from ads.estilos_video where id = ${brief.estiloSalvo} and workspace_id = ${p.workspace_id}` : [];
+    const direcao = deCenas ? undefined : salvo ? { nome: salvo.nome, descricao: salvo.descricao || "a linguagem visual do vídeo de referência abaixo" } : await escolherDirecao(p.workspace_id, p.id);
+    if (direcao) await c.log(`${salvo ? "Estilo salvo" : "Direção de arte"}: ${direcao.nome}`);
+    const sistema = deCenas ? sistemaAjusteCenas(brief) : sistemaComposicao(brief, direcao, ajuste, salvo?.referencia);
     let html = !porIA
       ? montarComposicao({ sb, brief, brand: ctxCriativo.brand, w, h, assets: readdirSync(join(pasta, "assets")), rotulo: brief.produto })
       : bloco((await ia(sistema, ajuste && p.composition ? promptAjuste(p.composition, sb, pedido, ctxCriativo.texto) : promptComposicao(sb, ctxCriativo.texto, ritmo))).text, "html");

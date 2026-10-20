@@ -377,6 +377,45 @@ export async function aprovarEdicao(projectId: string, input: unknown) {
   });
 }
 
+/**
+ * Salva a linguagem visual de um vídeo do modo Livre como estilo: nos próximos vídeos a IA repete o visual com o
+ * conteúdo novo (em qualquer formato). A composição aprovada vira a referência.
+ */
+export async function salvarEstilo(projectId: string, input: unknown) {
+  return run(async () => {
+    const ctx = await requireCtx();
+    requireRole(ctx, "editor");
+    const p = await doWorkspace(ctx, projectId);
+    const e = z.object({
+      nome: z.string().trim().min(2, "Dê um nome ao estilo").max(60, "Nome muito longo"),
+      descricao: z.string().trim().max(400, "Descrição muito longa").default(""),
+    }).parse(input);
+    const sql = db();
+    const [row] = await sql<{ composition: string | null; livre: boolean }[]>`
+      select composition, coalesce(brief->>'estiloVisual', 'hud') = 'livre' as livre from ads.video_projects where id = ${p.id} and kind = 'video'`;
+    if (!row?.composition) throw new Error("Gere o vídeo antes de salvar o estilo");
+    if (!row.livre || row.composition.includes("assets/cenas.js")) throw new Error("Só vídeos do modo Livre viram estilo (os outros já são estilos prontos)");
+    const [x] = await sql<{ n: number }[]>`select count(*)::int as n from ads.estilos_video where workspace_id = ${ctx.workspace.id}`;
+    if ((x?.n ?? 0) >= 30) throw new Error("Limite de 30 estilos salvos: apague algum antes");
+    const direcao = /<!-- direcao: ([^>]*?) -->/.exec(row.composition)?.[1] ?? "";
+    const [novo] = await sql<{ id: string }[]>`insert into ads.estilos_video (workspace_id, nome, descricao, referencia, projeto_origem, capa_id, created_by)
+      values (${ctx.workspace.id}, ${e.nome}, ${e.descricao || (direcao ? `linguagem "${direcao}" do vídeo de referência` : "")}, ${row.composition}, ${p.id}, ${p.creative_id}, ${ctx.user.id}) returning id`;
+    await audit(sql, { workspaceId: ctx.workspace.id, actor: ctx.actor, action: "Salvar estilo de vídeo", entityType: "video_project", entityId: p.id, entityName: e.nome });
+    revalidatePath("/studio/novo");
+    return novo!.id;
+  });
+}
+
+export async function apagarEstilo(id: string) {
+  return run(async () => {
+    const ctx = await requireCtx();
+    requireRole(ctx, "editor");
+    const r = await db()`delete from ads.estilos_video where id = ${uuid.parse(id)} and workspace_id = ${ctx.workspace.id}`;
+    if (!r.count) throw new Error("Estilo não encontrado");
+    revalidatePath("/studio/novo");
+  });
+}
+
 /** Favorita (ou desfavorita) uma voz do ElevenLabs para quem está logado: as favoritas aparecem primeiro no Studio. */
 export async function favoritarVoz(vozId: string, favorita: boolean) {
   return run(async () => {

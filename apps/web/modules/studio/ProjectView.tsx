@@ -2,20 +2,20 @@
 
 import { confirmar } from "../shell/confirmar";
 import { gsap } from "gsap";
-import { AudioLines, Check, ClipboardCheck, Palette, Clapperboard, Download, FileCode2, Film, Loader2, PenLine, RefreshCw, Rocket, Square, Trash2, Upload, Wand2 } from "lucide-react";
+import { AudioLines, Bookmark, Check, ClipboardCheck, Palette, Clapperboard, Download, FileCode2, Film, Loader2, PenLine, RefreshCw, Rocket, Square, Trash2, Upload, Wand2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Escolha } from "../motion/Escolha";
 import { BotaoPublicar } from "../instagram/BotaoPublicar";
 import { toast } from "../shell/toast";
-import { ajustarComIA, apagarVideo, cancelarVideo, gerarDeNovo, regerarComStoryboard, trocarVoz } from "./actions";
+import { ajustarComIA, apagarVideo, cancelarVideo, gerarDeNovo, regerarComStoryboard, salvarEstilo, trocarVoz } from "./actions";
 
 interface Cena { start: number; end: number; headline: string; subtext?: string; narration?: string; animation?: string; tipo?: string; itens?: string[] }
 const TIPO: Record<string, string> = { abertura: "Abertura", titulo: "Título", lista: "Lista", numero: "Número", comparacao: "Antes/depois", produto: "Produto", citacao: "Depoimento", cta: "CTA" };
 const editavel = (s: Cena) => ({ headline: s.headline, subtext: s.subtext ?? "", narration: s.narration ?? "", ...(s.itens ? { itens: [...s.itens] } : {}) });
 export interface ProjetoView {
   id: string; title: string; status: string; step_detail: string | null; error: string | null; progress: number | null;
-  brief: { formato: string; duracao: number; voz: string; vozNome?: string; musica: string; produto: string };
+  brief: { formato: string; duracao: number; voz: string; vozNome?: string; musica: string; produto: string; estiloVisual?: string };
   storyboard: { scenes: Cena[]; duration: number; music: { tag: string } | null } | null;
   creative: { id: string; duration_ms: number | null; size_bytes: string | null; width: number | null; height: number | null; arquivado: boolean; avisos: string[]; music: string | null } | null;
   thumb: boolean;
@@ -43,6 +43,7 @@ export function ProjectView({ p, podeEditar, vozes }: { p: ProjetoView; podeEdit
   const [pend, start] = useTransition();
   const [cenas, setCenas] = useState(() => (p.storyboard?.scenes ?? []).map(editavel));
   const [pedido, setPedido] = useState("");
+  const [nomeEstilo, setNomeEstilo] = useState("");
   const [novaVoz, setNovaVoz] = useState(() => vozes.find((v) => v.fav && v.id !== p.brief.voz)?.id ?? "");
   const musicaOriginal = p.storyboard?.music?.tag ?? "none";
   const [musica, setMusica] = useState(musicaOriginal);
@@ -151,6 +152,22 @@ export function ProjectView({ p, podeEditar, vozes }: { p: ProjetoView; podeEdit
               <button className="btn btn-primary btn-sm" disabled={pend || rodando || pedido.trim().length < 3} onClick={() => acao(() => ajustarComIA(p.id, pedido), "Ajuste na fila: a narração é mantida", () => setPedido(""))}>
                 {pend ? <Loader2 className="animate-spin" aria-hidden /> : <><Wand2 aria-hidden /> Aplicar ajuste</>}
               </button>
+            </div>
+          </div>
+        )}
+
+        {podeEditar && p.creative && !revisao && p.brief.estiloVisual === "livre" && (
+          <div className="panel" data-enter style={{ padding: 18, display: "flex", flexDirection: "column", gap: 10 }}>
+            <div className="panel-title" style={{ display: "flex", gap: 8, alignItems: "center" }}><Bookmark size={15} aria-hidden /> Salvar como estilo</div>
+            <span className="subtle caption">Gostou do visual? Salve e escolha em Novo vídeo → Estilo visual: a IA repete esta linguagem (texturas, tipografia, movimento) com outro conteúdo e em qualquer formato.</span>
+            <div className="cluster" style={{ gap: 6 }}>
+              <input className="input-sm" style={{ flex: 1, minWidth: 180 }} maxLength={60} value={nomeEstilo} onChange={(e) => setNomeEstilo(e.target.value)} placeholder="Nome do estilo (ex.: Papel recortado)" disabled={rodando} />
+              <button className="btn btn-primary btn-sm" disabled={pend || rodando || nomeEstilo.trim().length < 2} onClick={() => start(async () => {
+                const r = await salvarEstilo(p.id, { nome: nomeEstilo });
+                if (!r.ok) return toast.err(r.error);
+                toast.ok("Estilo salvo: já aparece em Novo vídeo");
+                setNomeEstilo("");
+              })}><Bookmark aria-hidden /> Salvar estilo</button>
             </div>
           </div>
         )}

@@ -23,6 +23,8 @@ export default async function NovoPage({ searchParams }: { searchParams: Promise
   // vozes do ElevenLabs (se a chave estiver configurada); falha na API = só as locais
   const chave = await chaveElevenLabs();
   const [eu] = await sql<{ vozes_favoritas: string[] }[]>`select vozes_favoritas from ads.workspace_members where workspace_id = ${ws} and user_id = ${ctx.user.id}`;
+  const estilosSalvos = (await sql<{ id: string; nome: string; descricao: string; capa_id: string | null }[]>`
+    select id, nome, descricao, capa_id from ads.estilos_video where workspace_id = ${ws} order by created_at desc`).map((e) => ({ id: e.id, nome: e.nome, descricao: e.descricao, capaId: e.capa_id }));
   const vozesEl = chave ? (await vozesElevenLabs(chave).catch(() => [])).map(({ id, nome, categoria, preview }) => ({ id, nome, categoria, preview })) : [];
 
   // "Usar meu vídeo" no calendário: o Reels que vai receber a edição (só deste workspace)
@@ -32,7 +34,7 @@ export default async function NovoPage({ searchParams }: { searchParams: Promise
   return (
     <div className="page">
       <StudioNovo inicial={inicial} post={{ contas: contas.map((c) => ({ id: c.id, username: c.username })), marcas }}
-        video={{ produto, musicas: Object.fromEntries(tags.map((t) => [t.tag, t.n])), marcas, vozesEl, favoritas: eu?.vozes_favoritas ?? [] }}
+        video={{ produto, musicas: Object.fromEntries(tags.map((t) => [t.tag, t.n])), marcas, vozesEl, favoritas: eu?.vozes_favoritas ?? [], estilosSalvos }}
         imagem={{ produto, marcas }}
         edicao={{ marcas, item: item ? { id: item.id, tema: item.tema, quando: item.data_hora.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" }) } : null }} />
     </div>

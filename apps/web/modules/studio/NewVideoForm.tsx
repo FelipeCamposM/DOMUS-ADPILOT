@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Escolha, Revelar } from "../motion/Escolha";
 import { toast } from "../shell/toast";
-import { EstiloPicker, type Estilo } from "./EstiloPicker";
+import { EstiloPicker, type Estilo, type EstiloSalvo } from "./EstiloPicker";
 import { Palco } from "./Palco";
-import { criarVideo, favoritarVoz } from "./actions";
+import { apagarEstilo, criarVideo, favoritarVoz } from "./actions";
+import { confirmar } from "../shell/confirmar";
 import { Anexos, paraEnvio, type AnexosValor } from "./Anexos";
 import type { MarcaResumo } from "@/lib/marcas";
 import { comMarca, faltando, Identidade } from "./Identidade";
@@ -29,9 +30,9 @@ const MUSICAS: [string, string][] = [["auto", "Automática"], ["none", "Sem mús
 
 export interface VozEl { id: string; nome: string; categoria: string; preview: string | null }
 
-export function NewVideoForm({ produto, musicas, marcas, vozesEl, favoritas: favIniciais }: {
+export function NewVideoForm({ produto, musicas, marcas, vozesEl, favoritas: favIniciais, estilosSalvos = [] }: {
   produto: string; musicas: Record<string, number>; vozesEl: VozEl[]; favoritas: string[];
-  marcas: MarcaResumo[];
+  marcas: MarcaResumo[]; estilosSalvos?: EstiloSalvo[];
 }) {
   const [anexos, setAnexos] = useState<AnexosValor>({ assets: [], links: [] });
   const router = useRouter();
@@ -40,7 +41,9 @@ export function NewVideoForm({ produto, musicas, marcas, vozesEl, favoritas: fav
   const [f, setF] = useState({
     produto, objetivo: "", descricao: "", publico: "", cta: "", estilo: "premium, moderno, tipografia forte", cores: "",
     duracao: 15, formato: "9:16", voz: "pf_dora", vozNome: "", musica: "auto", efeitos: true, orientacao: "", estiloVisual: "hud" as Estilo, legendas: true,
+    estiloSalvo: null as string | null,
   });
+  const [salvos, setSalvos] = useState(estilosSalvos);
   const [marcaId, setMarcaId] = useState<string | null>(marcas[0]?.id ?? null);
   const [favoritas, setFavoritas] = useState(favIniciais);
   // favoritas primeiro (na ordem em que foram marcadas), depois o resto como veio do ElevenLabs
@@ -98,8 +101,15 @@ export function NewVideoForm({ produto, musicas, marcas, vozesEl, favoritas: fav
         <Identidade marcas={marcas} valor={marcaId} onChange={setMarcaId} />
         <div className="panel" data-enter style={{ padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
           <div className="panel-title">Estilo visual</div>
-          <EstiloPicker valor={f.estiloVisual} onChange={(v) => set("estiloVisual", v)} />
-          <p className="subtle caption">{f.estiloVisual === "livre" ? "A IA escreve a animação do zero: mais variedade, resultado menos previsível." : "Cenas prontas e testadas (sem texto saindo da tela). A IA escolhe as cenas e escreve os textos; o roteiro passa por você antes."}</p>
+          <EstiloPicker valor={f.estiloVisual} onChange={(v) => set("estiloVisual", v)} salvos={salvos} salvo={f.estiloSalvo} onSalvo={(id) => set("estiloSalvo", id)}
+            onApagar={async (id) => {
+              if (!(await confirmar("Apagar este estilo salvo? Os vídeos já feitos com ele não mudam."))) return;
+              const r = await apagarEstilo(id);
+              if (!r.ok) return toast.err(r.error);
+              setSalvos((x) => x.filter((e) => e.id !== id));
+              if (f.estiloSalvo === id) set("estiloSalvo", null);
+            }} />
+          <p className="subtle caption">{f.estiloSalvo ? "A IA repete a linguagem visual do vídeo que você salvou como estilo, com o conteúdo novo e no formato escolhido." : f.estiloVisual === "livre" ? "A IA escreve a animação do zero: mais variedade, resultado menos previsível." : "Cenas prontas e testadas (sem texto saindo da tela). A IA escolhe as cenas e escreve os textos; o roteiro passa por você antes."}</p>
           <button type="button" role="switch" aria-checked={f.legendas} className="chave" onClick={() => set("legendas", !f.legendas)} disabled={f.voz === "none"}>
             <span className="chave-trilho"><span className="chave-bola" /></span> Legenda da narração {f.voz === "none" ? "(sem voz)" : f.legendas ? "ligada" : "desligada"}
           </button>

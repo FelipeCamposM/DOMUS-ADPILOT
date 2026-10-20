@@ -67,7 +67,7 @@ export function lerStoryboard(json: string): Storyboard {
 }
 
 /** Regras da HyperFrames (CLI `docs` + CLAUDE.md do projeto) + direção de arte. O Claude só devolve o HTML. */
-export function sistemaComposicao(b: Brief, direcao?: Direcao, ajuste = false): string {
+export function sistemaComposicao(b: Brief, direcao?: Direcao, ajuste = false, referencia?: string): string {
   const [w, h] = FORMATOS[b.formato];
   return `Você é motion designer sênior e escreve composições de vídeo em HTML para a HyperFrames (renderizada quadro a quadro em Chrome headless).
 Responda APENAS com um bloco \`\`\`html contendo o documento completo index.html.
@@ -100,7 +100,14 @@ ${!direcao ? "  Mantenha a linguagem visual da composição atual."
   para tirar elementos visuais: aí refaça o visual inteiro nesta direção: "${direcao.nome}": ${direcao.descricao}
   O pedido do cliente manda: se ele pede para tirar algo, tire de verdade (inclusive opções do MK.init).`
   : `  "${direcao.nome}": ${direcao.descricao}`}
-- Construa a linguagem inteira a partir dela: composição, tipografia, texturas, formas, ritmo, transições e easings próprios.
+${referencia ? `- ESTILO SALVO pelo cliente: a composição em <estilo_referencia> é o vídeo que ele aprovou. Repita a MESMA linguagem
+  visual (texturas, formas, tipografia, paleta, camadas, tipo de movimento, transições, easings e ritmo), reaproveitando
+  as técnicas de CSS/SVG/GSAP dela, mas com o CONTEÚDO deste storyboard e adaptada a ${w}×${h} (reorganize o layout
+  para o formato; nada pode ficar fora do quadro nem na área da interface). Não copie textos nem imagens dela.
+<estilo_referencia>
+${referencia.slice(0, 60_000)}
+</estilo_referencia>
+` : ""}- Construa a linguagem inteira a partir dela: composição, tipografia, texturas, formas, ritmo, transições e easings próprios.
   Nada de "template": se a direção pede papel, colagem, isométrico ou tipografia suíça, o vídeo PARECE isso.
 - PROIBIDO (clichês que já se repetiram): alvo/anéis concêntricos com mira, faixas de texto atravessando a tela
   (marquee), moldura HUD com cantos e timecode, grade + partículas + bolhas desfocadas como fundo, sweep de luz em

@@ -1,6 +1,6 @@
 "use server";
 
-import { apagarArquivo, audit, db, MAX_FONTE_MB, MUSICA_TAGS, r2Key, r2Presign, SFX_CATEGORIAS, storageAtual, tamanhoArquivo } from "@domus-ads/core";
+import { apagarArquivo, audit, db, enqueueJob, MAX_FONTE_MB, MUSICA_TAGS, r2Key, r2Presign, SFX_CATEGORIAS, storageAtual, tamanhoArquivo } from "@domus-ads/core";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { run } from "@/lib/action";
@@ -90,6 +90,50 @@ export async function apagarCriativo(id: string) {
     if (c.r2_key) await apagarArquivo(c.storage, c.r2_key);
     await sql`delete from ads.creatives where id = ${id}`;
     await audit(sql, { workspaceId: ctx.workspace.id, actor: ctx.actor, action: "Apagar item da biblioteca", entityType: "creative", entityId: id, entityName: c.name });
+    revalidatePath("/creatives");
+  });
+}
+
+/** "Gerar com ElevenLabs": o worker gera a música/efeito e salva na biblioteca (aparece aqui quando ficar pronto). */
+export async function gerarAudioIA(input: unknown) {
+  return run(async () => {
+    const ctx = await requireCtx();
+    requireRole(ctx, "editor");
+    const p = z.discriminatedUnion("tipo", [
+      z.object({ tipo: z.literal("MUSIC"), tag: z.enum(MUSICA_TAGS, { message: "Escolha o clima" }), duracao: z.number().min(10, "Mínimo 10 s").max(180, "Máximo 3 min").default(60) }),
+      z.object({ tipo: z.literal("SFX"), tag: z.enum(SFX_CATEGORIAS, { message: "Escolha a categoria" }), duracao: z.number().min(0.5).max(10).optional() }),
+    ]).and(z.object({ prompt: z.string().trim().max(400, "Descrição muito longa").default(""), nome: z.string().trim().max(80, "Nome muito longo").default("") })).parse(input);
+    const sql = db();
+    const [w] = await sql<{ ok: boolean }[]>`select last_seen > now() - interval '90 seconds' as ok from ads.worker_status order by last_seen desc limit 1`;
+    if (!w?.ok) throw new Error("O worker está offline. Ligue o PC do worker e tente de novo.");
+    const [fila] = await sql<{ n: number }[]>`select count(*)::int as n from ads.jobs where type = 'GENERATE_AUDIO' and workspace_id = ${ctx.workspace.id} and status in ('PENDING','RUNNING')`;
+    if ((fila?.n ?? 0) >= 5) throw new Error("Já tem 5 áudios sendo gerados: espere terminar");
+    await enqueueJob(sql, { workspaceId: ctx.workspace.id, type: "GENERATE_AUDIO", payload: p, createdBy: ctx.user.id, maxAttempts: 1 });
+    await audit(sql, { workspaceId: ctx.workspace.id, actor: ctx.actor, action: "Gerar áudio no ElevenLabs", entityType: "creative", after: { tipo: p.tipo, tag: p.tag } });
+    revalidatePath("/creatives");
+  });
+}
+
+/** Organizar a biblioteca de áudio: nome, clima/categoria e música favorita (a que os vídeos usam primeiro naquele clima). */
+export async function editarAudio(id: string, input: unknown) {
+  return run(async () => {
+    const ctx = await requireCtx();
+    requireRole(ctx, "editor");
+    const sql = db();
+    const [c] = await sql<{ type: "MUSIC" | "SFX"; tags: string[] }[]>`select type, tags from ads.creatives where id = ${z.string().uuid().parse(id)} and workspace_id = ${ctx.workspace.id} and type in ('MUSIC','SFX')`;
+    if (!c) throw new Error("Áudio não encontrado");
+    const e = z.object({
+      nome: z.string().trim().min(1, "Nome vazio").max(120, "Nome muito longo").optional(),
+      tags: z.array(c.type === "MUSIC" ? z.enum(MUSICA_TAGS) : z.enum(SFX_CATEGORIAS)).min(1, "Escolha ao menos uma").max(c.type === "MUSIC" ? 7 : 1).optional(),
+      favorita: z.boolean().optional(),
+    }).parse(input);
+    if (e.favorita && c.type === "MUSIC") {
+      // uma favorita por clima: desmarca as outras dos mesmos climas
+      await sql`update ads.creatives set metadata = metadata - 'favorita' where workspace_id = ${ctx.workspace.id} and type = 'MUSIC' and id <> ${id} and tags && ${e.tags ?? c.tags}::text[]`;
+    }
+    await sql`update ads.creatives set name = coalesce(${e.nome ?? null}, name), tags = coalesce(${e.tags ?? null}::text[], tags),
+      metadata = case when ${e.favorita ?? null}::boolean is null then metadata else metadata || jsonb_build_object('favorita', ${e.favorita ?? false}::boolean) end, updated_at = now()
+      where id = ${id}`;
     revalidatePath("/creatives");
   });
 }

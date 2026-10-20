@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import { can, requireCtx } from "@/lib/ctx";
 import { ago } from "@/lib/format";
 import { criativos, type CriativoLinha } from "@/lib/video";
-import { Library } from "@/modules/creatives/Library";
+import { db } from "@domus-ads/core";
+import { AudioLibrary, type AudioItem } from "@/modules/creatives/AudioLibrary";
 import { Busca } from "@/modules/shell/Busca";
 import { VideoCard } from "@/modules/studio/VideoCard";
 
@@ -74,7 +75,15 @@ export default async function CreativesPage({ searchParams }: { searchParams: Pr
     );
   } else if (aba === "musicas" || aba === "efeitos") {
     const tipo = aba === "musicas" ? "MUSIC" : "SFX";
-    corpo = <Library tipo={tipo} itens={await criativos(ws, [tipo], q)} podeEditar={editor} />;
+    const t = q?.trim() ? `%${q.trim().slice(0, 100).replace(/[\\%_]/g, (x) => `\\${x}`)}%` : null;
+    const sql = db();
+    const [itens, gerando] = await Promise.all([
+      sql<AudioItem[]>`select id, name, tags, license, duration_ms, metadata->>'origem' as origem, coalesce((metadata->>'favorita')::boolean, false) as favorita, metadata->>'prompt' as prompt
+        from ads.creatives where workspace_id = ${ws} and type = ${tipo} and status = 'READY'
+          and (${t}::text is null or name ilike ${t} or array_to_string(tags, ' ') ilike ${t}) order by created_at desc limit 500`,
+      sql<{ tag: string }[]>`select payload->>'tag' as tag from ads.jobs where workspace_id = ${ws} and type = 'GENERATE_AUDIO' and payload->>'tipo' = ${tipo} and status in ('PENDING','RUNNING')`,
+    ]);
+    corpo = <AudioLibrary tipo={tipo} itens={itens} podeEditar={editor} gerando={gerando} />;
   } else {
     const tipo = aba === "imagens" ? "IMAGE" : "VIDEO";
     const itens = (await criativos(ws, [tipo], q)).filter((c) => gerado(c.tags));
