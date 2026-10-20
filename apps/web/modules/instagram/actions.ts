@@ -47,6 +47,10 @@ export async function salvarPublicacao(id: string, input: unknown) {
     const sql = db();
     const ok = await sql`select count(*)::int n from ads.creatives where id = any(${d.midias.map((m) => m.creativeId)}::uuid[]) and workspace_id = ${ctx.workspace.id}`;
     if (ok[0]!.n !== new Set(d.midias.map((m) => m.creativeId)).size) throw new Error("Mídia não encontrada na biblioteca");
+    if (d.opcoes.capaId) {
+      const [c] = await sql`select 1 from ads.creatives where id = ${d.opcoes.capaId} and workspace_id = ${ctx.workspace.id} and type = 'IMAGE' and status = 'READY'`;
+      if (!c) throw new Error("A imagem da capa não está na biblioteca");
+    }
     await sql`update ads.instagram_posts set tipo = ${d.tipo}, legenda = ${d.legenda}, midias = ${sql.json(d.midias)}, opcoes = ${sql.json(d.opcoes as Json)},
       status = case when status = 'FALHOU' then 'RASCUNHO' else status end, updated_at = now() where id = ${p.id}`;
     revalidatePath("/instagram", "layout");

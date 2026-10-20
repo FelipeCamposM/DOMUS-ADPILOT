@@ -6,7 +6,7 @@ export interface ContaIG {
   seguidores: number | null; seguindo: number | null; publicacoes: number | null; conexao_ok: boolean;
 }
 export interface PostIG {
-  id: string; ig_account_id: string; tipo: "FEED" | "CARROSSEL" | "REELS" | "STORY"; legenda: string; midias: { creativeId: string }[]; opcoes: { compartilharNoFeed?: boolean; capaMs?: number };
+  id: string; ig_account_id: string; tipo: "FEED" | "CARROSSEL" | "REELS" | "STORY"; legenda: string; midias: { creativeId: string }[]; opcoes: { compartilharNoFeed?: boolean; capaMs?: number; capaId?: string };
   status: string; agendado_para: string | null; publicado_em: string | null; permalink: string | null; erro: string | null;
   sugestao: { gerando?: boolean; legenda?: string; hashtags?: string[]; erro?: string } | null; updated_at: string;
   capa: { id: string; type: string } | null; brand_id: string | null;

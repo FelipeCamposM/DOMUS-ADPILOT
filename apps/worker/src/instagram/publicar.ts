@@ -6,8 +6,8 @@ import { arquivarPublicados, restaurar } from "../video/arquivo";
 import { ffmpeg, FFPROBE, rodar } from "../video/tools";
 import { avisar } from "../whatsapp";
 
-interface Post { id: string; tipo: "FEED" | "CARROSSEL" | "REELS" | "STORY"; legenda: string; midias: { creativeId: string }[]; opcoes: { compartilharNoFeed?: boolean; capaMs?: number; repostDe?: string }; workspace_id: string }
-interface Criativo { id: string; type: string; mime: string | null; storage: string; r2_key: string; arquivado: boolean }
+interface Post { id: string; tipo: "FEED" | "CARROSSEL" | "REELS" | "STORY"; legenda: string; midias: { creativeId: string }[]; opcoes: { compartilharNoFeed?: boolean; capaMs?: number; capaId?: string; repostDe?: string }; workspace_id: string }
+interface Criativo { id: string; type: string; mime: string | null; storage: string; r2_key: string; arquivado: boolean; capa_ms: number | null }
 
 const NOME = { FEED: "Post", CARROSSEL: "Carrossel", REELS: "Reels", STORY: "Story" } as const;
 const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -53,7 +53,7 @@ export async function publicarInstagram(postId: string, c: { signal: AbortSignal
     const api = instagramDaConexao(conta.credentials_enc);
     const ids = p.midias.map((m) => m.creativeId);
     const lista = await sql<Criativo[]>`
-      select id, type, mime, storage, r2_key, arquivado from ads.creatives
+      select id, type, mime, storage, r2_key, arquivado, (metadata->>'capaMs')::int as capa_ms from ads.creatives
       where id = any(${ids}::uuid[]) and workspace_id = ${p.workspace_id} and status = 'READY' and r2_key is not null`;
     const midias = ids.map((id) => lista.find((x) => x.id === id)).filter((x): x is Criativo => !!x);
     if (midias.length !== ids.length) throw new Error("Uma das mídias foi apagada da biblioteca");
@@ -105,9 +105,24 @@ export async function publicarInstagram(postId: string, c: { signal: AbortSignal
       }
       container = (await api.criarContainer(conta.ig_user_id, { media_type: "CAROUSEL", children: filhos.join(","), ...legenda })).id;
     } else if (p.tipo === "REELS") {
+      // capa: imagem escolhida (JPEG 9:16) > quadro escolhido > quadro que o Studio marcou como capa (título já na tela)
+      let capa: Record<string, string> = {};
+      const [img] = p.opcoes.capaId ? await sql<Criativo[]>`select id, type, mime, storage, r2_key, arquivado, null::int as capa_ms from ads.creatives
+        where id = ${p.opcoes.capaId} and workspace_id = ${p.workspace_id} and type = 'IMAGE' and status = 'READY' and r2_key is not null` : [];
+      if (img) {
+        const orig = join(pasta, "capa-orig"), jpg = join(pasta, "capa.jpg");
+        writeFileSync(orig, await lerArquivo(img));
+        await paraJpeg(orig, jpg, 1080, 1920);
+        const key = `instagram/${p.id}/capa.jpg`;
+        await r2Put(key, readFileSync(jpg), "image/jpeg");
+        temporarios.push(key);
+        capa = { cover_url: await r2Presign(key, "GET", 7200) };
+      } else {
+        const ms = p.opcoes.capaMs ?? midias[0]!.capa_ms;
+        if (ms != null) capa = { thumb_offset: String(ms) };
+      }
       container = (await api.criarContainer(conta.ig_user_id, {
-        media_type: "REELS", video_url: urls[0]!.url, share_to_feed: String(p.opcoes.compartilharNoFeed !== false), ...legenda,
-        ...(p.opcoes.capaMs != null ? { thumb_offset: String(p.opcoes.capaMs) } : {}),
+        media_type: "REELS", video_url: urls[0]!.url, share_to_feed: String(p.opcoes.compartilharNoFeed !== false), ...legenda, ...capa,
       })).id;
     } else if (p.tipo === "STORY") {
       container = (await api.criarContainer(conta.ig_user_id, urls[0]!.video ? { media_type: "STORIES", video_url: urls[0]!.url } : { media_type: "STORIES", image_url: urls[0]!.url })).id;

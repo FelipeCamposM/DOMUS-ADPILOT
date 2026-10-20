@@ -124,7 +124,7 @@ export async function runEdicao(payload: VideoPayload, c: Ctx) {
     await mixar({ video: mudo, saida: final, duracao: plano.duration, vozes: fonte.audio ? [{ file: join(pasta, "assets", "base.mp4"), start: 0 }] : [], sfx, musica, signal: c.signal });
 
     await etapa("UPLOADING", "Enviando para o armazenamento…");
-    const res = await salvarVideo({ p, pasta, final, titulo: plano.title, w, h, thumbEm: Math.min(plano.duration - 0.1, 1.2),
+    const res = await salvarVideo({ p, pasta, final, titulo: plano.title, w, h, thumbEm: capaDaEdicao(plano),
       meta: { projectId: p.id, edicao: true, brief, music: musica?.nome ?? null, avisos: avisos.slice(0, 3) } });
     await c.progress(100);
     return res;
@@ -353,4 +353,11 @@ async function aplicarAjuste(p: PlanoEdicao, r: RespostaPlano, fonte: Fonte, pas
     await c.log(`pausas recortadas: ${novo.duration.toFixed(1)} s`);
   }
   return planoEdicaoSchema.parse(novo);
+}
+
+
+/** Capa: o 1º título animado já inteiro na tela (fim dele menos um respiro); sem título, 1,2 s. */
+function capaDaEdicao(p: PlanoEdicao): number {
+  const t = p.overlays.find((o) => o.tipo === "titulo" || o.tipo === "destaque");
+  return Math.min(p.duration - 0.1, t ? Math.max(t.start + 1, t.end - 0.4) : 1.2);
 }

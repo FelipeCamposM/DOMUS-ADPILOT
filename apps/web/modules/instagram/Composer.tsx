@@ -13,6 +13,7 @@ import { toast } from "../shell/toast";
 import { agendarPublicacao, pedirLegenda, salvarPublicacao, voltarParaRascunho } from "./actions";
 import { arquivo, FeedMock, GradeMock, type MidiaPreview, ReelsMock, StoryMock } from "./Mockups";
 import { ICONE_TIPO } from "./NovaPublicacao";
+import { CapaReels } from "./CapaReels";
 
 export interface ItemBiblioteca extends MidiaPreview { name: string; duration_ms: number | null }
 
@@ -32,7 +33,7 @@ export function Composer({ post, conta, biblioteca, feed, marcas, podeEditar }: 
   const [ids, setIds] = useState<string[]>(post.midias.map((m) => m.creativeId));
   const [legenda, setLegenda] = useState(post.legenda);
   const [noFeed, setNoFeed] = useState(post.opcoes.compartilharNoFeed !== false);
-  const [capaMs, setCapaMs] = useState<number | undefined>(post.opcoes.capaMs);
+  const [capa, setCapa] = useState<{ capaMs?: number; capaId?: string }>({ capaMs: post.opcoes.capaMs, capaId: post.opcoes.capaId });
   const [modo, setModo] = useState<"agora" | "agendar">(post.agendado_para && post.status === "AGENDADO" ? "agendar" : "agora");
   const [data, setData] = useState(() => {
     if (!post.agendado_para) return padraoAgendamento();
@@ -82,7 +83,7 @@ export function Composer({ post, conta, biblioteca, feed, marcas, podeEditar }: 
     return () => clearInterval(t);
   }, [gerando, status, modo, post.id, router]);
 
-  const dados = () => ({ tipo, legenda, midias: ids.map((creativeId) => ({ creativeId })), opcoes: { compartilharNoFeed: noFeed, ...(capaMs != null ? { capaMs } : {}) } });
+  const dados = () => ({ tipo, legenda, midias: ids.map((creativeId) => ({ creativeId })), opcoes: { compartilharNoFeed: noFeed, ...(capa.capaMs != null ? { capaMs: capa.capaMs } : {}), ...(capa.capaId ? { capaId: capa.capaId } : {}) } });
   const salvar = (silencioso = false) => new Promise<boolean>((ok) => start(async () => {
     const r = await salvarPublicacao(post.id, dados());
     if (!r.ok) { toast.err(r.error); return ok(false); }
@@ -180,10 +181,7 @@ export function Composer({ post, conta, biblioteca, feed, marcas, podeEditar }: 
             {tipo === "REELS" && video && (
               <div className="ig-opcoes">
                 <label className="ig-switch"><input type="checkbox" checked={noFeed} disabled={travado} onChange={(e) => mudou(setNoFeed)(e.target.checked)} /><span>Mostrar o Reels também no feed do perfil</span></label>
-                <div className="field">
-                  <label className="label" htmlFor="capa">Capa: segundo {((capaMs ?? 0) / 1000).toFixed(1)}</label>
-                  <input id="capa" type="range" min={0} max={video.duration_ms ?? 0} step={100} value={capaMs ?? 0} disabled={travado} onChange={(e) => mudou(setCapaMs)(Number(e.target.value))} />
-                </div>
+                <CapaReels video={video} capaMs={capa.capaMs} capaId={capa.capaId} travado={travado} onChange={mudou(setCapa)} />
               </div>
             )}
           </section>

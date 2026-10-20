@@ -1456,3 +1456,20 @@ fieldset:disabled .chave { opacity: 0.6; cursor: default; }
 .audio-mover:hover { background: rgb(var(--c-bg-elevated)); }
 .audio-mover select { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 @media (max-width: 640px) { .audio-item { grid-template-columns: 36px minmax(0, 1fr); } .audio-tempo { display: none; } }
+
+/* ── Capa do Reels ── */
+.capa-reels { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 14px; align-items: start; margin-top: 4px; }
+.capa-previa { position: relative; aspect-ratio: 9 / 16; border-radius: 12px; overflow: hidden; background: rgb(var(--c-bg-inset)); box-shadow: 0 8px 24px -10px rgb(0 0 0 / 0.6); }
+.capa-previa img, .capa-previa video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+/* grade do perfil: miolo 3:4 do quadro 9:16 */
+.capa-grade { position: absolute; left: 0; right: 0; top: 50%; aspect-ratio: 3 / 4; transform: translateY(-50%); outline: 2px solid rgb(255 255 255 / 0.9); box-shadow: 0 0 0 999px rgb(0 0 0 / 0.45); pointer-events: none; }
+.capa-grade i { position: absolute; left: 4px; top: 4px; font-size: 9.5px; font-style: normal; font-weight: 700; background: rgb(0 0 0 / 0.6); color: #fff; padding: 1px 5px; border-radius: 5px; }
+.capa-lado { display: grid; gap: 10px; min-width: 0; }
+.capa-tira { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 4px; }
+.capa-tira button { all: unset; cursor: pointer; display: grid; gap: 2px; justify-items: center; border-radius: 8px; padding: 2px; transition: transform .15s, box-shadow .2s; }
+.capa-tira button:hover:not(:disabled) { transform: translateY(-2px); }
+.capa-tira button[aria-selected="true"] { box-shadow: 0 0 0 2px rgb(var(--c-glow)), var(--glow-sm); }
+.capa-tira canvas { width: 100%; aspect-ratio: 9 / 16; border-radius: 6px; background: rgb(var(--c-bg-elevated)); }
+.capa-tira canvas[data-pronto="false"] { animation: etapa-pulsa 1.4s var(--ease-in-out) infinite; }
+.capa-tira span { font-size: 9.5px; color: rgb(var(--c-text-tertiary)); }
+@media (max-width: 640px) { .capa-reels { grid-template-columns: 1fr; } .capa-previa { width: 140px; } .capa-tira { grid-template-columns: repeat(4, minmax(0, 1fr)); } }

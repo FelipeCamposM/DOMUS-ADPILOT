@@ -55,6 +55,8 @@ export const postSchema = z.object({
   opcoes: z.object({
     compartilharNoFeed: z.boolean().default(true),
     capaMs: z.number().int().min(0).max(LIMITES_IG.reelsMaxSeg * 1000).optional(),
+    // capa do Reels: uma imagem da biblioteca (no lugar de um quadro do vídeo)
+    capaId: z.string().uuid("Capa inválida").optional(),
   }).default({ compartilharNoFeed: true }),
 });
 export type PostInput = z.infer<typeof postSchema>;

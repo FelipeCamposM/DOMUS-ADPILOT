@@ -196,7 +196,7 @@ export async function runVideo(payload: VideoPayload, c: Ctx) {
     // 6. Armazenamento (PC ou R2, conforme STORAGE) + criativo; o banco guarda só a chave e onde ela está
     await etapa("UPLOADING", "Enviando para o armazenamento…");
     const meta = { projectId: p.id, brief, storyboard: sb, voice: brief.voz, music: musica?.nome ?? null, avisos };
-    const r2 = await salvarVideo({ p, pasta, final, titulo: sb.title, w, h, meta, thumbEm: Math.min(sb.duration - 0.1, Math.max(0.5, (sb.scenes[0]?.end ?? 2) * 0.75)) });
+    const r2 = await salvarVideo({ p, pasta, final, titulo: sb.title, w, h, meta, thumbEm: Math.min(sb.duration - 0.1, Math.max(1, (sb.scenes[0]?.end ?? 2) - 0.35)) });
     await c.progress(100);
     return r2;
   } catch (e) {
@@ -244,7 +244,7 @@ export async function salvarVideo(o: {
   const storage = await guardarArquivo(kVideo, final, "video/mp4");
   if (existsSync(thumb)) await guardarArquivo(kThumb, thumb, "image/jpeg");
   const dur = Math.round((await duracao(final)) * 1000);
-  const meta = sql.json(o.meta as unknown as Json);
+  const meta = sql.json({ ...o.meta, capaMs: Math.round(o.thumbEm * 1000) } as unknown as Json);
   if (antigo) {
     await sql`update ads.creatives set name = ${o.titulo}, storage = ${storage}, r2_key = ${kVideo}, thumbnail_key = ${existsSync(thumb) ? kThumb : null}, size_bytes = ${size},
       width = ${o.w}, height = ${o.h}, duration_ms = ${dur}, status = 'READY', metadata = ${meta}, updated_at = now() where id = ${id}`;
