@@ -35,7 +35,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     // arquivado: a prévia leve que ficou no R2 serve para ver; o original só volta do Drive para baixar (?download / ?original)
     const querOriginal = req.nextUrl.searchParams.has("download") || req.nextUrl.searchParams.has("original");
     if (c.arquivado && c.preview_key && !querOriginal) {
-      return NextResponse.redirect(await r2Presign(c.preview_key, "GET", 3600), { status: 302, headers: { "Cache-Control": "private, max-age=1800" } });
+      return NextResponse.redirect(await r2Presign(c.preview_key, "GET", 3600), { status: 302, headers: { "Cache-Control": "private, no-cache" } });
     }
     if (c.arquivado) {
       await pedirRestauro(sql, id.data, ctx.workspace.id);
@@ -48,7 +48,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const nome = req.nextUrl.searchParams.get("download") ? `${c.name.replace(/[^\w\- ]/g, "_")}.${ext}` : undefined;
 
   if (c.storage !== "local") {
-    return NextResponse.redirect(await r2Presign(key, "GET", 3600, nome), { status: 302, headers: { "Cache-Control": "private, max-age=1800" } });
+    return NextResponse.redirect(await r2Presign(key, "GET", 3600, nome), { status: 302, headers: { "Cache-Control": "private, no-cache" } });
   }
 
   if (!process.env.MEDIA_DIR) {
@@ -60,8 +60,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const headers: Record<string, string> = {
     "Content-Type": (thumb ? null : c.mime) ?? TIPOS[ext] ?? "application/octet-stream",
     "Accept-Ranges": "bytes",
-    "Cache-Control": "private, max-age=3600",
+    // a chave muda quando o arquivo é refeito: o navegador revalida e só baixa de novo se mudou
+    "Cache-Control": "private, no-cache",
+    ETag: `"${key.split("/").pop()}"`,
   };
+  if (req.headers.get("if-none-match") === headers.ETag) return new Response(null, { status: 304, headers });
   if (nome) headers["Content-Disposition"] = `attachment; filename="${nome}"`;
 
   const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.get("range") ?? "");

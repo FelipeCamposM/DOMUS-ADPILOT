@@ -67,7 +67,7 @@ export function lerStoryboard(json: string): Storyboard {
 }
 
 /** Regras da HyperFrames (CLI `docs` + CLAUDE.md do projeto) + direção de arte. O Claude só devolve o HTML. */
-export function sistemaComposicao(b: Brief): string {
+export function sistemaComposicao(b: Brief, direcao?: Direcao, ajuste = false): string {
   const [w, h] = FORMATOS[b.formato];
   return `Você é motion designer sênior e escreve composições de vídeo em HTML para a HyperFrames (renderizada quadro a quadro em Chrome headless).
 Responda APENAS com um bloco \`\`\`html contendo o documento completo index.html.
@@ -94,27 +94,55 @@ ESTRUTURA OBRIGATÓRIA (HyperFrames):
 
 ${KIT_DOC}
 
-DIREÇÃO DE ARTE (estética de motion de produto/tech: HUD, vidro, profundidade, legenda cinética):
-- Nada de slide parado: em TODA cena há câmera (MK.camera) + pelo menos 2 camadas em profundidade (texto, painel/ícone/gráfico, fundo).
-- Legenda cinética: a narração de cada cena aparece com MK.words, sincronizada com a fala (comece em scene.start + 0.25;
-  se a cena tiver "words", passe {words: scene.words}), com 1–2 palavras-chave em hl. A headline entra com MK.title ou MK.in.
-- Elementos de interface que ilustram a ideia: painéis .mk-glass, prompt digitando (MK.typewriter), chips, contador, anel, gráfico.
-- Cortes: toda troca de cena tem transição (MK.flash, MK.sweep ou MK.marquee) exatamente no instante do corte,
-  e a cena que sai usa MK.out ~0,3 s antes. Varie as transições.
-- Ritmo: entradas importantes caem nas batidas da música (lista abaixo, quando houver); acentos fortes no início dos compassos.
-- Layout em zonas fixas, sem sobreposição: visuais (painéis, mockups, gráficos) na metade de cima; headline logo abaixo;
-  legenda cinética numa faixa própria acima da margem inferior. Texto nunca fica em cima de outro texto nem de painel;
-  quando um elemento novo ocupa a zona, o anterior já saiu. Não repita na legenda a mesma frase da headline/subtext.
-- Paleta de 1 cor de destaque (accent) + 1 secundária sobre fundo escuro, com brilho. Tipografia grande (classes .mk-*).
-- Margem de segurança de 8% nas bordas (no 9:16 deixe livre os 12% de baixo e de cima para a interface do Reels/Stories).
-- A "animation" de cada cena é só uma sugestão de entrada para a headline.
-- Cores: ${b.cores || "as da identidade visual, se houver; senão, uma paleta premium coerente com o estilo"}. Estilo: ${b.estilo || "premium e moderno"}.
+DIREÇÃO DE ARTE DESTE VÍDEO (obrigatória, e diferente dos vídeos anteriores):
+${!direcao ? "  Mantenha a linguagem visual da composição atual."
+  : ajuste ? `  Num ajuste, mantenha a linguagem da composição atual, A MENOS que o pedido peça outro estilo, mais originalidade ou
+  para tirar elementos visuais: aí refaça o visual inteiro nesta direção: "${direcao.nome}": ${direcao.descricao}
+  O pedido do cliente manda: se ele pede para tirar algo, tire de verdade (inclusive opções do MK.init).`
+  : `  "${direcao.nome}": ${direcao.descricao}`}
+- Construa a linguagem inteira a partir dela: composição, tipografia, texturas, formas, ritmo, transições e easings próprios.
+  Nada de "template": se a direção pede papel, colagem, isométrico ou tipografia suíça, o vídeo PARECE isso.
+- PROIBIDO (clichês que já se repetiram): alvo/anéis concêntricos com mira, faixas de texto atravessando a tela
+  (marquee), moldura HUD com cantos e timecode, grade + partículas + bolhas desfocadas como fundo, sweep de luz em
+  toda transição. Só use algum disso se a direção acima pedir explicitamente.
+- Movimento com intenção: cada cena tem uma ideia visual (metáfora do que é dito), não só texto entrando. Varie o
+  tipo de transição entre as cenas (corte seco, máscara, wipe com forma, zoom através de um elemento, morph de cor…).
+- A narração aparece como legenda sincronizada (MK.words ou o seu próprio sistema; se a cena tiver "words", use os
+  tempos), com 1–2 palavras-chave destacadas, numa faixa própria acima da margem inferior. A headline entra do jeito da direção.
+- Layout sem sobreposição: texto nunca fica em cima de outro texto nem de imagem; quando um elemento novo ocupa a
+  zona, o anterior já saiu. Não repita na legenda a frase da headline.
+- Ritmo: entradas importantes caem nas batidas da música (lista abaixo, quando houver).
+- Margem de segurança de 8% nas bordas (no 9:16 deixe livre os 12% de cima e os 15% de baixo para a interface do Reels).
+- A "animation" de cada cena é só uma sugestão.
+- Cores: ${b.cores || "as da identidade visual, se houver (obrigatórias); senão, uma paleta coerente com a direção"}. Estilo pedido: ${b.estilo || "premium e moderno"}.
 ${REGRAS_CONTEXTO}
 - Texto exatamente como no storyboard (pode quebrar linha). A narração vai na tela só como legenda cinética (MK.words).
 - Nome do produto/marca SEMPRE escrito exatamente “${b.produto}”, letra por letra. Para colorir só parte do nome, divida o
   texto original sem repetir nem acrescentar letras (ex.: “SIAPLUS” → <span>SIA</span><span>PLUS</span>, nunca SIAP + PLUS).
   Confira a ortografia de toda palavra na tela antes de responder.`;
 }
+
+/**
+ * Direções de arte do modo Livre: cada vídeo sorteia uma que não foi usada nos últimos vídeos do workspace, para a IA
+ * não cair sempre no mesmo visual.
+ */
+export interface Direcao { nome: string; descricao: string }
+export const DIRECOES: Direcao[] = [
+  { nome: "Colagem editorial", descricao: "recortes de papel com bordas irregulares e sombra, fotos/prints recortados, fita adesiva, tipografia de revista misturando serifa e grotesca; elementos entram como se fossem colados (pequenos giros, quique seco)." },
+  { nome: "Suíço cinético", descricao: "grade tipográfica rígida, fundo claro, preto + 1 cor forte, tipografia enorme em caixa alta alinhada à esquerda, réguas e números grandes; movimentos lineares precisos, cortes secos em grade." },
+  { nome: "Neo-brutalismo", descricao: "blocos chapados de cor saturada, contornos pretos grossos, sombras duras deslocadas, botões e cartões quadrados; movimento com estalo (back.out), objetos caindo e travando no lugar." },
+  { nome: "Isométrico 3D", descricao: "cena isométrica construída em CSS 3D (cubos, plataformas, telas flutuando), câmera girando ao redor; cores pastel ou da marca, sombras suaves." },
+  { nome: "Gradiente líquido", descricao: "fundos de gradiente em malha que se transformam devagar, formas orgânicas (blobs SVG) que se fundem, vidro fosco, tipografia limpa grande; transições por morph de forma." },
+  { nome: "Minimal monocromático", descricao: "uma cor só (tons da marca) e muito espaço vazio, tipografia fina e elegante, linhas finas desenhando formas; ritmo calmo, revelações por máscara." },
+  { nome: "Cromado Y2K", descricao: "tipografia cromada/metálica com reflexo, estrelas e brilhos, gradientes iridescentes, formas infladas; movimento elástico e brincalhão." },
+  { nome: "Stop-motion de papel", descricao: "formas de papel recortado com textura, movimento em passos (ease steps, 12 fps aparente), leve tremido de mão, sombras de papel em camadas." },
+  { nome: "Interface em close", descricao: "a história contada dentro de telas e componentes de UI ampliados (cursor clicando, toggles, cards, notificações chegando), câmera passeando pela interface; sem moldura HUD." },
+  { nome: "Tipografia gigante", descricao: "palavras enormes ocupando a tela inteira, cortadas nas bordas, trocando de escala e direção; contraste máximo, quase sem outros elementos." },
+  { nome: "Risografia", descricao: "2 ou 3 cores chapadas com textura granulada, desalinhamento de registro proposital, ilustrações simples em SVG; movimentos curtos e secos." },
+  { nome: "Cinema escuro", descricao: "fundo quase preto, iluminação de holofote (gradiente radial) revelando o texto, grão de filme sutil, tipografia serifada elegante, letterbox; movimentos lentos e dramáticos." },
+  { nome: "Split-screen", descricao: "tela dividida em 2–3 painéis que se reorganizam a cada cena (antes/depois, problema/solução), divisórias animadas; cores contrastantes por painel." },
+  { nome: "Ilustração em traço", descricao: "ícones e cenas desenhados em SVG com traço contínuo sendo desenhado (stroke-dashoffset), preenchimentos que surgem depois; fundo claro, cores da marca." },
+];
 
 /** Como usar identidade visual e anexos (vale para vídeo e imagem). */
 export const REGRAS_CONTEXTO = `- Identidade visual (quando vier no pedido): cores, fontes, tom e regras dela são obrigatórios.

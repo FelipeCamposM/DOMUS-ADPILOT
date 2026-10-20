@@ -36,11 +36,17 @@ export async function r2Head(key: string): Promise<{ size: number; type: string 
   return r.ok ? { size: Number(r.headers.get("content-length") ?? 0), type: r.headers.get("content-type") } : null;
 }
 
-/** URL assinada (GET para ver/baixar, PUT para upload direto do navegador). Padrão: 1 hora. */
+/**
+ * URL assinada (GET para ver/baixar, PUT para upload direto do navegador), válida por pelo menos `segundos`.
+ * GET é assinado com a hora cheia: a mesma chave dá a MESMA URL durante a hora, e o navegador reaproveita o arquivo
+ * do cache dele (a rota /file pode responder o redirecionamento sem cache e trocar na hora quando o vídeo é refeito).
+ */
 export async function r2Presign(key: string, method: "GET" | "PUT" = "GET", segundos = 3600, download?: string): Promise<string> {
   const u = new URL(url(key));
-  u.searchParams.set("X-Amz-Expires", String(segundos));
+  const hora = method === "GET" ? new Date(Math.floor(Date.now() / 3_600_000) * 3_600_000) : null;
+  u.searchParams.set("X-Amz-Expires", String(hora ? segundos + 3600 : segundos));
   if (download) u.searchParams.set("response-content-disposition", `attachment; filename="${download.replace(/[^\w.\- ]/g, "_")}"`);
-  const assinado = await r2().aws.sign(new Request(u, { method }), { aws: { signQuery: true } });
+  const datetime = hora?.toISOString().replace(/[:-]|\.\d{3}/g, ""); // 20261020T000000Z
+  const assinado = await r2().aws.sign(new Request(u, { method }), { aws: { signQuery: true, ...(datetime ? { datetime } : {}) } });
   return assinado.url;
 }

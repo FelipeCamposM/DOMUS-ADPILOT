@@ -80,26 +80,27 @@ export const MOTION_KIT_JS = String.raw`(function () {
     window.__timelines = window.__timelines || {};
     window.__timelines[o.id || root.getAttribute("data-composition-id") || "main"] = tl;
 
-    // fundo: blobs que derivam devagar, grade, partículas flutuando, vinheta e scanlines
+    // decoração de fundo é OPCIONAL (cada vídeo cria a sua): blobs, grade, partículas, vinheta e scanlines só se pedidos
     var bg = el("div", "mk-layer", root); bg.style.zIndex = 0; root.insertBefore(bg, root.firstChild);
     var cores = [o.accent || "#A855FF", o.accent2 || o.accent || "#A855FF"];
-    for (var i = 0; i < 3; i++) {
+    for (var i = 0; i < (o.blobs ? 3 : 0); i++) {
       var b = el("div", "mk-blob", bg); var s = (45 + rnd() * 30) * Math.min(W, H) / 100;
       b.style.width = s + "px"; b.style.height = s + "px"; b.style.background = "radial-gradient(circle," + cores[i % 2] + ",transparent 65%)";
       gsap.set(b, { x: rnd() * W - s / 2, y: rnd() * H * .8 - s / 2, opacity: .18 + rnd() * .22 });
       tl.to(b, { x: "+=" + ((rnd() - .5) * W * .5), y: "+=" + ((rnd() - .5) * H * .3), scale: .8 + rnd() * .5, duration: total, ease: "sine.inOut" }, 0);
     }
-    if (o.grid !== false) { var g = el("div", "mk-grid", bg); tl.fromTo(g, { opacity: 0, scale: 1.08 }, { opacity: 1, scale: 1, duration: 1.6, ease: MK.ease.enter }, 0); tl.to(g, { y: -Math.min(W, H) * .06, duration: total, ease: "none" }, 0); }
-    var n = o.particles == null ? 46 : o.particles;
+    if (o.grid === true) { var g = el("div", "mk-grid", bg); tl.fromTo(g, { opacity: 0, scale: 1.08 }, { opacity: 1, scale: 1, duration: 1.6, ease: MK.ease.enter }, 0); tl.to(g, { y: -Math.min(W, H) * .06, duration: total, ease: "none" }, 0); }
+    var n = o.particles || 0;
     for (var p = 0; p < n; p++) {
       var d = el("div", "mk-dot", bg);
       gsap.set(d, { x: rnd() * W, y: rnd() * H, scale: .4 + rnd() * .9, opacity: 0 });
       tl.to(d, { opacity: .15 + rnd() * .55, duration: 1.2, ease: "sine.out" }, rnd() * 1.5);
       tl.to(d, { y: "-=" + (H * (.05 + rnd() * .12)), x: "+=" + ((rnd() - .5) * W * .08), duration: total, ease: "none" }, 0);
     }
-    el("div", "mk-vignette", bg); if (o.scanlines !== false) el("div", "mk-scan", bg);
+    if (o.vignette) el("div", "mk-vignette", bg);
+    if (o.scanlines === true) el("div", "mk-scan", bg);
 
-    if (o.hud !== false) {
+    if (o.hud === true) {
       var hud = el("div", "mk-hud", root);
       ["mk-c1", "mk-c2", "mk-c3", "mk-c4"].forEach(function (c) { el("div", "mk-corner " + c, hud); });
       el("div", "mk-hud-tl", hud, o.label || "");
@@ -289,44 +290,30 @@ export const MOTION_KIT_JS = String.raw`(function () {
     MK.tl.fromTo(sh, { xPercent: -200 }, { xPercent: 450, duration: .9, ease: MK.ease.move, repeat: o.shines || 2, repeatDelay: .7 }, at + .5);
     MK.tl.to(b, { scale: 1.05, duration: .5, ease: "sine.inOut", yoyo: true, repeat: o.pulses || 3 }, at + 1);
   };
-  // logo: entrada de marca com anéis e flash
+  // logo: entrada de marca (só a logo; anéis/alvo só se a composição chamar MK.ring de propósito)
   MK.logo = function (target, o) {
     o = o || {}; var at = o.at || 0; var e = $(target);
     MK.tl.fromTo(e, { scale: .3, opacity: 0, rotationY: -90, filter: "blur(16px)" }, { scale: 1, opacity: 1, rotationY: 0, filter: "blur(0px)", duration: 1.2, ease: MK.ease.enter }, at);
-    var r = e.getBoundingClientRect(); var rr = MK.root.getBoundingClientRect(); var ok = r.width > 0;
-    MK.ring({ x: ok ? r.left - rr.left + r.width / 2 : o.x, y: ok ? r.top - rr.top + r.height / 2 : o.y, size: ok ? Math.max(r.width, r.height) * 1.6 : o.size, at: at + .2, pulses: 1 });
   };
 
   window.MK = MK;
 })();`;
 
-/** Referência da API para o prompt da IA (o "manual" do kit). */
-export const KIT_DOC = `MOTION KIT (já carregado: <script src="assets/motion-kit.js"></script> logo depois do GSAP). Use-o SEMPRE: ele é o design system dos vídeos.
-Setup (uma vez, depois de montar o HTML das cenas):
-  const tl = MK.init({ accent:"#hex", accent2:"#hex", bg:"#hex", text:"#hex", font:"Fonte Títulos", mono:"JetBrains Mono",
-                       label:"MARCA / 001", footer:"texto curto", status:"", particles:46, grid:true, hud:true });
-  // MK.init cria fundo vivo (blobs, grade, partículas, vinheta), HUD com cantos/timecode/barra de progresso e registra window.__timelines["main"].
-  // Use MK.tl (ou o tl retornado) para tudo; todos os métodos recebem {at: segundos absolutos}.
-Tipografia:
-  MK.words(el, "frase da narração", {at, dur, hl:["palavra","chave"], style:"rise"|"blur"|"depth", words})  // palavra a palavra, sincroniza com a voz
-  MK.title(el, "MANCHETE", {at, hl:["palavra"]})          // letra a letra em 3D, de dentro de máscara
-  MK.typewriter(el, "texto digitado", {at, cps:28})        // campo de prompt digitando, com cursor
-  MK.counter(el, {from, to, at, dur, decimals, prefix, suffix})
-Superfícies e profundidade:
-  MK.panel(els, {at, from:"depth"|"bottom"|"left"|"right", tilt:6})   // painel de vidro entra em 3D e fica levemente inclinado
-  MK.cards(els, {at, fan:true})                            // pilha 3D que abre em leque
-  MK.camera(sceneEl, {at, dur, to:1.07, rotY:4})           // push-in lento de câmera (use em TODA cena)
-  MK.float(els, {at, dur})                                 // flutuação sutil
-Gráficos:
-  MK.ring({x, y, size, at, in:sceneEl})                    // alvo/anéis pulsando
-  MK.particles({x, y, count:120, mode:"burst"|"converge", at, in:sceneEl})
-  MK.chart(svgPathEl, {at, dur})                           // desenha path SVG (stroke) como gráfico
-  MK.line({x, y, w, at, in:sceneEl})                       // traço de luz que cresce
-Transições (entre cenas, no instante do corte):
-  MK.flash({at}) · MK.sweep({at}) · MK.marquee(["PALAVRA","OUTRA"], {at, dur:1.4, angle:-12})
-  MK.in(els, {at, style:"rise"|"scale"|"depth"|"pop"|"left"|"right"}) · MK.out(els, {at, style:"up"|"zoom"|"depth"|"blur"|"left"})
+/** Referência da API para o prompt da IA (o "manual" do kit). O kit é APOIO, não estilo: cada vídeo cria a própria linguagem. */
+export const KIT_DOC = `MOTION KIT (carregado em <script src="assets/motion-kit.js"></script> logo depois do GSAP). É uma CAIXA DE FERRAMENTAS
+OPCIONAL, não um estilo: use só o que servir à direção de arte deste vídeo e escreva o resto em GSAP/CSS/SVG do seu jeito.
+Setup obrigatório (cria o timeline e registra window.__timelines["main"]; fundo liso na cor bg, SEM decoração):
+  const tl = MK.init({ accent:"#hex", accent2:"#hex", bg:"#hex", text:"#hex", font:"Fonte", mono:"Fonte mono", total:<duração> });
+  Decoração opcional (desligada por padrão; ligue só se combinar com a direção): blobs:true · grid:true · particles:40 ·
+  vignette:true · scanlines:true · hud:true (moldura com cantos/timecode, estética "tech HUD").
+  Todos os métodos recebem {at: segundos absolutos} e usam MK.tl.
+Tipografia: MK.words(el, "frase", {at, dur, hl:[…], style:"rise"|"blur"|"depth", words}) · MK.title(el, "MANCHETE", {at, hl})
+  MK.typewriter(el, "texto", {at, cps}) · MK.counter(el, {from, to, at, dur, decimals, prefix, suffix})
+Profundidade: MK.panel(els, {at, from:"depth"|"bottom"|"left"|"right", tilt}) · MK.cards(els, {at, fan}) · MK.camera(el, {at, dur, to, rotY}) · MK.float(els, {at, dur})
+Gráficos: MK.chart(svgPath, {at, dur}) · MK.line({x, y, w, at, in}) · MK.particles({x, y, count, mode:"burst"|"converge", at, in})
+  MK.ring({x, y, size, at, in}) = alvo com anéis e mira (clichê: só se a ideia pedir um "alvo" de verdade)
+Transições: MK.flash({at}) · MK.sweep({at}) · MK.marquee([…], {at}) (faixas de texto atravessando a tela: clichê, evite)
+  MK.in(els, {at, style}) · MK.out(els, {at, style})
 Marca/CTA: MK.logo(imgEl, {at}) · MK.cta(btnEl, {at})
-Classes prontas: .mk-center (cena centrada) .mk-display .mk-h1 .mk-h2 .mk-sub .mk-label (mono, cor de destaque) .mk-glass (painel)
-  .mk-prompt (campo de prompt) .mk-chip .mk-btn (botão CTA) .mk-hl (palavra destacada). Unidade: var(--mk-u) = 1% do lado menor.
-Tokens: MK.ease.enter (entradas) · MK.ease.move (deslocamentos) · MK.ease.snap (estalos) · MK.ease.exit (saídas). Não invente outros easings.
-MK.rand() é o aleatório determinístico (Math.random é proibido).`;
+Classes: .mk-center .mk-display .mk-h1 .mk-h2 .mk-sub .mk-label .mk-glass .mk-prompt .mk-chip .mk-btn .mk-hl · var(--mk-u) = 1% do lado menor.
+Easings: MK.ease.* ou qualquer easing do GSAP (CustomEase não está carregado). MK.rand() é o aleatório determinístico (Math.random é proibido).`;

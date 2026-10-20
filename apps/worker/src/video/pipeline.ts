@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } f
 import { join } from "node:path";
 import { DATA_DIR } from "../env";
 import { bloco, perguntarIA } from "../ai/ask";
-import { lerStoryboard, promptAjuste, promptComposicao, promptCorrecao, promptRoteiro, SISTEMA_ROTEIRO, sistemaAjusteCenas, sistemaComposicao, violacoes } from "./compose";
+import { DIRECOES, lerStoryboard, promptAjuste, type Direcao, promptComposicao, promptCorrecao, promptRoteiro, SISTEMA_ROTEIRO, sistemaAjusteCenas, sistemaComposicao, violacoes } from "./compose";
 import { contextoCriativo } from "./contexto";
 import { arquivoMusica, arquivoSfx } from "./sfx";
 import { duracao, ffmpeg, hyperframes } from "./tools";
@@ -154,7 +154,10 @@ export async function runVideo(payload: VideoPayload, c: Ctx) {
     writeFileSync(join(pasta, "assets", "motion-kit.js"), MOTION_KIT_JS, "utf8");
     writeFileSync(join(pasta, "assets", "cenas.js"), CENAS_JS, "utf8");
     const deCenas = ajuste ? !!p.composition?.includes("assets/cenas.js") : modelo;
-    const sistema = deCenas ? sistemaAjusteCenas(brief) : sistemaComposicao(brief);
+    // Livre: uma direção de arte que o workspace não usou nos últimos vídeos (a composição guarda qual foi)
+    const direcao = deCenas ? undefined : await escolherDirecao(p.workspace_id, p.id);
+    if (direcao) await c.log(`Direção de arte: ${direcao.nome}`);
+    const sistema = deCenas ? sistemaAjusteCenas(brief) : sistemaComposicao(brief, direcao, ajuste);
     let html = !porIA
       ? montarComposicao({ sb, brief, brand: ctxCriativo.brand, w, h, assets: readdirSync(join(pasta, "assets")), rotulo: brief.produto })
       : bloco((await ia(sistema, ajuste && p.composition ? promptAjuste(p.composition, sb, pedido, ctxCriativo.texto) : promptComposicao(sb, ctxCriativo.texto, ritmo))).text, "html");
@@ -173,6 +176,7 @@ export async function runVideo(payload: VideoPayload, c: Ctx) {
       await c.log(`${erros.length} problema(s) na composição; pedindo correção à IA`);
       html = bloco((await ia(sistema, promptCorrecao(html, erros))).text, "html");
     }
+    if (direcao && !ajuste) html = marcarDirecao(html, direcao.nome); // ajuste mantém a marca da composição de origem
     await sql`update ads.video_projects set composition = ${html}, updated_at = now() where id = ${p.id}`;
 
     // 4. Render (vídeo sem áudio; o áudio é mixado depois no FFmpeg)
@@ -196,6 +200,24 @@ export async function runVideo(payload: VideoPayload, c: Ctx) {
     await sql`update ads.video_projects set status = 'FAILED', error = ${(e as Error).message.slice(0, 1000)}, updated_at = now() where id = ${p.id}`;
     throw e;
   }
+}
+
+const MARCA_DIRECAO = "<!-- direcao: ";
+// logo depois do <!DOCTYPE> (comentário antes dele pode tirar a página do modo padrão)
+const marcarDirecao = (html: string, nome: string) => {
+  const limpo = html.replace(/<!-- direcao: [^>]*-->\r?\n?/g, "");
+  const m = /^\s*<!DOCTYPE[^>]*>\r?\n?/i.exec(limpo);
+  return m ? `${m[0]}${MARCA_DIRECAO}${nome} -->\n${limpo.slice(m[0].length)}` : `${MARCA_DIRECAO}${nome} -->\n${limpo}`;
+};
+
+/** Sorteia (pelo id do projeto) uma direção de arte fora das 6 mais recentes do workspace. */
+async function escolherDirecao(workspaceId: string, projectId: string): Promise<Direcao> {
+  const recentes = (await db()<{ d: string | null }[]>`
+    select substring(composition from '<!-- direcao: ([^>]*?) -->') as d from ads.video_projects
+    where workspace_id = ${workspaceId} and id <> ${projectId} and composition like ${`${MARCA_DIRECAO}%`} order by updated_at desc limit 6`).map((x) => x.d);
+  const livres = DIRECOES.filter((d) => !recentes.includes(d.nome));
+  const lista = livres.length ? livres : DIRECOES;
+  return lista[(Date.now() + projectId.charCodeAt(0)) % lista.length]!;
 }
 
 /**
