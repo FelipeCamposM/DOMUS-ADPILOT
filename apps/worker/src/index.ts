@@ -1,8 +1,9 @@
 import { CONCURRENCY, SYNC_INTERVAL_MIN, WORKER_ID } from "./env"; // primeiro: carrega o .env
-import { claimJob, completeJob, db, enqueueJob, failJob, jobDeSync, jobLog, migrate, recoverJobs, syncConnection, syncInstagram, type Job, type JobType } from "@domus-ads/core";
+import { claimJob, completeJob, db, enqueueJob, failJob, jobDeSync, jobLog, migrate, recoverJobs, syncConnection, syncInstagram, tiposLivres, type Job, type JobType } from "@domus-ads/core";
 import { createServer } from "node:net";
 import { hostname } from "node:os";
 import { runChatTurn } from "./ai/chat";
+import { limparPedidos, runSistema } from "./ai/sistema";
 import { atualizarUsoContas } from "./ai/uso";
 import { detectar, publicarDetectadas, runLogin } from "./ai/login";
 import { runImagem, type ImagemPayload } from "./video/imagem";
@@ -21,7 +22,7 @@ import { acaoWhatsapp, avisar, estadoWhatsapp, gravarQr, ouvirWhatsapp, vigiarQu
  * FOR UPDATE SKIP LOCKED e grava progresso/resultado no banco; a web só lê. A web nunca manda comando de shell:
  * cada tipo de job tem um handler fixo aqui (allowlist).
  */
-const TIPOS: readonly JobType[] = ["SYNC_META", "SYNC_GOOGLE", "AI_CHAT", "AI_LOGIN", "AI_DETECT", "WORKER_STARTUP", "GENERATE_VIDEO", "GENERATE_IMAGE", "AI_CAMPAIGN", "RESTORE_MEDIA", "SYNC_INSTAGRAM", "PUBLISH_INSTAGRAM", "AI_INSTAGRAM_CAPTION", "AI_USAGE", "WHATSAPP", "AI_CALENDARIO", "GENERATE_AUDIO"];
+const TIPOS: readonly JobType[] = ["SYNC_META", "SYNC_GOOGLE", "AI_CHAT", "AI_LOGIN", "AI_DETECT", "WORKER_STARTUP", "GENERATE_VIDEO", "GENERATE_IMAGE", "AI_CAMPAIGN", "RESTORE_MEDIA", "SYNC_INSTAGRAM", "PUBLISH_INSTAGRAM", "AI_INSTAGRAM_CAPTION", "AI_USAGE", "WHATSAPP", "AI_CALENDARIO", "GENERATE_AUDIO", "AI_SISTEMA"];
 const sql = db();
 const ativos = new Map<string, AbortController>();
 let parando = false;
@@ -43,6 +44,9 @@ async function executar(job: Job) {
       result = await syncConnection(String(job.payload.connectionId), log, async (p) => { await sql`update ads.jobs set progress = ${p} where id = ${job.id}`; });
     } else if (job.type === "AI_CHAT") {
       result = await runChatTurn(String(job.payload.conversationId), ctl.signal, log);
+    } else if (job.type === "AI_SISTEMA") {
+      // pedido de um sistema conectado (Sistemas → API /api/externo/v1)
+      result = await runSistema(String(job.payload.pedidoId), ctl.signal, log);
     } else if (job.type === "AI_LOGIN") {
       result = await runLogin(String(job.payload.loginId), ctl.signal, log);
     } else if (job.type === "AI_DETECT") {
@@ -97,8 +101,10 @@ async function executar(job: Job) {
 async function loop() {
   while (!parando) {
     try {
-      if (ativos.size < CONCURRENCY) {
-        const job = await claimJob(sql, WORKER_ID, TIPOS);
+      // CONCURRENCY vagas para tudo + 1 só para respostas de chat (nunca esperam atrás de vídeo ou sincronização)
+      const tipos = tiposLivres(ativos.size, CONCURRENCY, TIPOS);
+      if (tipos) {
+        const job = await claimJob(sql, WORKER_ID, tipos);
         if (job) { void executar(job); continue; }
       }
     } catch (e) {
@@ -170,7 +176,8 @@ await migrate(process.env.DIRECT_URL, (m) => console.log(m)); // banco sempre em
 await sql`update ads.ai_logins set status = 'FAILED', error = 'Worker reiniciado durante o login', updated_at = now()
            where status in ('STARTING','AWAITING_USER','CODE_SUBMITTED')`;
 await sql`update ads.jobs set status = 'FAILED', error = 'Worker reiniciado', finished_at = now()
-           where status = 'RUNNING' and type in ('AI_LOGIN','WORKER_STARTUP','GENERATE_VIDEO','GENERATE_IMAGE','GENERATE_AUDIO','PUBLISH_INSTAGRAM','AI_INSTAGRAM_CAPTION','WHATSAPP','AI_CALENDARIO')`;
+           where status = 'RUNNING' and type in ('AI_LOGIN','WORKER_STARTUP','GENERATE_VIDEO','GENERATE_IMAGE','GENERATE_AUDIO','PUBLISH_INSTAGRAM','AI_INSTAGRAM_CAPTION','WHATSAPP','AI_CALENDARIO','AI_SISTEMA')`;
+await sql`update ads.sistema_pedidos set status = 'ERRO', erro = 'Worker reiniciado durante a resposta.', instrucoes = null, prompt = null, updated_at = now() where status = 'RODANDO'`;
 await sql`update ads.calendarios set status = 'ERRO', erro = 'Worker reiniciado durante o planejamento. Gere de novo.' where status = 'GERANDO'`;
 await sql`update ads.calendario_itens set refazendo = null where refazendo is not null`;
 await gravarQr(null).catch(() => {});
@@ -186,8 +193,9 @@ const recuperados = await recoverJobs(sql, WORKER_ID);
 await sql`update ads.ai_messages set status = 'ERROR', meta = meta || '{"error":"Worker reiniciado durante a resposta"}' where status = 'STREAMING'`;
 await sql`update ads.ai_conversations set status = 'IDLE' where status = 'RUNNING' and not exists (
   select 1 from ads.jobs j where j.type = 'AI_CHAT' and j.status = 'PENDING' and j.payload->>'conversationId' = ads.ai_conversations.id::text)`;
-console.log(`DOMUS Worker "${WORKER_ID}" no ar · ${CONCURRENCY} jobs simultâneos · ${recuperados.length} job(s) recuperado(s)`);
+console.log(`DOMUS Worker "${WORKER_ID}" no ar · ${CONCURRENCY} jobs simultâneos + 1 vaga de chat · ${recuperados.length} job(s) recuperado(s)`);
 repetir(heartbeat, 30_000);
+repetir(limparPedidos, 6 * 3600_000);
 repetir(agendarSyncs, 5 * 60_000);
 repetir(publicarAgendados, 30_000);
 repetir(automatizarCalendario, 60_000);
