@@ -362,6 +362,28 @@ vezes, com espera crescente).
 - Sincronização automática: o worker sincroniza cada conexão a cada `SYNC_INTERVAL_MIN` minutos (padrão 60).
   Cada sincronização traz as campanhas e as métricas diárias dos últimos 30 dias.
 
+### Sistemas (admin da plataforma)
+Central de IA da empresa: outros sistemas seus (ex.: admin do SIAPLUS) usam as contas de IA daqui, pelo mesmo worker.
+- **Conectar sistema**: dê um nome e copie a chave (`domus_…`, aparece uma vez; no banco fica só o hash). No admin do
+  outro sistema, cole a chave e o endereço do AdPilot.
+- **Ajustar**: limite da janela de 5 h (acima dele a conta não atende o sistema; ex.: 80 guarda 20% para você) e quais
+  contas podem atender (padrão: todas, na ordem de prioridade). **Pausar** recusa os pedidos na hora; **chave nova**
+  derruba a antiga.
+- **Consumo**: hoje, 7 e 30 dias por sistema (o próprio AdPilot é uma linha), respostas por dia e qual conta/plano
+  atendeu. Respostas e tokens são exatos; a janela de 5 h por sistema é estimativa (soma de quanto ela subiu em cada
+  resposta; a janela é da conta inteira).
+- Fila: o worker tem `WORKER_CONCURRENCY` vagas para tudo e **mais uma só para respostas de chat** (chat do AdPilot e
+  sistemas): uma pergunta nunca espera atrás de vídeo ou sincronização.
+
+Como ligar um sistema novo (API, cabeçalho `Authorization: Bearer domus_…`, rotas públicas fora do login):
+- `POST /api/externo/v1/pedidos` com `{"instrucoes": "...", "prompt": "..."}` → `{"id"}`. Máx. 5 em andamento por sistema.
+- `GET /api/externo/v1/pedidos/{id}` → `status` (FILA, RODANDO, PRONTO, ERRO, CANCELADO), `texto` (chega aos poucos),
+  `erro`, `conta`, `provider`, `modelo`, tokens e duração. Leia a cada 1 s enquanto não terminar.
+- `POST /api/externo/v1/pedidos/{id}/parar`.
+- `GET /api/externo/v1/uso` → worker online e as contas que atendem o sistema, com o uso de 5 h/semana.
+- Sem sessão: mande o histórico inteiro em cada prompt. A IA roda sem ferramentas (só texto). Instruções e prompt são
+  apagados ao fim da resposta e o pedido some em 7 dias (o consumo fica). Exemplo pronto: `lib/adpilot.ts` do SIAPLUS-site.
+
 ### Auditoria
 Toda alteração com data, usuário, ação, item, antes → depois e origem (Usuário, Recomendação da IA, Sistema). Entram:
 pausar/ativar, orçamento, conexões, membros, workspace e contas de IA.
