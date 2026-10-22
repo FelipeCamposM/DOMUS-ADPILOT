@@ -1473,3 +1473,18 @@ fieldset:disabled .chave { opacity: 0.6; cursor: default; }
 .capa-tira canvas[data-pronto="false"] { animation: etapa-pulsa 1.4s var(--ease-in-out) infinite; }
 .capa-tira span { font-size: 9.5px; color: rgb(var(--c-text-tertiary)); }
 @media (max-width: 640px) { .capa-reels { grid-template-columns: 1fr; } .capa-previa { width: 140px; } .capa-tira { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+/* ── Sistemas conectados ─────────────────────────────────────────────────────────────── */
+.sis-cor { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; display: inline-block; }
+.sis-grafico { display: grid; grid-template-columns: repeat(30, 1fr); gap: 4px; height: 180px; align-items: end; padding: 18px 18px 6px; }
+.sis-coluna { height: 100%; display: flex; align-items: flex-end; border-radius: 4px; background: rgb(var(--c-bg-elevated) / 0.5); }
+.sis-pilha { width: 100%; display: flex; flex-direction: column-reverse; border-radius: 4px; overflow: hidden; min-height: 0;
+  transform-origin: bottom; animation: sis-sobe .7s var(--ease-out) both; animation-delay: calc(var(--i) * 18ms); }
+.sis-pilha > i { display: block; min-height: 2px; }
+.sis-eixo { display: flex; justify-content: space-between; font-size: 11px; padding: 0 18px 14px; }
+.sis-chave { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--radius-md); background: rgb(var(--c-bg-inset)); border: 1px solid rgb(var(--c-brand) / 0.35); }
+.sis-chave code { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 12.5px; }
+.anim-linha { animation: sis-entra .45s var(--ease-out) both; animation-delay: calc(var(--i) * 45ms); }
+@keyframes sis-sobe { from { transform: scaleY(0); } }
+@keyframes sis-entra { from { opacity: 0; transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) { .sis-pilha, .anim-linha { animation: none; } }

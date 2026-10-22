@@ -1,7 +1,7 @@
 "use client";
 
 import { gsap } from "gsap";
-import { Activity, Bot, Cable, CalendarDays, Clapperboard, FolderOpen, Images, LayoutDashboard, Megaphone, MessageCircle, Palette, ScrollText, Settings } from "lucide-react";
+import { Activity, Bot, Boxes, Cable, CalendarDays, Clapperboard, FolderOpen, Images, LayoutDashboard, Megaphone, MessageCircle, Palette, ScrollText, Settings } from "lucide-react";
 import Link from "next/link";
 import { InstagramIcon } from "../connections/Logos";
 import { usePathname } from "next/navigation";
@@ -17,6 +17,7 @@ export const NAV = [
   { href: "/instagram", label: "Instagram", icon: InstagramIcon, group: "Criação" },
   { href: "/conteudos", label: "Conteúdos", icon: CalendarDays, group: "Criação" },
   { href: "/ai", label: "IA", icon: Bot, group: "Inteligência" },
+  { href: "/sistemas", label: "Sistemas", icon: Boxes, group: "Inteligência" },
   { href: "/jobs", label: "Jobs", icon: Activity, group: "Operação" },
   { href: "/connections", label: "Conexões", icon: Cable, group: "Operação" },
   { href: "/mensagens", label: "Mensagens", icon: MessageCircle, group: "Operação" },

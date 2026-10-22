@@ -12,7 +12,7 @@ export interface JobLinha {
   created_at: string; started_at: string | null; finished_at: string | null; payload: Record<string, unknown>;
 }
 
-const TIPO: Record<string, string> = { SYNC_META: "Sincronizar Meta", SYNC_GOOGLE: "Sincronizar Google", AI_CHAT: "Resposta da IA", GENERATE_VIDEO: "Gerar vídeo", AI_LOGIN: "Login de conta de IA", AI_DETECT: "Procurar contas de IA", WORKER_STARTUP: "Início com o Windows", AI_USAGE: "Ler uso das contas de IA", WHATSAPP: "Conexão do WhatsApp" };
+const TIPO: Record<string, string> = { SYNC_META: "Sincronizar Meta", SYNC_GOOGLE: "Sincronizar Google", AI_CHAT: "Resposta da IA", GENERATE_VIDEO: "Gerar vídeo", AI_LOGIN: "Login de conta de IA", AI_DETECT: "Procurar contas de IA", WORKER_STARTUP: "Início com o Windows", AI_USAGE: "Ler uso das contas de IA", WHATSAPP: "Conexão do WhatsApp", AI_SISTEMA: "IA para sistema conectado" };
 const STATUS: Record<string, [string, string]> = {
   PENDING: ["Na fila", "badge-info"], RUNNING: ["Rodando", "badge-brand"], COMPLETED: ["Concluído", ""], FAILED: ["Falhou", "badge-error"], CANCELLED: ["Cancelado", ""],
 };
