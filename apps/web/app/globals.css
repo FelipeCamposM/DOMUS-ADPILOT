@@ -1533,3 +1533,6 @@ fieldset:disabled .chave { opacity: 0.6; cursor: default; }
 .wa-previa-modelo { padding: 10px 12px; border-radius: 10px; background: rgb(var(--c-brand) / 0.12); }
 .wa-previa-modelo p { margin: 4px 0 0; white-space: pre-line; font-size: 14px; }
 @media (max-width: 860px) { .wa-dica { display: none; } .wa-biblioteca { grid-template-columns: repeat(3, 1fr); } }
+/* botão do Consultor (fixo no canto) não cobre o enviar */
+.wa-compor { padding-right: 96px; }
+@media (max-width: 860px) { .wa-compor { padding-right: 84px; } }
