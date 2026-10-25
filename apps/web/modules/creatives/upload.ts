@@ -2,7 +2,7 @@
 
 import { cancelarUpload, concluirUpload, iniciarUpload } from "./actions";
 
-export interface Enviado { id: string; name: string; type: "IMAGE" | "VIDEO" | "MUSIC" | "SFX" }
+export interface Enviado { id: string; name: string; type: "IMAGE" | "VIDEO" | "MUSIC" | "SFX" | "VOICE" }
 
 /** Duração/dimensões lidas pelo próprio navegador (sem subir o arquivo duas vezes). */
 function medir(f: File): Promise<{ durationMs: number | null; width: number | null; height: number | null }> {
@@ -31,7 +31,7 @@ function medir(f: File): Promise<{ durationMs: number | null; width: number | nu
  * Envia um arquivo para a biblioteca do workspace: registra, manda o binário (rota local ou URL pré-assinada do R2)
  * e confirma o tamanho. Lança Error com mensagem em português.
  */
-export async function enviarArquivo(f: File, extra: { type?: "MUSIC" | "SFX"; tags?: string[]; license?: string; pastaId?: string | null; onProgresso?: (pct: number) => void } = {}): Promise<Enviado> {
+export async function enviarArquivo(f: File, extra: { type?: "MUSIC" | "SFX" | "VOICE"; tags?: string[]; license?: string; pastaId?: string | null; onProgresso?: (pct: number) => void } = {}): Promise<Enviado> {
   const type = extra.type ?? (f.type.startsWith("video/") ? "VIDEO" : f.type.startsWith("image/") ? "IMAGE" : null);
   if (!type) throw new Error(`“${f.name}”: envie imagem (PNG, JPG, WEBP, SVG) ou vídeo (MP4, MOV, WEBM)`);
   const m = await medir(f);

@@ -1488,3 +1488,11 @@ fieldset:disabled .chave { opacity: 0.6; cursor: default; }
 @keyframes sis-sobe { from { transform: scaleY(0); } }
 @keyframes sis-entra { from { opacity: 0; transform: translateY(6px); } }
 @media (prefers-reduced-motion: reduce) { .sis-pilha, .anim-linha { animation: none; } }
+
+/* Gravar a própria voz (Novo vídeo) */
+.voz-gravando { display: grid; grid-template-columns: auto auto 1fr auto; gap: 12px; align-items: center; padding: 14px 16px; border-radius: 14px; border: 1px solid rgb(var(--c-error) / 0.5); background: rgb(var(--c-error) / 0.06); }
+.voz-ponto { width: 10px; height: 10px; border-radius: 50%; background: rgb(var(--c-error)); animation: voz-pulso 1.1s ease-in-out infinite; }
+.voz-nivel { height: 6px; border-radius: 99px; background: rgb(var(--c-border)); overflow: hidden; }
+.voz-nivel > span { display: block; height: 100%; background: rgb(var(--c-brand)); transform-origin: left; transition: transform 80ms linear; }
+@keyframes voz-pulso { 50% { opacity: 0.35; transform: scale(0.8); } }
+@media (prefers-reduced-motion: reduce) { .voz-ponto { animation: none; } }

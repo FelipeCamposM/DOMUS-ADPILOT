@@ -1,4 +1,4 @@
-import { apagarArquivo, briefSchema, db, FORMATOS, guardarArquivo, PAPEIS_COR, paletaSchema, r2Key, retimeScenes, tempoLeitura, type Brief, type Json, type Storyboard } from "@domus-ads/core";
+import { apagarArquivo, briefSchema, VOZ_PROPRIA, db, FORMATOS, guardarArquivo, PAPEIS_COR, paletaSchema, r2Key, retimeScenes, tempoLeitura, type Brief, type Json, type Storyboard } from "@domus-ads/core";
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { DATA_DIR } from "../env";
@@ -14,6 +14,7 @@ import { revisarComposicao } from "./qa";
 import { gerarTrilha } from "./music";
 import { ttsPara } from "./tts";
 import { runEdicao } from "./editar";
+import { corrigir, encaixarNaFala, legendaRevisada, prepararVozPropria, promptVoz, SISTEMA_ROTEIRO_VOZ, type VozPropria } from "./voz-propria";
 
 type Etapa = "SCRIPTING" | "VOICE" | "COMPOSING" | "RENDERING" | "MIXING" | "UPLOADING" | "READY";
 export interface Ctx { signal: AbortSignal; log: (m: string) => Promise<void>; progress: (p: number) => Promise<void> }
@@ -52,6 +53,9 @@ export async function runVideo(payload: VideoPayload, c: Ctx) {
     ctxCriativo.brand = { ...ctxCriativo.brand, cores: pa.cores.map((hex, i) => ({ hex, nome: PAPEIS_COR[i] ?? "" })), fonteTitulo: pa.fonteTitulo || ctxCriativo.brand.fonteTitulo, fonteTexto: pa.fonteTexto || ctxCriativo.brand.fonteTexto };
     ctxCriativo.texto += `\n\n<paleta_aprovada>\nO cliente aprovou estas cores e fontes antes do render. Use exatamente elas e não introduza outras cores de destaque.\n${pa.cores.map((hex, i) => `- ${PAPEIS_COR[i]}: ${hex}`).join("\n")}${pa.fonteTitulo ? `\n- Fonte dos títulos: ${pa.fonteTitulo}` : ""}${pa.fonteTexto ? `\n- Fonte dos textos: ${pa.fonteTexto}` : ""}\n</paleta_aprovada>`;
   }
+  // voz do cliente: a transcrição (cache na pasta) manda no roteiro e nos tempos; nada de TTS
+  const propria = brief.voz === VOZ_PROPRIA;
+  const vozPropria = () => prepararVozPropria(p.workspace_id, brief, pasta, [brief.produto, ctxCriativo.marca].filter(Boolean).join(", "), c);
   const ia = (sistema: string, prompt: string) => perguntarIA({ workspaceId: p.workspace_id, projetoId: p.id, sistema, prompt, cwd: pasta, signal: c.signal, log: c.log, imagens: ctxCriativo.imagens });
 
   try {
@@ -59,19 +63,27 @@ export async function runVideo(payload: VideoPayload, c: Ctx) {
     let sb: Storyboard;
     const modo = payload.mode ?? "full";
     if (modo === "full" || !p.storyboard) {
-      await etapa("SCRIPTING", "Escrevendo roteiro e storyboard…");
-      let r = await ia(SISTEMA_ROTEIRO, promptRoteiro(brief, ctxCriativo.texto));
+      let voz: VozPropria | null = null;
+      if (propria) {
+        await etapa("SCRIPTING", "Transcrevendo a sua voz…");
+        voz = await vozPropria();
+      }
+      await etapa("SCRIPTING", propria ? "Escrevendo o roteiro em cima da sua fala…" : "Escrevendo roteiro e storyboard…");
+      const sistemaR = propria ? `${SISTEMA_ROTEIRO}\n\n${SISTEMA_ROTEIRO_VOZ}` : SISTEMA_ROTEIRO;
+      const pedidoR = `${promptRoteiro(brief, ctxCriativo.texto)}${voz ? `\n\n${promptVoz(voz)}` : ""}`;
+      let r = await ia(sistemaR, pedidoR);
       try {
         sb = lerStoryboard(bloco(r.text, "json"));
       } catch (e) {
         await c.log(`${(e as Error).message}; pedindo correção`);
-        r = await ia(SISTEMA_ROTEIRO, `${promptRoteiro(brief, ctxCriativo.texto)}\n\nSua resposta anterior falhou na validação: ${(e as Error).message}. Responda de novo, só o bloco json válido.`);
+        r = await ia(sistemaR, `${pedidoR}\n\nSua resposta anterior falhou na validação: ${(e as Error).message}. Responda de novo, só o bloco json válido.`);
         sb = lerStoryboard(bloco(r.text, "json"));
       }
       if (!brief.efeitos) sb.sfx = [];
       if (brief.musica === "none") sb.music = null;
-      // tempo de leitura é regra (não pedido à IA): cada cena dura pelo menos o necessário para ler o texto fixo
-      sb = retimeScenes(sb, sb.scenes.map(tempoLeitura));
+      // tempo de leitura é regra (não pedido à IA): cada cena dura pelo menos o necessário para ler o texto fixo.
+      // Voz do cliente: o tempo é o da fala (cenas grudadas nas palavras, legenda = transcrição revisada)
+      sb = voz ? encaixarNaFala(sb, corrigir(voz, bloco(r.text, "json"))) : retimeScenes(sb, sb.scenes.map(tempoLeitura));
       // a paleta que o vídeo vai usar vai junto para a revisão: o usuário vê (e corrige) as cores antes de gastar com o render
       const { P } = paletaCenas(brief, ctxCriativo.brand);
       const paleta = { origem: ctxCriativo.brand.cores.length ? ctxCriativo.origem : "estilo", marca: ctxCriativo.marca, cores: [P.bg, P.a, P.tx, P.a2], fonteTitulo: P.ft, fonteTexto: P.fb };
@@ -87,7 +99,12 @@ export async function runVideo(payload: VideoPayload, c: Ctx) {
     // 2. Narração por cena (Kokoro local ou ElevenLabs) e reajuste dos tempos para a voz caber
     const vozes: { file: string; start: number }[] = [];
     const arquivoVoz = (i: number) => [join(pasta, `voz-${i}.mp3`), join(pasta, `voz-${i}.wav`)].find(existsSync);
-    if (modo !== "adjust" && brief.voz !== "none") {
+    if (propria) {
+      // o áudio não muda; texto editado na revisão só mexe na legenda
+      const v = await vozPropria();
+      sb = legendaRevisada(sb);
+      vozes.push({ file: v.arquivo, start: 0 });
+    } else if (modo !== "adjust" && brief.voz !== "none") {
       await etapa("VOICE", brief.voz.startsWith("el:") ? "Gravando a narração (ElevenLabs)…" : "Gravando a narração…");
       for (const i of sb.scenes.keys()) for (const f of [`voz-${i}.mp3`, `voz-${i}.wav`]) rmSync(join(pasta, f), { force: true });
       const tts = ttsPara(brief.voz, c.log);

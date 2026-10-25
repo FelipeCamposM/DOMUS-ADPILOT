@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, AudioLines, Loader2, MessageSquareText, Mic, MicOff, Music2, Play, Sparkles, Star, Volume2, VolumeX } from "lucide-react";
+import { ArrowRight, AudioLines, Scissors, UserRound, Loader2, MessageSquareText, Mic, MicOff, Music2, Play, Sparkles, Star, Volume2, VolumeX } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Escolha, Revelar } from "../motion/Escolha";
@@ -12,6 +12,7 @@ import { confirmar } from "../shell/confirmar";
 import { Anexos, paraEnvio, type AnexosValor } from "./Anexos";
 import type { MarcaResumo } from "@/lib/marcas";
 import { comMarca, faltando, Identidade } from "./Identidade";
+import { GravarVoz, type VozGravada } from "./GravarVoz";
 
 const FORMATOS = [
   { v: "9:16", l: "Vertical", d: "Reels, Stories, Shorts", w: 18, h: 32 },
@@ -41,8 +42,10 @@ export function NewVideoForm({ produto, musicas, marcas, vozesEl, favoritas: fav
   const [f, setF] = useState({
     produto, objetivo: "", descricao: "", publico: "", cta: "", estilo: "premium, moderno, tipografia forte", cores: "",
     duracao: 15, formato: "9:16", voz: "pf_dora", vozNome: "", musica: "auto", efeitos: true, orientacao: "", estiloVisual: "hud" as Estilo, legendas: true,
-    estiloSalvo: null as string | null,
+    estiloSalvo: null as string | null, cortarPausas: true,
   });
+  const [minhaVoz, setMinhaVoz] = useState<VozGravada | null>(null);
+  const propria = f.voz === "propria";
   const [salvos, setSalvos] = useState(estilosSalvos);
   const [marcaId, setMarcaId] = useState<string | null>(marcas[0]?.id ?? null);
   const [favoritas, setFavoritas] = useState(favIniciais);
@@ -54,14 +57,15 @@ export function NewVideoForm({ produto, musicas, marcas, vozesEl, favoritas: fav
     const r = await favoritarVoz(id, on);
     if (!r.ok) { toast.err(r.error); setFavoritas((x) => (on ? x.filter((v) => v !== id) : [...x, id])); }
   };
-  const falta = faltando(f);
+  const falta = propria ? (!minhaVoz ? "Grave ou envie a sua voz" : !minhaVoz.id ? "Espere o envio do áudio terminar" : f.produto.trim().length < 2 ? "Informe o produto" : null) : faltando(f);
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((x) => ({ ...x, [k]: v }));
   const [ouvindo, setOuvindo] = useState<HTMLAudioElement | null>(null);
   const ouvir = (url: string) => { ouvindo?.pause(); const a = new Audio(url); void a.play(); setOuvindo(a); };
 
   const enviar = () => start(async () => {
     setErro(null);
-    const r = await criarVideo({ ...comMarca(f, marcaId), anexos: paraEnvio(anexos) });
+    // voz própria: a duração é a da fala (a do briefing só precisa ser válida)
+    const r = await criarVideo({ ...comMarca({ ...f, audioProprio: propria ? minhaVoz?.id ?? null : null }, marcaId), anexos: paraEnvio(anexos) });
     if (!r.ok) return setErro(r.error);
     toast.ok("Na fila: primeiro vem o roteiro para você aprovar");
     router.push(`/studio/${r.data}`);
@@ -115,8 +119,8 @@ export function NewVideoForm({ produto, musicas, marcas, vozesEl, favoritas: fav
           </button>
         </div>
         <div className="panel" data-enter style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
-          <Palco w={FORMATOS.find((x) => x.v === f.formato)!.w} h={FORMATOS.find((x) => x.v === f.formato)!.h} numero={f.duracao} unidade="s"
-            legenda={`${f.formato} · ${f.voz === "none" ? "sem voz" : f.voz.startsWith("el:") ? f.vozNome || "ElevenLabs" : VOZES.find((x) => x.v === f.voz)?.l ?? ""}`} />
+          <Palco w={FORMATOS.find((x) => x.v === f.formato)!.w} h={FORMATOS.find((x) => x.v === f.formato)!.h} numero={propria ? Math.round(minhaVoz?.dur ?? 0) : f.duracao} unidade="s"
+            legenda={`${f.formato} · ${propria ? "sua voz" : f.voz === "none" ? "sem voz" : f.voz.startsWith("el:") ? f.vozNome || "ElevenLabs" : VOZES.find((x) => x.v === f.voz)?.l ?? ""}`} />
           <div className="panel-title">Formato</div>
           <Escolha valor={f.formato} className="kpis" style={{ gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
             {FORMATOS.map((x) => (
@@ -128,13 +132,30 @@ export function NewVideoForm({ produto, musicas, marcas, vozesEl, favoritas: fav
               </button>
             ))}
           </Escolha>
-          <div className="panel-title" style={{ marginTop: 4 }}>Duração</div>
-          <Escolha valor={f.duracao} raio={999} variante="pilula" className="cluster" style={{ gap: 6 }}>
-            {DURACOES.map((d) => <button key={d} data-opt={d} type="button" className="chip" data-active={f.duracao === d} onClick={() => set("duracao", d)}>{d} s</button>)}
-          </Escolha>
+          {propria ? <p className="subtle caption">Duração: a da sua fala, já sem as pausas.</p> : <>
+            <div className="panel-title" style={{ marginTop: 4 }}>Duração</div>
+            <Escolha valor={f.duracao} raio={999} variante="pilula" className="cluster" style={{ gap: 6 }}>
+              {DURACOES.map((d) => <button key={d} data-opt={d} type="button" className="chip" data-active={f.duracao === d} onClick={() => set("duracao", d)}>{d} s</button>)}
+            </Escolha>
+          </>}
         </div>
 
         <div className="panel" data-enter style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
+          <button type="button" className="panel spotlight" aria-pressed={propria} onClick={() => set("voz", propria ? "pf_dora" : "propria")}
+            style={{ padding: "12px 14px", textAlign: "left", cursor: "pointer", display: "flex", gap: 12, alignItems: "center", borderColor: propria ? "rgb(var(--c-brand) / 0.7)" : undefined }}>
+            <UserRound size={18} aria-hidden />
+            <span><b style={{ fontWeight: 650 }}>Narrar com a minha voz</b><br /><span className="subtle" style={{ fontSize: 11.5 }}>grave ou envie o áudio: a IA escreve o roteiro em cima da sua fala</span></span>
+          </button>
+          <Revelar aberto={propria}>
+            <div className="stack" style={{ gap: 10, paddingTop: 2 }}>
+              <GravarVoz valor={minhaVoz} onChange={setMinhaVoz} />
+              <button type="button" role="switch" aria-checked={f.cortarPausas} className="chave" onClick={() => set("cortarPausas", !f.cortarPausas)}>
+                <span className="chave-trilho"><span className="chave-bola" /></span><Scissors aria-hidden /> Cortar pausas e respiros {f.cortarPausas ? "ligado" : "desligado"}
+              </button>
+              <p className="subtle caption">Você aprova o roteiro (cenas, textos na tela e a legenda da sua fala) antes do render.</p>
+            </div>
+          </Revelar>
+          {!propria && <>
           <div className="panel-title" style={{ display: "flex", gap: 8, alignItems: "center" }}><Mic size={15} aria-hidden /> Voz local (sem custo)</div>
           <Escolha valor={f.voz} className="kpis" style={{ gridTemplateColumns: "1fr 1fr", gap: 8 }}>
             {VOZES.map((x) => (
@@ -160,6 +181,7 @@ export function NewVideoForm({ produto, musicas, marcas, vozesEl, favoritas: fav
                 </span>
               ))}
             </Escolha>
+          </>}
           </>}
           <div className="panel-title" style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}><Music2 size={15} aria-hidden /> Música</div>
           <Escolha valor={f.musica} raio={999} variante="pilula" className="cluster" style={{ gap: 6 }}>

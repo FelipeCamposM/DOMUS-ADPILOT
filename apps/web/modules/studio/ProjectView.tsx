@@ -34,7 +34,7 @@ const ETAPAS = [
 ] as const;
 const PARADO = ["NEW", "REVIEW", "READY", "FAILED"];
 const MUSICAS: [string, string][] = [["none", "Sem música"], ["corporate", "Corporativa"], ["technology", "Tecnologia"], ["energetic", "Energética"], ["premium", "Premium"], ["minimal", "Minimalista"], ["emotional", "Emocional"], ["dark", "Dark"]];
-const VOZ: Record<string, string> = { pf_dora: "Dora", pm_alex: "Alex", pm_santa: "Santa", none: "sem voz" };
+const VOZ: Record<string, string> = { pf_dora: "Dora", pm_alex: "Alex", pm_santa: "Santa", none: "sem voz", propria: "sua voz" };
 const seg = (n: number) => `${n.toFixed(1).replace(".", ",")} s`;
 
 export function ProjectView({ p, podeEditar, vozes }: { p: ProjetoView; podeEditar: boolean; vozes: { id: string; nome: string; fav: boolean }[] }) {
@@ -172,7 +172,7 @@ export function ProjectView({ p, podeEditar, vozes }: { p: ProjetoView; podeEdit
           </div>
         )}
 
-        {podeEditar && p.creative && !revisao && vozes.length > 0 && (
+        {podeEditar && p.creative && !revisao && vozes.length > 0 && p.brief.voz !== "propria" && (
           <div className="panel" data-enter style={{ padding: 18, display: "flex", flexDirection: "column", gap: 10 }}>
             <div className="panel-title" style={{ display: "flex", gap: 8, alignItems: "center" }}><AudioLines size={15} aria-hidden /> Trocar só a voz</div>
             <span className="subtle caption">Mesmo roteiro, cores e animação; a narração é regravada e os tempos se ajustam. Agora: {VOZ[p.brief.voz] ?? (p.brief.vozNome || p.brief.voz)}.</span>
@@ -194,6 +194,7 @@ export function ProjectView({ p, podeEditar, vozes }: { p: ProjetoView; podeEdit
             <div>
               <div className="panel-title" style={{ display: "flex", gap: 8, alignItems: "center" }}>{revisao && <ClipboardCheck size={15} aria-hidden />}{revisao ? "Aprove o roteiro" : "Storyboard"}</div>
               <div className="subtle caption">{!p.storyboard ? "Aparece quando o roteiro ficar pronto."
+                : revisao && p.brief.voz === "propria" ? `${p.storyboard.scenes.length} cenas em cima da sua fala · ${seg(p.storyboard.duration)} (sem as pausas). Os tempos seguem a sua voz; edite os textos na tela e corrija a legenda se precisar.`
                 : revisao ? `${p.storyboard.scenes.length} cenas · cerca de ${seg(p.storyboard.duration)}. Edite textos, narração e música se quiser; a geração (voz, animação e render) só começa quando você aprovar.`
                 : `${p.storyboard.scenes.length} cenas · ${seg(p.storyboard.duration)}. Edite o texto e gere de novo: voz e tempos se ajustam sozinhos.`}</div>
             </div>
@@ -237,7 +238,8 @@ export function ProjectView({ p, podeEditar, vozes }: { p: ProjetoView; podeEdit
                   </div>
                 )}
                 {p.brief.voz !== "none" && (
-                  <textarea className="input-sm" rows={2} style={{ height: "auto", paddingBlock: 8, resize: "vertical" }} placeholder="Narração" aria-label={`Narração da cena ${i + 1}`}
+                  <textarea className="input-sm" rows={2} style={{ height: "auto", paddingBlock: 8, resize: "vertical" }} placeholder={p.brief.voz === "propria" ? "Legenda da sua fala" : "Narração"}
+                    title={p.brief.voz === "propria" ? "O que você falou neste trecho. Corrigir aqui muda só a legenda; o áudio é o seu." : undefined} aria-label={`Narração da cena ${i + 1}`}
                     value={cenas[i]?.narration ?? ""} disabled={!podeEditar || rodando} maxLength={600}
                     onChange={(e) => setCenas((c) => c.map((x, j) => (j === i ? { ...x, narration: e.target.value } : x)))} />
                 )}

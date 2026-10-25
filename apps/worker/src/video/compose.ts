@@ -1,4 +1,4 @@
-import { ESTILOS, FORMATOS, MUSICA_TAGS, SFX_CATEGORIAS, storyboardSchema, TIPOS_CENA, VOZES, type Brief, type Storyboard } from "@domus-ads/core";
+import { ESTILOS, FORMATOS, MUSICA_TAGS, SFX_CATEGORIAS, storyboardSchema, TIPOS_CENA, VOZ_PROPRIA, VOZES, type Brief, type Storyboard } from "@domus-ads/core";
 import { KIT_DOC } from "./kit/motion-kit";
 
 /** Animações que o storyboard pode pedir (o Claude implementa cada uma em GSAP na composição). */
@@ -52,7 +52,7 @@ Formato: ${b.formato}
 Estilo visual: ${ESTILOS[b.estiloVisual].nome} (${b.estilo || "-"})
 Cores/identidade: ${b.cores || "livre, premium"}
 CTA: ${b.cta || "-"}
-Voz: ${b.voz in VOZES ? VOZES[b.voz as keyof typeof VOZES] : b.vozNome || "ElevenLabs"}
+Voz: ${b.voz === VOZ_PROPRIA ? "a voz do próprio cliente (gravada por ele; ver <fala_do_cliente>)" : b.voz in VOZES ? VOZES[b.voz as keyof typeof VOZES] : b.vozNome || "ElevenLabs"}
 Música: ${b.musica === "auto" ? "automática (escolha a tag)" : b.musica}
 Efeitos sonoros: ${b.efeitos ? "sim" : "não"}
 </briefing>`;

@@ -9,6 +9,22 @@ export const MUSICA_TAGS = ["corporate", "technology", "dark", "energetic", "emo
 /** Vozes locais (Kokoro, pt-BR). "none" = sem narração. */
 export const ehVozLocal = (v: string) => v in VOZES;
 export const VOZES = { pf_dora: "Dora (feminina)", pm_alex: "Alex (masculina)", pm_santa: "Santa (masculina, grave)", none: "Sem narração" } as const;
+/** Narração com a voz do próprio cliente (áudio gravado na plataforma ou enviado): até 2 min (limite do storyboard). */
+export const VOZ_PROPRIA = "propria";
+export const MAX_VOZ_S = 120;
+export const MAX_VOZ_MB = 50;
+
+/**
+ * Edição de texto na revisão de um vídeo com a voz do cliente: o áudio não muda, só a legenda. Mesmo nº de palavras =
+ * troca 1 a 1 (correção de grafia); senão as palavras novas se espalham no mesmo intervalo da fala original.
+ */
+export function legendaEditada(texto: string, words: { w: string; start: number }[] | undefined): { w: string; start: number }[] | undefined {
+  const novas = texto.trim().split(/\s+/).filter(Boolean);
+  if (!words?.length || !novas.length) return words && novas.length ? words : undefined;
+  if (novas.length === words.length) return words.map((x, i) => ({ w: novas[i]!, start: x.start }));
+  const t0 = words[0]!.start, t1 = words.at(-1)!.start;
+  return novas.map((w, i) => ({ w, start: round(t0 + ((t1 - t0) * i) / Math.max(1, novas.length - 1)) }));
+}
 
 /**
  * Estilos visuais dos vídeos: cada um é um pacote de pele (cores, formas, tipografia) + personalidade de movimento,
@@ -48,8 +64,11 @@ export const briefSchema = z.object({
   cta: z.string().trim().max(120).default(""),
   cores: z.string().trim().max(200).default(""),
   // voz local (Kokoro) ou do ElevenLabs ("el:<voice_id>", com o nome em vozNome)
-  voz: z.string().refine((v) => v in VOZES || /^el:[A-Za-z0-9]{8,40}$/.test(v), "Voz inválida").default("pf_dora"),
+  // "propria" = o áudio que o cliente gravou/enviou (audioProprio) é a narração; o roteiro nasce da transcrição dele
+  voz: z.string().refine((v) => v in VOZES || v === VOZ_PROPRIA || /^el:[A-Za-z0-9]{8,40}$/.test(v), "Voz inválida").default("pf_dora"),
   vozNome: z.string().trim().max(80).default(""),
+  audioProprio: z.string().uuid("Áudio inválido").nullable().default(null),
+  cortarPausas: z.coerce.boolean().default(true),
   // auto = a IA escolhe o clima; sem música licenciada na biblioteca, a trilha é composta (original) no worker
   musica: z.enum(["none", "auto", ...MUSICA_TAGS]).default("auto"),
   efeitos: z.coerce.boolean().default(true),
@@ -58,7 +77,8 @@ export const briefSchema = z.object({
   identidade: z.enum(IDENTIDADES).default("workspace"),
   // estilo salvo (modo Livre): a IA repete a linguagem visual de um vídeo aprovado
   estiloSalvo: z.string().uuid("Estilo inválido").nullable().default(null),
-}).refine(temObjetivo, MSG_OBJETIVO);
+}).refine((b) => b.voz === VOZ_PROPRIA || temObjetivo(b), MSG_OBJETIVO) // a própria fala já diz do que se trata
+  .refine((b) => (b.voz === VOZ_PROPRIA) === !!b.audioProprio, { message: "Grave ou envie o áudio com a sua voz", path: ["audioProprio"] });
 export type Brief = z.infer<typeof briefSchema>;
 
 /** Efeitos sonoros e climas de música: o que pedir ao ElevenLabs quando a biblioteca não tem (o gerado fica salvo). */

@@ -1,6 +1,6 @@
 "use server";
 
-import { anexosSchema, apagarArquivo, audit, briefEdicaoSchema, briefImagemSchema, briefSchema, db, enqueueJob, MAX_FONTE_S, MUSICA_TAGS, paletaSchema, planoEdicaoSchema, planoImagemSchema, reescrever, storyboardSchema, violacoes, type Json } from "@domus-ads/core";
+import { anexosSchema, apagarArquivo, audit, briefEdicaoSchema, briefImagemSchema, briefSchema, db, enqueueJob, MAX_FONTE_S, MUSICA_TAGS, paletaSchema, planoEdicaoSchema, planoImagemSchema, reescrever, storyboardSchema, violacoes, VOZ_PROPRIA, type Json } from "@domus-ads/core";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { run } from "@/lib/action";
@@ -115,6 +115,10 @@ export async function criarVideo(input: { brief: unknown; anexos?: unknown; marc
     requireRole(ctx, "editor");
     const brief = briefSchema.parse(input.brief);
     const anexos = await validarAnexos(ctx, input.anexos);
+    if (brief.audioProprio) {
+      const [a] = await db()`select 1 from ads.creatives where id = ${brief.audioProprio} and workspace_id = ${ctx.workspace.id} and type = 'VOICE' and status = 'READY'`;
+      if (!a) throw new Error("A gravação da sua voz não foi encontrada. Grave ou envie de novo.");
+    }
     const marca = brief.identidade === "workspace" ? await marcaDoWorkspace(ctx.workspace.id, input.marcaId) : null;
     await workerOnline();
     const sql = db();
@@ -183,9 +187,10 @@ export async function trocarVoz(projectId: string, voz: string, vozNome: string)
     const p = await doWorkspace(ctx, projectId);
     if (p.ocupado) throw new Error("Este vídeo já está sendo gerado");
     const v = z.object({ voz: briefSchema.shape.voz, vozNome: briefSchema.shape.vozNome }).parse({ voz, vozNome });
-    if (v.voz === "none") throw new Error("Escolha uma voz");
-    const [row] = await db()<{ composition: string | null }[]>`select composition from ads.video_projects where id = ${p.id} and kind = 'video'`;
+    if (v.voz === "none" || v.voz === VOZ_PROPRIA) throw new Error("Escolha uma voz");
+    const [row] = await db()<{ composition: string | null; voz: string }[]>`select composition, brief->>'voz' as voz from ads.video_projects where id = ${p.id} and kind = 'video'`;
     if (!row?.composition) throw new Error("Gere o vídeo antes de trocar a voz");
+    if (row.voz === VOZ_PROPRIA) throw new Error("Este vídeo é narrado com a sua voz: para outra narração, crie um vídeo novo");
     await workerOnline();
     await db()`update ads.video_projects set brief = brief || ${db().json(v)} where id = ${p.id}`;
     await enfileirar(ctx, p.id, { mode: "voz" });

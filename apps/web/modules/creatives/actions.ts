@@ -1,6 +1,6 @@
 "use server";
 
-import { apagarArquivo, audit, db, enqueueJob, MAX_FONTE_MB, MUSICA_TAGS, r2Key, r2Presign, SFX_CATEGORIAS, storageAtual, tamanhoArquivo } from "@domus-ads/core";
+import { apagarArquivo, audit, db, enqueueJob, MAX_FONTE_MB, MAX_VOZ_MB, MUSICA_TAGS, r2Key, r2Presign, SFX_CATEGORIAS, storageAtual, tamanhoArquivo } from "@domus-ads/core";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { run } from "@/lib/action";
@@ -13,6 +13,8 @@ const audio = z.string().regex(/^audio\/[\w.+-]+$/, "Envie um arquivo de áudio 
 const uploadSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("MUSIC"), tags: z.array(z.enum(MUSICA_TAGS)).min(1, "Escolha ao menos um clima para a música"), mime: audio, license: licenca, size: z.number().int().positive().max(50 * MB, "Arquivo acima de 50 MB") }),
   z.object({ type: z.literal("SFX"), tags: z.array(z.enum(SFX_CATEGORIAS)).min(1, "Escolha a categoria do efeito"), mime: audio, license: licenca, size: z.number().int().positive().max(50 * MB, "Arquivo acima de 50 MB") }),
+  // voz do cliente gravada no navegador ou enviada: vira a narração de um vídeo (não entra na biblioteca de áudio)
+  z.object({ type: z.literal("VOICE"), tags: z.tuple([]).default([]), mime: audio, license: z.string().trim().max(200).default("autoral (voz do cliente)"), size: z.number().int().positive().max(MAX_VOZ_MB * MB, `Áudio acima de ${MAX_VOZ_MB} MB`) }),
   z.object({ type: z.literal("IMAGE"), tags: z.tuple([z.literal("asset")]).default(["asset"]), mime: z.string().regex(/^image\/(png|jpe?g|webp|gif|svg\+xml)$/, "Envie PNG, JPG, WEBP, GIF ou SVG"),
     license: z.string().trim().max(200).default(""), size: z.number().int().positive().max(25 * MB, "Imagem acima de 25 MB") }),
   z.object({ type: z.literal("VIDEO"), tags: z.tuple([z.literal("asset")]).default(["asset"]), mime: z.string().regex(/^video\/(mp4|webm|quicktime)$/, "Envie MP4, WEBM ou MOV"),
@@ -24,7 +26,7 @@ const uploadSchema = z.discriminatedUnion("type", [
   height: z.number().int().positive().max(20000).nullable().optional(),
   pastaId: z.string().uuid("Pasta inválida").nullable().optional(),
 }));
-const PASTA = { MUSIC: "music", SFX: "sfx", IMAGE: "images", VIDEO: "videos" } as const;
+const PASTA = { MUSIC: "music", SFX: "sfx", VOICE: "voices", IMAGE: "images", VIDEO: "videos" } as const;
 
 /**
  * 1º passo do upload: registra o criativo e devolve para onde o navegador manda o arquivo (PUT): a rota da própria
@@ -65,7 +67,7 @@ export async function concluirUpload(id: string) {
       throw new Error("O arquivo não chegou inteiro ao armazenamento. Tente de novo.");
     }
     await sql`update ads.creatives set status = 'READY', updated_at = now() where id = ${id}`;
-    await audit(sql, { workspaceId: ctx.workspace.id, actor: ctx.actor, action: ({ MUSIC: "Enviar música", SFX: "Enviar efeito sonoro", IMAGE: "Enviar imagem", VIDEO: "Enviar vídeo" } as Record<string, string>)[c.type] ?? "Enviar arquivo", entityType: "creative", entityId: id, entityName: c.name });
+    await audit(sql, { workspaceId: ctx.workspace.id, actor: ctx.actor, action: ({ MUSIC: "Enviar música", SFX: "Enviar efeito sonoro", VOICE: "Enviar gravação de voz", IMAGE: "Enviar imagem", VIDEO: "Enviar vídeo" } as Record<string, string>)[c.type] ?? "Enviar arquivo", entityType: "creative", entityId: id, entityName: c.name });
     revalidatePath("/creatives");
     revalidatePath("/arquivos");
   });

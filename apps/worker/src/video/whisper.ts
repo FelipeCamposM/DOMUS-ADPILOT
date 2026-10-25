@@ -88,7 +88,7 @@ export function garantirWhisper(log: (m: string) => Promise<void>): Promise<void
 export interface Analise { palavras: (Palavra & { p: number })[]; rostos: { t: number; x0: number; y0: number; x1: number; y1: number }[]; dispositivo: string }
 
 /** Transcreve o áudio (wav 16 kHz) e acha os rostos no vídeo. Glossário (marca, nomes) ajuda a acertar a grafia. */
-export async function analisar(o: { pasta: string; audio: string | null; video: string; glossario: string; signal: AbortSignal; log: (m: string) => Promise<void> }): Promise<Analise> {
+export async function analisar(o: { pasta: string; audio: string | null; video: string | null; glossario: string; signal: AbortSignal; log: (m: string) => Promise<void> }): Promise<Analise> {
   await garantirWhisper(o.log);
   mkdirSync(MODELOS, { recursive: true });
   const script = join(o.pasta, "analisar.py"), args = join(o.pasta, "analisar.json"), saida = join(o.pasta, "analise.json");
