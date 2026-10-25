@@ -15,14 +15,14 @@ import { arquivarExcesso, restaurar } from "./video/arquivo";
 import { gerarLegenda, type LegendaPayload } from "./instagram/legenda";
 import { publicarInstagram } from "./instagram/publicar";
 import { automatizarCalendario, expirarAtrasados, gerarCalendario, responderWhatsapp, type CalendarioPayload } from "./instagram/calendario";
-import { acaoWhatsapp, avisar, estadoWhatsapp, gravarQr, ouvirWhatsapp, vigiarQueda } from "./whatsapp";
+import { acaoWhatsapp, avisar, enviarDaFila, estadoWhatsapp, gravarQr, ouvirWhatsapp, vigiarQueda } from "./whatsapp";
 
 /**
  * DOMUS Worker: roda no PC local, sem porta aberta para fora (só o webhook do WhatsApp, em 127.0.0.1). Ele mesmo busca trabalho na fila (ads.jobs) com
  * FOR UPDATE SKIP LOCKED e grava progresso/resultado no banco; a web só lê. A web nunca manda comando de shell:
  * cada tipo de job tem um handler fixo aqui (allowlist).
  */
-const TIPOS: readonly JobType[] = ["SYNC_META", "SYNC_GOOGLE", "AI_CHAT", "AI_LOGIN", "AI_DETECT", "WORKER_STARTUP", "GENERATE_VIDEO", "GENERATE_IMAGE", "AI_CAMPAIGN", "RESTORE_MEDIA", "SYNC_INSTAGRAM", "PUBLISH_INSTAGRAM", "AI_INSTAGRAM_CAPTION", "AI_USAGE", "WHATSAPP", "AI_CALENDARIO", "GENERATE_AUDIO", "AI_SISTEMA"];
+const TIPOS: readonly JobType[] = ["SYNC_META", "SYNC_GOOGLE", "AI_CHAT", "AI_LOGIN", "AI_DETECT", "WORKER_STARTUP", "GENERATE_VIDEO", "GENERATE_IMAGE", "AI_CAMPAIGN", "RESTORE_MEDIA", "SYNC_INSTAGRAM", "PUBLISH_INSTAGRAM", "AI_INSTAGRAM_CAPTION", "AI_USAGE", "WHATSAPP", "AI_CALENDARIO", "GENERATE_AUDIO", "AI_SISTEMA", "WHATSAPP_ENVIAR"];
 const sql = db();
 const ativos = new Map<string, AbortController>();
 let parando = false;
@@ -77,6 +77,9 @@ async function executar(job: Job) {
       result = { ok: true };
     } else if (job.type === "WHATSAPP") {
       result = await acaoWhatsapp(String(job.payload.acao), ctl.signal, log);
+    } else if (job.type === "WHATSAPP_ENVIAR") {
+      // mensagem escrita na tela Mensagens
+      result = await enviarDaFila(String(job.payload.id));
     } else if (job.type === "RESTORE_MEDIA") {
       result = await restaurar(String(job.payload.creativeId));
     } else if (job.type === "WORKER_STARTUP") {

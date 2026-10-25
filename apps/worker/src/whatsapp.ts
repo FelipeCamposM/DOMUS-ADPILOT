@@ -1,5 +1,8 @@
-import { db, whatsappAvisos } from "@domus-ads/core";
-import { createHash } from "node:crypto";
+import { db, formatarNumero, guardarArquivo, lerArquivo, mesmoNumero, whatsappAvisos } from "@domus-ads/core";
+import { createHash, randomUUID } from "node:crypto";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { DATA_DIR } from "./env";
 import { createServer } from "node:http";
 import { emailAdmins } from "./email";
 
@@ -40,29 +43,58 @@ export async function estadoWhatsapp(): Promise<EstadoWhatsapp | null> {
   }
 }
 
-let cacheJid: { para: string; jid: string } | null = null;
-/** Número dos avisos e o JID dele (o WhatsApp agora endereça por LID: mandar direto para o número dá "no LID found"). */
+const jids = new Map<string, string>();
+/** JID de um número (o WhatsApp agora endereça por LID: mandar direto para o número dá "no LID found"). */
+async function jidDe(numero: string): Promise<string> {
+  const c = jids.get(numero);
+  if (c) return c;
+  const { Users } = await wz<{ Users: { IsInWhatsapp: boolean; JID: string }[] }>("POST", "/user/check", { Phone: [numero] });
+  const jid = Users.find((u) => u.IsInWhatsapp)?.JID;
+  if (!jid) throw new Error(`O número ${numero} não tem WhatsApp`);
+  jids.set(numero, jid);
+  return jid;
+}
+
+/** Número dos avisos e o JID dele. */
 async function destino() {
   const para = await whatsappAvisos();
   if (!URL_WZ || !TOKEN || !para) throw new Error("WhatsApp ou número dos avisos não configurado");
-  if (cacheJid?.para === para) return cacheJid;
-  const { Users } = await wz<{ Users: { IsInWhatsapp: boolean; JID: string }[] }>("POST", "/user/check", { Phone: [para] });
-  const jid = Users.find((u) => u.IsInWhatsapp)?.JID;
-  if (!jid) throw new Error(`O número ${para} não tem WhatsApp`);
-  return (cacheJid = { para, jid });
+  return { para, jid: await jidDe(para) };
+}
+
+const MIMES: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "video/mp4": "mp4", "audio/ogg": "ogg", "audio/mpeg": "mp3", "audio/mp4": "m4a", "application/pdf": "pdf" };
+/** Guarda a mídia de uma mensagem (enviada ou recebida) no armazenamento da plataforma; o banco fica só com a chave. */
+async function guardarMidia(dados: Buffer, mime: string, nome?: string | null): Promise<{ storage: string; key: string }> {
+  const ext = MIMES[mime.split(";")[0]!] ?? nome?.split(".").pop()?.replace(/[^a-z0-9]/gi, "").slice(0, 5).toLowerCase() ?? "bin";
+  const key = `ads/plataforma/whatsapp/${randomUUID()}.${ext || "bin"}`;
+  const tmp = join(DATA_DIR, "whatsapp-tmp");
+  mkdirSync(tmp, { recursive: true });
+  const arq = join(tmp, key.split("/").pop()!);
+  writeFileSync(arq, dados);
+  try { return { storage: await guardarArquivo(key, arq, mime), key }; } finally { rmSync(arq, { force: true }); }
+}
+
+/** Corpo da Wuzapi para cada tipo (áudio que não é ogg/opus vai como arquivo: o WhatsApp só toca opus como áudio). */
+function rotaMidia(tipo: string, mime: string, dados: Buffer, legenda: string, nome: string): [string, Record<string, string>] {
+  const url = `data:${mime};base64,${dados.toString("base64")}`;
+  if (tipo === "imagem") return ["/chat/send/image", { Image: url, Caption: legenda }];
+  if (tipo === "video") return ["/chat/send/video", { Video: url, Caption: legenda }];
+  if (tipo === "audio" && mime.startsWith("audio/ogg")) return ["/chat/send/audio", { Audio: url }];
+  return ["/chat/send/document", { Document: `data:application/octet-stream;base64,${dados.toString("base64")}`, FileName: nome || "arquivo" }];
 }
 
 /** Envia para o número dos avisos e grava no histórico (Mensagens). Lança se falhar. */
-async function enviar(caminho: string, corpo: Record<string, string>, texto: string) {
+async function enviar(caminho: string, corpo: Record<string, string>, texto: string, midia?: { tipo: string; dados: Buffer; mime: string }) {
   const para = await whatsappAvisos();
-  const registrar = (erro: string | null) => db()`insert into ads.whatsapp_envios (para, texto, status, erro)
-    values (${para ?? "—"}, ${texto}, ${erro ? "FALHOU" : "ENVIADO"}, ${erro})`.catch(() => {});
+  const m = midia ? await guardarMidia(midia.dados, midia.mime).catch(() => null) : null;
+  const registrar = (erro: string | null, waId: string | null) => db()`insert into ads.whatsapp_envios (para, texto, status, erro, direcao, tipo, midia_storage, midia_key, midia_mime, wa_id, autor)
+    values (${para ?? "—"}, ${texto}, ${erro ? "FALHOU" : "ENVIADO"}, ${erro}, 'OUT', ${midia?.tipo ?? "texto"}, ${m?.storage ?? null}, ${m?.key ?? null}, ${midia?.mime ?? null}, ${waId}, 'DOMUS (automático)')`.catch(() => {});
   try {
     const d = await destino();
-    await wz("POST", caminho, { Phone: d.jid, ...corpo });
-    await registrar(null);
+    const r = await wz<{ Id?: string }>("POST", caminho, { Phone: d.jid, ...corpo });
+    await registrar(null, r?.Id ?? null);
   } catch (e) {
-    await registrar((e as Error).message);
+    await registrar((e as Error).message, null);
     throw e;
   }
 }
@@ -79,33 +111,91 @@ export async function avisar(texto: string, falhar = false) {
 
 /** Imagem (PNG/JPEG) ou vídeo MP4 para o número dos avisos. Lança se falhar. */
 export const enviarMidia = (tipo: "image" | "video", arquivo: Buffer, mime: string, legenda = "") =>
-  enviar(`/chat/send/${tipo}`, { [tipo === "image" ? "Image" : "Video"]: `data:${mime};base64,${arquivo.toString("base64")}`, Caption: legenda },
-    `[${tipo === "image" ? "imagem" : "vídeo"}]${legenda ? ` ${legenda}` : ""}`);
+  enviar(...rotaMidia(tipo === "image" ? "imagem" : "video", mime, arquivo, legenda, ""), legenda, { tipo: tipo === "image" ? "imagem" : "video", dados: arquivo, mime });
+
+/**
+ * Job WHATSAPP_ENVIAR: mensagem escrita na tela Mensagens (status PENDENTE). Manda texto ou mídia para o número da
+ * conversa e marca ENVIADO (com o id do WhatsApp) ou FALHOU com o motivo.
+ */
+export async function enviarDaFila(id: string) {
+  const sql = db();
+  const [m] = await sql<{ para: string; texto: string; tipo: string; midia_storage: string | null; midia_key: string | null; midia_mime: string | null; midia_nome: string | null }[]>`
+    select para, texto, tipo, midia_storage, midia_key, midia_mime, midia_nome from ads.whatsapp_envios where id = ${id} and direcao = 'OUT' and status in ('PENDENTE','FALHOU')`;
+  if (!m) return { ok: false, motivo: "mensagem não está na fila" };
+  try {
+    if (!URL_WZ || !TOKEN) throw new Error("WhatsApp não configurado no worker");
+    const jid = await jidDe(m.para);
+    const [rota, corpo] = m.midia_key && m.midia_storage
+      ? rotaMidia(m.tipo, m.midia_mime ?? "application/octet-stream", await lerArquivo({ storage: m.midia_storage, r2_key: m.midia_key }), m.texto, m.midia_nome ?? "")
+      : ["/chat/send/text", { Body: m.texto }];
+    const r = await wz<{ Id?: string }>("POST", rota, { Phone: jid, ...corpo });
+    // áudio/documento não têm legenda: o texto vai logo depois, como mensagem separada
+    if (m.midia_key && m.texto && !("Caption" in corpo)) await wz("POST", "/chat/send/text", { Phone: jid, Body: m.texto });
+    await sql`update ads.whatsapp_envios set status = 'ENVIADO', erro = null, wa_id = ${r?.Id ?? null} where id = ${id}`;
+    return { ok: true };
+  } catch (e) {
+    await sql`update ads.whatsapp_envios set status = 'FALHOU', erro = ${(e as Error).message.slice(0, 300)} where id = ${id}`;
+    throw e;
+  }
+}
 
 // ───────────── Respostas: webhook da Wuzapi → worker ─────────────
 
 const PORTA_HOOK = Number(process.env.WORKER_HOOK_PORT || 47392);
 const CAMINHO_HOOK = `/whatsapp/${createHash("sha256").update(`webhook:${TOKEN}`).digest("hex").slice(0, 32)}`;
-const LIMITE_HOOK = 20_000_000; // mídia recebida vem em base64: só o texto interessa
-/** Mesmo número com ou sem o 9 do celular brasileiro (o WhatsApp guarda alguns sem). */
-const mesmoNumero = (a: string, b: string) => a === b || (a.startsWith("55") && b.startsWith("55") && a.slice(0, 4) === b.slice(0, 4) && a.slice(-8) === b.slice(-8));
+const LIMITE_HOOK = 90_000_000; // mídia recebida vem em base64 (vídeo de até ~60 MB)
 
-type EventoMsg = { type?: string; jsonData?: string; event?: { Info?: Record<string, unknown>; Message?: { conversation?: string; extendedTextMessage?: { text?: string } } } };
+type Conteudo = { caption?: string; mimetype?: string; fileName?: string; text?: string };
+type EventoMsg = {
+  type?: string; jsonData?: string; base64?: string; mimeType?: string; fileName?: string;
+  event?: { Info?: Record<string, unknown>; Message?: { conversation?: string; extendedTextMessage?: Conteudo; imageMessage?: Conteudo; videoMessage?: Conteudo; audioMessage?: Conteudo; documentMessage?: Conteudo; documentWithCaptionMessage?: { message?: { documentMessage?: Conteudo } }; stickerMessage?: Conteudo } };
+};
 
-/** Texto que o número dos avisos mandou; o resto (grupos, outros contatos, mídia, o próprio envio) vira null. */
-async function textoDoDono(corpo: string, tipo: string): Promise<string | null> {
+/** Número de verdade de um JID; LID (@lid) não é telefone e só serve se não houver outro. */
+function numeroDaConversa(cands: unknown[]): string | null {
+  const jidsOk = cands.filter((x): x is string => typeof x === "string" && !!x);
+  const tel = jidsOk.find((x) => x.endsWith("@s.whatsapp.net")) ?? jidsOk[0];
+  return numeroDe(tel);
+}
+
+const decodificar = (b64: string) => Buffer.from(b64.replace(/^data:[^,]*,/, ""), "base64");
+
+/**
+ * Mensagem do webhook → histórico (Mensagens). Guarda tudo de conversa individual (texto e mídia), inclusive o que
+ * foi mandado pelo celular; ignora grupos, status e o eco do que a própria plataforma mandou (mesmo id).
+ * Devolve o texto quando é o número dos avisos falando (respostas sim/não das aprovações).
+ */
+async function guardarRecebida(corpo: string, tipo: string): Promise<string | null> {
   let j = JSON.parse(tipo.includes("json") ? corpo : new URLSearchParams(corpo).get("jsonData") ?? "{}") as EventoMsg;
   if (typeof j.jsonData === "string") j = JSON.parse(j.jsonData) as EventoMsg;
   const info = j.event?.Info ?? {};
-  if (j.type !== "Message" || info.IsFromMe || info.IsGroup) return null;
-  const texto = (j.event?.Message?.conversation ?? j.event?.Message?.extendedTextMessage?.text ?? "").trim();
-  if (!texto) return null;
-  const d = await destino();
-  const de = [info.Sender, info.SenderAlt, info.Chat, info.ChatAlt].map((x) => numeroDe(typeof x === "string" ? x : null)).filter((x): x is string => !!x);
-  if (!de.some((n) => [d.para, numeroDe(d.jid)].some((a) => a && mesmoNumero(n, a)))) {
-    console.log(`WhatsApp: mensagem de ${de.join(" / ") || "?"} ignorada (não é o número dos avisos)`);
-    return null;
-  }
+  const msg = j.event?.Message ?? {};
+  if (j.type !== "Message" || info.IsGroup || String(info.Chat ?? "").includes("broadcast")) return null;
+  const doc = msg.documentMessage ?? msg.documentWithCaptionMessage?.message?.documentMessage;
+  const conteudo = msg.imageMessage ?? msg.videoMessage ?? msg.audioMessage ?? doc ?? msg.stickerMessage;
+  const texto = (msg.conversation ?? msg.extendedTextMessage?.text ?? conteudo?.caption ?? "").trim();
+  if (!texto && !conteudo) return null; // reação, apagada, confirmação…
+  const deMim = info.IsFromMe === true;
+  const numero = numeroDaConversa(deMim ? [info.Chat, info.ChatAlt, info.RecipientAlt] : [info.SenderAlt, info.Sender, info.Chat, info.ChatAlt]);
+  if (!numero) return null;
+  const waId = typeof info.ID === "string" ? info.ID : null;
+  if (deMim) await new Promise((ok) => setTimeout(ok, 4000)); // o envio pela plataforma grava o id logo depois da resposta
+
+  const sql = db();
+  if (waId && (await sql`select 1 from ads.whatsapp_envios where wa_id = ${waId}`).length) return null;
+  const mime = (j.mimeType ?? conteudo?.mimetype ?? "").split(";")[0] || null;
+  const tipoMsg = msg.stickerMessage || msg.imageMessage ? "imagem" : msg.videoMessage ? "video" : msg.audioMessage ? "audio" : doc ? "documento" : "texto";
+  const m = j.base64 && mime ? await guardarMidia(decodificar(j.base64), mime, j.fileName ?? doc?.fileName).catch((e: Error) => { console.log(`WhatsApp: mídia não guardada: ${e.message}`); return null; }) : null;
+  const nome = typeof info.PushName === "string" && info.PushName.trim().length >= 2 ? info.PushName.trim().slice(0, 80) : formatarNumero(numero);
+  // quem mandou e não está salvo vira contato com o nome do WhatsApp (dá para renomear na tela)
+  if (!deMim) await sql`insert into ads.whatsapp_contatos (numero, nome, salvo, lido_em) values (${numero}, ${nome}, false, now() - interval '1 second') on conflict (numero) do nothing`;
+  await sql`insert into ads.whatsapp_envios (para, texto, status, direcao, tipo, midia_storage, midia_key, midia_mime, midia_nome, wa_id, autor)
+    values (${numero}, ${texto}, ${deMim ? "ENVIADO" : "RECEBIDO"}, ${deMim ? "OUT" : "IN"}, ${tipoMsg}, ${m?.storage ?? null}, ${m?.key ?? null}, ${mime}, ${doc?.fileName ?? j.fileName ?? null}, ${waId}, ${deMim ? "pelo celular" : null})
+    on conflict do nothing`;
+
+  if (deMim || !texto) return null;
+  const d = await destino().catch(() => null);
+  if (!d || ![d.para, numeroDe(d.jid)].some((a) => a && mesmoNumero(numero, a))) return null;
   return texto;
 }
 
@@ -117,7 +207,7 @@ async function registrarWebhook() {
     .catch((e: Error) => console.log(`webhook do WhatsApp não registrado: ${e.message}`));
 }
 
-/** Escuta o que chega no WhatsApp e passa as mensagens do número dos avisos para `responder`. */
+/** Escuta o que chega no WhatsApp: guarda no histórico e passa as mensagens do número dos avisos para `responder`. */
 export function ouvirWhatsapp(responder: (texto: string) => Promise<void>) {
   if (!URL_WZ || !TOKEN) return;
   createServer((req, res) => {
@@ -128,7 +218,7 @@ export function ouvirWhatsapp(responder: (texto: string) => Promise<void>) {
     req.on("end", () => {
       res.end("ok");
       if (tam > LIMITE_HOOK) return;
-      void textoDoDono(Buffer.concat(partes).toString("utf8"), String(req.headers["content-type"] ?? ""))
+      void guardarRecebida(Buffer.concat(partes).toString("utf8"), String(req.headers["content-type"] ?? ""))
         .then((t) => (t ? responder(t) : undefined))
         .catch((e: Error) => console.log(`WhatsApp: resposta não tratada: ${e.message}`));
     });

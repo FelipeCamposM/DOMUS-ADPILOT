@@ -21,3 +21,4 @@ export * from "./instagram";
 export * from "./instagram-regras";
 export * from "./calendario";
 export * from "./sistemas";
+export * from "./mensagens";

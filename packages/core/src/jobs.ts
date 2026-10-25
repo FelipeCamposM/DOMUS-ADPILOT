@@ -1,6 +1,6 @@
 import type { Json, Sql } from "./db";
 
-export const JOB_TYPES = ["SYNC_META", "SYNC_GOOGLE", "AI_CHAT", "AI_LOGIN", "AI_DETECT", "WORKER_STARTUP", "GENERATE_VIDEO", "GENERATE_IMAGE", "AI_CAMPAIGN", "RESTORE_MEDIA", "SYNC_INSTAGRAM", "PUBLISH_INSTAGRAM", "AI_INSTAGRAM_CAPTION", "AI_USAGE", "WHATSAPP", "AI_CALENDARIO", "GENERATE_AUDIO", "AI_SISTEMA"] as const;
+export const JOB_TYPES = ["SYNC_META", "SYNC_GOOGLE", "AI_CHAT", "AI_LOGIN", "AI_DETECT", "WORKER_STARTUP", "GENERATE_VIDEO", "GENERATE_IMAGE", "AI_CAMPAIGN", "RESTORE_MEDIA", "SYNC_INSTAGRAM", "PUBLISH_INSTAGRAM", "AI_INSTAGRAM_CAPTION", "AI_USAGE", "WHATSAPP", "AI_CALENDARIO", "GENERATE_AUDIO", "AI_SISTEMA", "WHATSAPP_ENVIAR"] as const;
 export type JobType = (typeof JOB_TYPES)[number];
 
 /** Job de sincronização de cada tipo de conexão. */
@@ -18,7 +18,7 @@ export async function enqueueJob(sql: Sql, j: { workspaceId: string | null; type
 }
 
 /** Respostas de chat: têm uma vaga só delas no worker para nunca esperar atrás de vídeo, áudio ou sincronização. */
-export const JOBS_RAPIDOS: readonly JobType[] = ["AI_CHAT", "AI_SISTEMA"];
+export const JOBS_RAPIDOS: readonly JobType[] = ["AI_CHAT", "AI_SISTEMA", "WHATSAPP_ENVIAR"];
 
 /** Que tipos o worker pode pegar agora: até `vagas` de qualquer tipo e mais uma só para respostas rápidas. */
 export function tiposLivres(ocupadas: number, vagas: number, todos: readonly JobType[]): readonly JobType[] | null {

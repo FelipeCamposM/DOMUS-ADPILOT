@@ -4,7 +4,7 @@ import { deltaPct, hashChave, novaChave } from "./sistemas";
 
 test("vaga extra só pega respostas rápidas", () => {
   expect(tiposLivres(2, 3, JOB_TYPES)).toBe(JOB_TYPES);
-  expect(tiposLivres(3, 3, JOB_TYPES)).toEqual(["AI_CHAT", "AI_SISTEMA"]);
+  expect(tiposLivres(3, 3, JOB_TYPES)).toEqual(["AI_CHAT", "AI_SISTEMA", "WHATSAPP_ENVIAR"]);
   expect(tiposLivres(4, 3, JOB_TYPES)).toBeNull();
 });
 
