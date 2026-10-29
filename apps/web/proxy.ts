@@ -17,7 +17,8 @@ export async function proxy(req: NextRequest) {
   // getClaims valida a assinatura do JWT localmente (chaves JWKS em cache) e renova a sessão se expirou; getUser ia ao
   // Supabase Auth em toda navegação
   // API dos sistemas conectados: sem sessão, cada rota confere a chave do sistema
-  if (req.nextUrl.pathname.startsWith("/api/externo/")) return NextResponse.next({ request: req });
+  // formulário dos sites (leads): público, a rota confere o site, o domínio e o limite por IP
+  if (req.nextUrl.pathname.startsWith("/api/externo/") || req.nextUrl.pathname === "/api/leads") return NextResponse.next({ request: req });
   const { data } = await sb.auth.getClaims();
   const publica = req.nextUrl.pathname.startsWith("/login") || req.nextUrl.pathname.startsWith("/auth");
   if (!data?.claims && !publica) {

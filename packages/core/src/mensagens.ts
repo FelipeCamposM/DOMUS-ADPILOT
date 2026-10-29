@@ -38,13 +38,74 @@ export const templateSchema = z.object({
   texto: z.string().trim().min(1, "Escreva o texto do modelo").max(MAX_TEXTO_WA, `Até ${MAX_TEXTO_WA} caracteres`),
 });
 
-/** Variáveis dos modelos. */
-export const VARIAVEIS_MODELO = { "{nome}": "nome do contato", "{primeiro_nome}": "primeiro nome", "{numero}": "telefone" } as const;
-export function preencherModelo(texto: string, c: { nome: string; numero: string }): string {
+/** Variáveis dos modelos. {site} = site de onde o lead veio (vazio se não for lead). */
+export const VARIAVEIS_MODELO = { "{nome}": "nome do contato", "{primeiro_nome}": "primeiro nome", "{numero}": "telefone", "{site}": "site de onde o lead veio" } as const;
+export function preencherModelo(texto: string, c: { nome: string; numero: string; site?: string | null }): string {
   const primeiro = c.nome.trim().split(/\s+/)[0] ?? "";
-  return texto.replaceAll("{primeiro_nome}", primeiro).replaceAll("{nome}", c.nome.trim()).replaceAll("{numero}", formatarNumero(c.numero));
+  return texto.replaceAll("{primeiro_nome}", primeiro).replaceAll("{nome}", c.nome.trim()).replaceAll("{numero}", formatarNumero(c.numero)).replaceAll("{site}", c.site ?? "");
 }
 
 /** Tipo de mídia da mensagem pelo mime. */
 export const tipoMidia = (mime: string): "imagem" | "video" | "audio" | "documento" =>
   mime.startsWith("image/") ? "imagem" : mime.startsWith("video/") ? "video" : mime.startsWith("audio/") ? "audio" : "documento";
+
+// ───────────── Leads dos sites (mini-CRM) ─────────────
+
+export const ETAPAS = ["NOVO", "CONTATO", "NEGOCIANDO", "GANHO", "PERDIDO"] as const;
+export type Etapa = (typeof ETAPAS)[number];
+export const ROTULO_ETAPA: Record<Etapa, string> = { NOVO: "Novo", CONTATO: "Em contato", NEGOCIANDO: "Negociando", GANHO: "Fechou", PERDIDO: "Perdeu" };
+export const etapaSchema = z.enum(ETAPAS, { message: "Etapa inválida" }).nullable();
+
+export const CONSENTIMENTO = "Aceito ser contatado pelo WhatsApp.";
+const curto = (max: number) => z.string().trim().max(max).optional().catch(undefined);
+
+/** O que o formulário do site manda. Consentimento é obrigatório (LGPD): sem ele o lead não entra. */
+export const leadSchema = z.object({
+  nome,
+  numero: numeroSchema,
+  mensagem: z.string().trim().max(1000, "Mensagem muito longa (até 1000 caracteres)").optional().default(""),
+  consentimento: z.union([z.literal(true), z.enum(["on", "sim", "true", "1"])], { message: "Marque que aceita ser contatado pelo WhatsApp" }),
+  pagina: curto(500),
+  utm_source: curto(120), utm_medium: curto(120), utm_campaign: curto(120), utm_term: curto(120), utm_content: curto(120),
+}).transform((l) => ({
+  nome: l.nome, numero: l.numero, mensagem: l.mensagem, pagina: l.pagina || null,
+  utm: Object.fromEntries(Object.entries({ source: l.utm_source, medium: l.utm_medium, campaign: l.utm_campaign, term: l.utm_term, content: l.utm_content })
+    .filter((e): e is [string, string] => !!e[1])),
+}));
+export type Lead = z.output<typeof leadSchema>;
+
+/** "https://www.castilho.adv.br/, outro.com" → ["castilho.adv.br", "outro.com"]. */
+export const lerDominios = (t: string) =>
+  [...new Set(t.split(/[\s,;]+/).map((d) => d.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/[/:].*$/, "")).filter(Boolean))];
+
+export const leadSiteSchema = z.object({
+  nome: z.string().trim().min(2, "Dê um nome ao site").max(60, "Nome muito longo"),
+  dominios: z.string().max(500, "Domínios demais").transform(lerDominios)
+    .pipe(z.array(z.string().regex(/^[a-z0-9-]+(\.[a-z0-9-]+)+$/, "Domínio inválido: use só o endereço (ex.: meusite.com.br)")).max(10, "Até 10 domínios")),
+  mensagem_inicial: z.string().trim().min(5, "Escreva a mensagem que o lead manda ao abrir o WhatsApp").max(500, "Mensagem muito longa"),
+});
+
+/** Origem do navegador está nos domínios do site (subdomínio vale). Lista vazia = qualquer um. */
+export function dominioPermitido(origem: string | null, dominios: string[]): boolean {
+  if (!dominios.length) return true;
+  let host: string;
+  try { host = new URL(origem ?? "").hostname.toLowerCase(); } catch { return false; }
+  return dominios.some((d) => host === d || host.endsWith(`.${d}`));
+}
+
+/** Link que abre o WhatsApp do lead já com a mensagem escrita: é ele quem começa a conversa. */
+export const linkWhatsapp = (numero: string, texto: string) => `https://wa.me/${numero}?text=${encodeURIComponent(texto)}`;
+
+// ───────────── Travas contra ban (primeiro contato) ─────────────
+
+/** Link na primeira mensagem (conversa em que a pessoa nunca respondeu) é o que mais vira denúncia de spam. */
+export const temLink = (t: string) => /(https?:\/\/|www\.)\S+|\b[\w-]+\.(com|br|net|org|app|io|site|link|ly)\b/i.test(t);
+export const FRIO = {
+  /** mensagens numa conversa antes da pessoa responder */
+  porConversa: 3,
+  /** conversas novas que nós começamos */
+  porHora: 10,
+  porDia: 40,
+  /** espera entre dois envios do número (segundos, sorteado) */
+  intervalo: [4, 12] as const,
+};

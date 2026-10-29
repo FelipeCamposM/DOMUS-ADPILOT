@@ -1,4 +1,4 @@
-import { db, formatarNumero, guardarArquivo, lerArquivo, mesmoNumero, whatsappAvisos } from "@domus-ads/core";
+import { db, formatarNumero, FRIO, guardarArquivo, lerArquivo, mesmoNumero, numeroSalvo, whatsappAvisos } from "@domus-ads/core";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -114,6 +114,29 @@ export const enviarMidia = (tipo: "image" | "video", arquivo: Buffer, mime: stri
   enviar(...rotaMidia(tipo === "image" ? "imagem" : "video", mime, arquivo, legenda, ""), legenda, { tipo: tipo === "image" ? "imagem" : "video", dados: arquivo, mime });
 
 /**
+ * Envios das conversas saem um de cada vez, com intervalo sorteado e "digitando…" antes (proporcional ao texto):
+ * número que dispara em rajada, sempre no mesmo ritmo, é o que a Meta marca como robô.
+ */
+let vez: Promise<unknown> = Promise.resolve();
+let ultimoEnvio = 0;
+const dormir = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
+function naVez<T>(fn: () => Promise<T>): Promise<T> {
+  const r = vez.then(async () => {
+    const [min, max] = FRIO.intervalo;
+    const espera = ultimoEnvio + (min + Math.random() * (max - min)) * 1000 - Date.now();
+    if (espera > 0) await dormir(espera);
+    try { return await fn(); } finally { ultimoEnvio = Date.now(); }
+  });
+  vez = r.catch(() => {});
+  return r;
+}
+async function digitando(jid: string, texto: string) {
+  await wz("POST", "/chat/presence", { Phone: jid, State: "composing" }).catch(() => {});
+  await dormir(Math.min(6000, 1200 + texto.length * 35));
+  await wz("POST", "/chat/presence", { Phone: jid, State: "paused" }).catch(() => {});
+}
+
+/**
  * Job WHATSAPP_ENVIAR: mensagem escrita na tela Mensagens (status PENDENTE). Manda texto ou mídia para o número da
  * conversa e marca ENVIADO (com o id do WhatsApp) ou FALHOU com o motivo.
  */
@@ -125,12 +148,17 @@ export async function enviarDaFila(id: string) {
   try {
     if (!URL_WZ || !TOKEN) throw new Error("WhatsApp não configurado no worker");
     const jid = await jidDe(m.para);
-    const [rota, corpo] = m.midia_key && m.midia_storage
-      ? rotaMidia(m.tipo, m.midia_mime ?? "application/octet-stream", await lerArquivo({ storage: m.midia_storage, r2_key: m.midia_key }), m.texto, m.midia_nome ?? "")
-      : ["/chat/send/text", { Body: m.texto }];
-    const r = await wz<{ Id?: string }>("POST", rota, { Phone: jid, ...corpo });
-    // áudio/documento não têm legenda: o texto vai logo depois, como mensagem separada
-    if (m.midia_key && m.texto && !("Caption" in corpo)) await wz("POST", "/chat/send/text", { Phone: jid, Body: m.texto });
+    const mandar = async () => {
+      const [rota, corpo] = m.midia_key && m.midia_storage
+        ? rotaMidia(m.tipo, m.midia_mime ?? "application/octet-stream", await lerArquivo({ storage: m.midia_storage, r2_key: m.midia_key }), m.texto, m.midia_nome ?? "")
+        : ["/chat/send/text", { Body: m.texto }];
+      const enviada = await wz<{ Id?: string }>("POST", rota, { Phone: jid, ...corpo });
+      // áudio/documento não têm legenda: o texto vai logo depois, como mensagem separada
+      if (m.midia_key && m.texto && !("Caption" in corpo)) await wz("POST", "/chat/send/text", { Phone: jid, Body: m.texto });
+      return enviada;
+    };
+    // aviso para você mesmo (lead novo etc.) sai na hora; conversa com outra pessoa espera a vez e "digita"
+    const r = m.para === (await whatsappAvisos()) ? await mandar() : await naVez(async () => { await digitando(jid, m.texto); return mandar(); });
     await sql`update ads.whatsapp_envios set status = 'ENVIADO', erro = null, wa_id = ${r?.Id ?? null} where id = ${id}`;
     return { ok: true };
   } catch (e) {
@@ -176,13 +204,14 @@ async function guardarRecebida(corpo: string, tipo: string): Promise<string | nu
   const texto = (msg.conversation ?? msg.extendedTextMessage?.text ?? conteudo?.caption ?? "").trim();
   if (!texto && !conteudo) return null; // reação, apagada, confirmação…
   const deMim = info.IsFromMe === true;
-  const numero = numeroDaConversa(deMim ? [info.Chat, info.ChatAlt, info.RecipientAlt] : [info.SenderAlt, info.Sender, info.Chat, info.ChatAlt]);
-  if (!numero) return null;
+  const doJid = numeroDaConversa(deMim ? [info.Chat, info.ChatAlt, info.RecipientAlt] : [info.SenderAlt, info.Sender, info.Chat, info.ChatAlt]);
+  if (!doJid) return null;
   const waId = typeof info.ID === "string" ? info.ID : null;
   if (deMim) await new Promise((ok) => setTimeout(ok, 4000)); // o envio pela plataforma grava o id logo depois da resposta
 
   const sql = db();
   if (waId && (await sql`select 1 from ads.whatsapp_envios where wa_id = ${waId}`).length) return null;
+  const numero = await numeroSalvo(sql, doJid); // lead salvo com o 9 e o WhatsApp mandando sem: mesma conversa
   const mime = (j.mimeType ?? conteudo?.mimetype ?? "").split(";")[0] || null;
   const tipoMsg = msg.stickerMessage || msg.imageMessage ? "imagem" : msg.videoMessage ? "video" : msg.audioMessage ? "audio" : doc ? "documento" : "texto";
   const m = j.base64 && mime ? await guardarMidia(decodificar(j.base64), mime, j.fileName ?? doc?.fileName).catch((e: Error) => { console.log(`WhatsApp: mídia não guardada: ${e.message}`); return null; }) : null;

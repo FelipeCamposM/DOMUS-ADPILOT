@@ -22,3 +22,4 @@ export * from "./instagram-regras";
 export * from "./calendario";
 export * from "./sistemas";
 export * from "./mensagens";
+export * from "./contatos";
