@@ -93,7 +93,7 @@ export function Sites({ sites }: { sites: SiteLead[] }) {
       {sites.length ? (
         <div className="crm-sites">
           {sites.map((st) => (
-            <article key={st.id} className="panel crm-site" data-ativo={st.ativo}>
+            <article key={st.id} className="panel crm-site spotlight" data-ativo={st.ativo} data-enter="scale">
               <header className="crm-site-topo">
                 <span className="wa-avatar"><Globe size={18} aria-hidden /></span>
                 <span className="stack" style={{ gap: 2, minWidth: 0, flex: 1 }}>

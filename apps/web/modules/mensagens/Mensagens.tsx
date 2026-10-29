@@ -9,7 +9,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Fragment, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
+import { entrar } from "../motion/entrar";
 import { enviarArquivo } from "../creatives/upload";
 import { confirmar } from "../shell/confirmar";
 import { Dialog } from "../shell/Dialog";
@@ -18,7 +19,7 @@ import { toast } from "../shell/toast";
 import {
   apagarNota, definirEtapa, enviarMensagem, marcarLida, reenviarMensagem, salvarContato, salvarNota,
 } from "./actions";
-import { corEtapa, EtapasCtx, useEtapas } from "./etapas";
+import { corEtapa, EtapaSeletor, EtapasCtx, useEtapas } from "./etapas";
 
 export interface Mensagem {
   id: string; created_at: string; para: string; texto: string; status: string; erro: string | null;
@@ -115,6 +116,9 @@ export function Mensagens({ mensagens, contatos, modelos, biblioteca, avisos, on
   const doFiltro = filtro === "todas" ? conversas : filtro === "leads" ? leads : conversas.filter((c) => c.naoLidas);
   const lista = q ? doFiltro.filter((c) => nome(c).toLowerCase().includes(q) || (digitos && c.numero.includes(digitos)) || c.msgs.some((m) => m.texto.toLowerCase().includes(q))) : doFiltro;
   const totalNaoLidas = conversas.reduce((a, c) => a + c.naoLidas, 0);
+  // conversas entram em cascata ao abrir a tela e ao trocar o filtro (não a cada atualização de 5 s)
+  const ul = useRef<HTMLUListElement>(null);
+  useLayoutEffect(() => entrar(ul.current?.children ?? [], { x: -12 }, { stagger: 0.03, duration: 0.45 }), [filtro]);
 
   return (
     <EtapasCtx.Provider value={etapas}>
@@ -131,7 +135,7 @@ export function Mensagens({ mensagens, contatos, modelos, biblioteca, avisos, on
             <button key={k} role="tab" aria-selected={filtro === k} className="chip" data-active={filtro === k} onClick={() => setFiltro(k)}>{l}{n ? <span className="wa-filtro-n">{n}</span> : null}</button>
           ))}
         </div>
-        <ul className="wa-lista">
+        <ul className="wa-lista" ref={ul}>
           {lista.map((c) => {
             const Ic = c.ultima && c.ultima.tipo !== "texto" ? ICONE_TIPO[c.ultima.tipo] : null;
             return (
@@ -226,6 +230,23 @@ function Conversa({ c, titulo, aviso, modelos, biblioteca, voltar, abrir, editar
   const [filtroModelo, setFiltroModelo] = useState("");
   const [pend, start] = useTransition();
   useEffect(() => { fim.current?.scrollIntoView({ block: "end" }); }, [c.msgs.length]);
+  // abrir a conversa: topo, faixa e as últimas bolhas sobem; mensagem nova (enviada ou recebida) entra com mola
+  const raiz = useRef<HTMLDivElement>(null);
+  const vistas = useRef(c.msgs.length);
+  useLayoutEffect(() => {
+    const r = raiz.current;
+    if (!r) return;
+    const bolhas = [...r.querySelectorAll(".wa-corpo > .wa-dia, .wa-bolha, .wa-nota")].slice(-14);
+    const fins = [entrar(r.querySelectorAll(".wa-topo, .wa-lead, .wa-compor"), { y: -8 }, { stagger: 0.05, duration: 0.45 }),
+      entrar(bolhas, { y: 14, scale: 0.98 }, { stagger: 0.025, delay: 0.08, duration: 0.5 })];
+    return () => fins.forEach((f) => f());
+  }, []);
+  useLayoutEffect(() => {
+    const novas = c.msgs.length - vistas.current;
+    vistas.current = c.msgs.length;
+    if (novas <= 0 || !raiz.current) return;
+    return entrar([...raiz.current.querySelectorAll(".wa-bolha, .wa-nota")].slice(-novas), { y: 16, scale: 0.94 }, { duration: 0.5, ease: "back.out(1.7)", transformOrigin: "100% 100%" });
+  }, [c.msgs.length]);
   useEffect(() => { campo.current?.focus(); }, [c.numero, nota]);
   const salvo = !!c.contato || aviso;
   const contatoModelo = { nome: c.contato?.nome ?? titulo, numero: c.numero, site: c.contato?.site };
@@ -277,7 +298,7 @@ function Conversa({ c, titulo, aviso, modelos, biblioteca, voltar, abrir, editar
   const modelosVistos = qm ? modelos.filter((m) => m.nome.toLowerCase().includes(qm) || m.texto.toLowerCase().includes(qm)) : modelos;
 
   return (
-    <>
+    <div className="wa-conversa" ref={raiz}>
       <header className="wa-topo">
         <button className="btn btn-ghost btn-xs wa-voltar" onClick={voltar} aria-label="Voltar para as conversas"><ArrowLeft aria-hidden /></button>
         <Avatar aviso={aviso} nome={c.contato?.nome} />
@@ -286,10 +307,7 @@ function Conversa({ c, titulo, aviso, modelos, biblioteca, voltar, abrir, editar
           <small className="subtle">{formatarNumero(c.numero)}{c.contato && !c.contato.salvo ? " · nome do WhatsApp" : ""}</small>
         </span>
         {!aviso && c.contato && (
-          <select className="select wa-etapa-sel" data-etapa={c.contato.etapa ?? ""} style={c.contato.etapa ? corEtapa(etapas.find((e) => e.chave === c.contato!.etapa)) : undefined} value={c.contato.etapa ?? ""} onChange={(e) => mudarEtapa(e.target.value)} aria-label="Etapa do lead" disabled={pend}>
-            <option value="">Não é lead</option>
-            {etapas.map((e) => <option key={e.chave} value={e.chave}>{e.nome}</option>)}
-          </select>
+          <EtapaSeletor etapas={etapas} valor={c.contato.etapa} onChange={(k) => mudarEtapa(k ?? "")} nenhum="Não é lead" pendente={pend} />
         )}
         {!aviso && <button className="btn btn-ghost btn-xs" onClick={editarContato}>{salvo && c.contato?.salvo ? <><Pencil aria-hidden /> Editar contato</> : <><User aria-hidden /> Salvar contato</>}</button>}
       </header>
@@ -397,6 +415,7 @@ function Conversa({ c, titulo, aviso, modelos, biblioteca, voltar, abrir, editar
             {pend ? <Loader2 className="animate-spin" aria-hidden /> : nota ? <StickyNote aria-hidden /> : <Send aria-hidden />}
           </button>
         </div>
+        <div className="wa-compor-rodape">
         {!nota && frio && salvo && (
           <span className="wa-frio" data-alerta={travado}>
             <ShieldCheck size={13} aria-hidden />
@@ -405,9 +424,11 @@ function Conversa({ c, titulo, aviso, modelos, biblioteca, voltar, abrir, editar
               : `Primeiro contato: curto, pessoal e sem link · ${FRIO.porConversa - enviadasFrio} mensagem(ns) até a pessoa responder.`}
           </span>
         )}
-        <span className="subtle caption wa-dica">{nota ? "Nota interna: fica só aqui na conversa." : "Enter envia · Shift+Enter quebra linha · *negrito* _itálico_"}</span>
+        <span className="wa-dica">{nota ? "Nota interna: fica só aqui na conversa."
+          : <><kbd>Enter</kbd> envia · <kbd>Shift</kbd>+<kbd>Enter</kbd> nova linha · <code>*negrito*</code> <code>_itálico_</code></>}</span>
+        </div>
       </footer>
-    </>
+    </div>
   );
 }
 

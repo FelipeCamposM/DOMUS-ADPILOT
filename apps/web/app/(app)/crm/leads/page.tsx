@@ -4,7 +4,7 @@ import { Leads, type Lead } from "@/modules/mensagens/Leads";
 
 export const metadata = { title: "CRM · Leads" };
 
-type Linha = Omit<Lead, "lead_em" | "etapa_em" | "ultima" | "primeira_resp"> & { lead_em: Date; etapa_em: Date; ultima: Date | null; primeira_resp: Date | null };
+type Linha = Omit<Lead, "lead_em" | "etapa_em" | "ultima" | "primeira_resp" | "consentimento_em"> & { lead_em: Date; etapa_em: Date; ultima: Date | null; primeira_resp: Date | null; consentimento_em: Date | null };
 const iso = (d: Date | null) => d?.toISOString() ?? null;
 
 export default async function CrmLeadsPage() {
@@ -14,7 +14,7 @@ export default async function CrmLeadsPage() {
       select c.numero, c.nome, c.etapa, s.nome as site, c.lead_valor::text as valor,
         coalesce(c.lead_em, c.updated_at) as lead_em, coalesce(c.etapa_em, c.lead_em, c.updated_at) as etapa_em,
         c.lead_dados->>'mensagem' as mensagem, c.lead_dados->>'origem' as origem, c.lead_dados->>'email' as email,
-        c.lead_dados->'utm'->>'source' as utm, c.lead_dados->'utm'->>'campaign' as campanha,
+        c.lead_dados->'utm'->>'source' as utm, c.lead_dados->'utm'->>'campaign' as campanha, c.lead_dados->>'pagina' as pagina, c.consentimento_em,
         m.ultima, m.ultima_dir, m.respondeu, m.msgs, m.primeira_resp
       from ads.whatsapp_contatos c
       left join ads.lead_sites s on s.id = c.lead_site
@@ -35,7 +35,7 @@ export default async function CrmLeadsPage() {
   return (
     <div className="page" style={{ maxWidth: 1600 }}>
       <Leads etapas={etapas} sites={sites.map((s) => s.nome)} salvos={salvos}
-        leads={leads.map((l) => ({ ...l, respondeu: !!l.respondeu, msgs: l.msgs ?? 0, lead_em: l.lead_em.toISOString(), etapa_em: l.etapa_em.toISOString(), ultima: iso(l.ultima), primeira_resp: iso(l.primeira_resp) }))} />
+        leads={leads.map((l) => ({ ...l, respondeu: !!l.respondeu, msgs: l.msgs ?? 0, lead_em: l.lead_em.toISOString(), etapa_em: l.etapa_em.toISOString(), ultima: iso(l.ultima), primeira_resp: iso(l.primeira_resp), consentimento_em: iso(l.consentimento_em) }))} />
     </div>
   );
 }

@@ -15,7 +15,7 @@ export default async function CrmConfigPage() {
   ]);
   return (
     <div className="page" style={{ maxWidth: 1100 }}>
-      <section className="panel">
+      <section className="panel" data-enter>
         <header className="panel-head"><span className="panel-title cluster" style={{ gap: 8 }}><MessageCircle size={16} aria-hidden /> WhatsApp</span>
           <span className="subtle caption">Número que conversa com os leads e manda os avisos</span></header>
         <div style={{ padding: 18 }}>
@@ -23,12 +23,12 @@ export default async function CrmConfigPage() {
             erro={(w.info.whatsappErro as string | null | undefined) ?? null} avisos={avisos} podeAdmin workerOnline={w.online} />
         </div>
       </section>
-      <section className="panel">
+      <section className="panel" data-enter>
         <header className="panel-head"><span className="panel-title cluster" style={{ gap: 8 }}><MessageSquareText size={16} aria-hidden /> Modelos de mensagem</span>
           <span className="subtle caption">Use no botão de modelos ao escrever</span></header>
         <div className="stack" style={{ padding: 18, gap: 12 }}><Modelos modelos={modelos} /></div>
       </section>
-      <section className="panel">
+      <section className="panel" data-enter>
         <header className="panel-head"><span className="panel-title cluster" style={{ gap: 8 }}><ShieldCheck size={16} aria-hidden /> Proteção contra ban</span>
           <span className="subtle caption">Sempre ligada</span></header>
         <div style={{ padding: 18 }}><Travas /></div>

@@ -1,9 +1,9 @@
 "use client";
 
 import { gsap } from "gsap";
-import { Activity, Bot, Boxes, Cable, CalendarDays, Clapperboard, FolderOpen, Globe, Images, LayoutDashboard, Megaphone, MessageCircle, Palette, ScrollText, Settings, Settings2, Sparkles } from "lucide-react";
+import { Activity, Bot, Boxes, Cable, CalendarDays, Clapperboard, FolderOpen, Globe, Images, LayoutDashboard, Megaphone, Palette, ScrollText, Settings, Settings2, Sparkles } from "lucide-react";
 import Link from "next/link";
-import { InstagramIcon } from "../connections/Logos";
+import { InstagramIcon, WhatsappIcon } from "../connections/Logos";
 import { usePathname } from "next/navigation";
 import { useLayoutEffect, useRef } from "react";
 
@@ -16,7 +16,7 @@ export const NAV = [
   { href: "/arquivos", label: "Arquivos", icon: FolderOpen, group: "Criação" },
   { href: "/instagram", label: "Instagram", icon: InstagramIcon, group: "Criação" },
   { href: "/conteudos", label: "Conteúdos", icon: CalendarDays, group: "Criação" },
-  { href: "/crm", label: "Mensagens", icon: MessageCircle, group: "CRM" },
+  { href: "/crm", label: "Mensagens", icon: WhatsappIcon, group: "CRM" },
   { href: "/crm/leads", label: "Leads", icon: Sparkles, group: "CRM" },
   { href: "/crm/sites", label: "Sites", icon: Globe, group: "CRM" },
   { href: "/crm/config", label: "Configurações", icon: Settings2, group: "CRM" },
