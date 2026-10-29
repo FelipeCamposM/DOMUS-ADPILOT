@@ -23,7 +23,7 @@ export default async function CrmLeadsPage() {
           (array_agg(e.direcao order by e.created_at desc))[1] as ultima_dir,
           bool_or(e.direcao = 'IN') as respondeu, count(*)::int as msgs,
           min(e.created_at) filter (where e.direcao = 'OUT' and e.created_at >= coalesce(c.lead_em, c.updated_at)) as primeira_resp
-        from ads.whatsapp_envios e where e.para = c.numero and e.direcao <> 'NOTA'
+        from ads.whatsapp_envios e where e.para = c.numero and e.direcao <> 'NOTA' and (e.agendado_para is null or e.agendado_para <= now())
       ) m on true
       where c.etapa is not null order by coalesce(c.lead_em, c.updated_at) desc`,
     sql<EtapaCrm[]>`select chave, nome, cor, ordem, tipo, dica from ads.crm_etapas order by ordem, created_at`,

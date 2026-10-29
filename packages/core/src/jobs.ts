@@ -10,10 +10,10 @@ export interface Job {
   id: string; workspace_id: string | null; type: JobType; payload: Record<string, unknown>; attempts: number; max_attempts: number;
 }
 
-export async function enqueueJob(sql: Sql, j: { workspaceId: string | null; type: JobType; payload: Record<string, unknown>; createdBy?: string | null; maxAttempts?: number }) {
+export async function enqueueJob(sql: Sql, j: { workspaceId: string | null; type: JobType; payload: Record<string, unknown>; createdBy?: string | null; maxAttempts?: number; runAfter?: Date }) {
   const [r] = await sql<{ id: string }[]>`
-    insert into ads.jobs (workspace_id, type, payload, created_by, max_attempts)
-    values (${j.workspaceId}, ${j.type}, ${sql.json(j.payload as Json)}, ${j.createdBy ?? null}, ${j.maxAttempts ?? 3}) returning id`;
+    insert into ads.jobs (workspace_id, type, payload, created_by, max_attempts, run_after)
+    values (${j.workspaceId}, ${j.type}, ${sql.json(j.payload as Json)}, ${j.createdBy ?? null}, ${j.maxAttempts ?? 3}, ${j.runAfter ?? new Date()}) returning id`;
   return r!.id;
 }
 

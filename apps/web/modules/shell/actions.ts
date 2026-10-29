@@ -16,6 +16,14 @@ export async function trocarWorkspace(id: string) {
   (await cookies()).set(WS_COOKIE, wsId, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 60 * 60 * 24 * 365 });
 }
 
+/** Sininho: marca tudo que chegou até agora como lido (para esta pessoa). */
+export async function marcarNotificacoesLidas() {
+  const ctx = await requireCtx();
+  await db()`insert into ads.notificacoes_lidas (user_id, lidas_em) values (${ctx.user.id}, now())
+    on conflict (user_id) do update set lidas_em = now()`;
+  revalidatePath("/", "layout");
+}
+
 export async function sair() {
   await (await supabase()).auth.signOut();
   redirect("/login");

@@ -9,7 +9,7 @@ export const metadata = { title: "CRM · Configurações" };
 
 export default async function CrmConfigPage() {
   const [modelos, avisos, w] = await Promise.all([
-    db()<Modelo[]>`select id, nome, texto from ads.whatsapp_templates order by nome`,
+    db()<Modelo[]>`select id, nome, texto, categoria, usos from ads.whatsapp_templates order by usos desc, nome`,
     whatsappAvisos(),
     workerOnline(),
   ]);

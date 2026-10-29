@@ -579,7 +579,7 @@ function Valor({ l }: { l: Lead }) {
 }
 
 /** Número que conta até o valor novo (GSAP). */
-function Num({ v, fmt = (n) => Math.round(n).toLocaleString("pt-BR") }: { v: number; fmt?: (n: number) => string }) {
+export function Num({ v, fmt = (n) => Math.round(n).toLocaleString("pt-BR") }: { v: number; fmt?: (n: number) => string }) {
   const ref = useRef<HTMLSpanElement>(null);
   const atual = useRef(0);
   const f = useRef(fmt);
@@ -596,7 +596,7 @@ function Num({ v, fmt = (n) => Math.round(n).toLocaleString("pt-BR") }: { v: num
 }
 
 /** Leads por dia (ou por hora, em "Hoje"), barras que crescem. */
-function Barras({ valores }: { valores: number[] }) {
+export function Barras({ valores }: { valores: number[] }) {
   const ref = useRef<SVGSVGElement>(null);
   const max = Math.max(1, ...valores);
   const chave = valores.join();

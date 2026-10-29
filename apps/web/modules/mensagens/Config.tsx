@@ -1,49 +1,63 @@
 "use client";
 
-import { FRIO, MAX_TEXTO_WA, preencherModelo, templateSchema, VARIAVEIS_MODELO } from "@domus-ads/core/mensagens";
+import { CATEGORIAS_MODELO, FRIO, MAX_TEXTO_WA, preencherModelo, templateSchema, temLink, VARIAVEIS_MODELO } from "@domus-ads/core/mensagens";
 import { Loader2, MessageSquareText, Pencil, Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useRef, useState, useTransition } from "react";
+import { useLayoutEffect, useRef, useState, useTransition } from "react";
+import { entrar } from "../motion/entrar";
 import { confirmar } from "../shell/confirmar";
 import { Dialog } from "../shell/Dialog";
 import { toast } from "../shell/toast";
 import { apagarTemplate, salvarTemplate } from "./actions";
 import { formatar, type Modelo } from "./Mensagens";
 
-/** Modelos de mensagem (lista + edição em janela). */
+type Edicao = { id: string | null; nome: string; texto: string; categoria: string };
+
+/** Modelos de mensagem: cartões com prévia e categoria; criar e editar em janela com prévia ao vivo. */
 export function Modelos({ modelos }: { modelos: Modelo[] }) {
   const router = useRouter();
-  const [edit, setEdit] = useState<{ id: string | null; nome: string; texto: string } | null>(null);
+  const [edit, setEdit] = useState<Edicao | null>(null);
+  const grade = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => entrar(grade.current?.children ?? [], { y: 12, scale: 0.98 }, { stagger: 0.04, duration: 0.5 }), []);
   return (
     <>
-      <div className="crm-modelos">
+      <div className="crm-modelos" ref={grade}>
         {modelos.map((m) => (
-          <article key={m.id} className="crm-modelo">
-            <header><b className="crm-trunc">{m.nome}</b>
-              <button className="btn btn-ghost btn-xs" onClick={() => setEdit({ ...m })} aria-label={`Editar ${m.nome}`}><Pencil aria-hidden /></button>
-              <button className="btn btn-ghost btn-xs" aria-label={`Apagar ${m.nome}`} onClick={async () => {
+          <article key={m.id} className="crm-modelo" onClick={() => setEdit({ ...m })}>
+            <header>
+              <span className="crm-modelo-ic"><MessageSquareText aria-hidden /></span>
+              <span className="stack" style={{ gap: 2, flex: 1, minWidth: 0 }}>
+                <b className="crm-trunc">{m.nome}</b>
+                <small className="crm-modelo-meta"><span className="mdl-cat">{m.categoria}</span>{m.usos > 0 ? `usado ${m.usos}×` : "nunca usado"}</small>
+              </span>
+              <button className="btn btn-ghost btn-xs" onClick={(e) => { e.stopPropagation(); setEdit({ ...m }); }} aria-label={`Editar ${m.nome}`}><Pencil aria-hidden /></button>
+              <button className="btn btn-ghost btn-xs" aria-label={`Apagar ${m.nome}`} onClick={async (e) => {
+                e.stopPropagation();
                 if (!(await confirmar(`Apagar o modelo “${m.nome}”?`))) return;
                 const r = await apagarTemplate(m.id);
                 if (!r.ok) toast.err(r.error); else router.refresh();
               }}><Trash2 aria-hidden /></button>
             </header>
-            <p>{formatar(m.texto)}</p>
+            <p>{formatar(preencherModelo(m.texto, EXEMPLO))}</p>
           </article>
         ))}
-        <button className="crm-modelo crm-modelo-novo" onClick={() => setEdit({ id: null, nome: "", texto: "" })}><Plus aria-hidden /> Novo modelo</button>
+        <button className="crm-modelo crm-modelo-novo" onClick={() => setEdit({ id: null, nome: "", texto: "", categoria: "Geral" })}><Plus aria-hidden /> Novo modelo</button>
       </div>
       {!modelos.length && <p className="subtle small" style={{ margin: 0 }}>Modelos aceitam {Object.keys(VARIAVEIS_MODELO).join(", ")}, trocados pelos dados do contato na hora de usar.</p>}
-      {edit && <EditarModelo inicial={edit} fechar={() => setEdit(null)} />}
+      {edit && <EditarModelo inicial={edit} categorias={[...new Set([...CATEGORIAS_MODELO, ...modelos.map((m) => m.categoria)])]} fechar={() => setEdit(null)} />}
     </>
   );
 }
 
-function EditarModelo({ inicial, fechar }: { inicial: { id: string | null; nome: string; texto: string }; fechar: () => void }) {
+const EXEMPLO = { nome: "Maria Souza", numero: "5531999999999", site: "seu site" };
+
+function EditarModelo({ inicial, categorias, fechar }: { inicial: Edicao; categorias: string[]; fechar: () => void }) {
   const router = useRouter();
   const [edit, setEdit] = useState(inicial);
   const [erro, setErro] = useState<string | null>(null);
   const [pend, start] = useTransition();
   const campo = useRef<HTMLTextAreaElement>(null);
+  const mudar = (d: Partial<Edicao>) => { setEdit({ ...edit, ...d }); setErro(null); };
   const salvar = () => start(async () => {
     const v = templateSchema.safeParse(edit);
     if (!v.success) return setErro(v.error.issues[0]?.message ?? "Dados inválidos");
@@ -56,33 +70,49 @@ function EditarModelo({ inicial, fechar }: { inicial: { id: string | null; nome:
   const inserir = (v: string) => {
     const el = campo.current;
     if (!el) return;
-    setEdit({ ...edit, texto: edit.texto.slice(0, el.selectionStart) + v + edit.texto.slice(el.selectionEnd) });
+    mudar({ texto: edit.texto.slice(0, el.selectionStart) + v + edit.texto.slice(el.selectionEnd) });
     requestAnimationFrame(() => { el.focus(); el.selectionStart = el.selectionEnd = el.selectionStart + v.length; });
   };
   return (
     <Dialog open onClose={fechar} title={edit.id ? "Editar modelo" : "Novo modelo"} largo>
-      <form className="stack" style={{ gap: 12 }} onSubmit={(e) => { e.preventDefault(); salvar(); }}>
-        <div className="field">
-          <label className="label" htmlFor="md-nome">Nome do modelo *</label>
-          <input id="md-nome" className="input" value={edit.nome} maxLength={60} onChange={(e) => { setEdit({ ...edit, nome: e.target.value }); setErro(null); }} autoFocus placeholder="Ex.: Boas-vindas, Proposta enviada, Cobrança" />
+      <form className="mdl" onSubmit={(e) => { e.preventDefault(); salvar(); }}>
+        <div className="mdl-editor">
+          <div className="cluster" style={{ gap: 10, alignItems: "flex-end" }}>
+            <div className="field" style={{ flex: 2, minWidth: 180 }}>
+              <label className="label" htmlFor="md-nome">Nome do modelo *</label>
+              <input id="md-nome" className="input" value={edit.nome} maxLength={60} onChange={(e) => mudar({ nome: e.target.value })} autoFocus placeholder="Ex.: Boas-vindas, Proposta enviada" />
+            </div>
+            <div className="field" style={{ flex: 1, minWidth: 140 }}>
+              <label className="label" htmlFor="md-cat">Categoria</label>
+              <input id="md-cat" className="input" list="md-cats" value={edit.categoria} maxLength={30} onChange={(e) => mudar({ categoria: e.target.value })} />
+              <datalist id="md-cats">{categorias.map((c) => <option key={c} value={c} />)}</datalist>
+            </div>
+          </div>
+          <div className="field">
+            <label className="label" htmlFor="md-texto">Texto *</label>
+            <textarea ref={campo} id="md-texto" className="input" rows={10} style={{ height: "auto", paddingBlock: 12, resize: "vertical" }} maxLength={MAX_TEXTO_WA}
+              value={edit.texto} onChange={(e) => mudar({ texto: e.target.value })} placeholder="Olá {primeiro_nome}, tudo bem? …" />
+            <span className="cluster" style={{ gap: 6 }}>
+              <span className="subtle caption">Inserir:</span>
+              {Object.entries(VARIAVEIS_MODELO).map(([v, d]) => <button key={v} type="button" className="mdl-var" title={d} onClick={() => inserir(v)}>{v}</button>)}
+              <span className="subtle caption" style={{ marginLeft: "auto" }}>{edit.texto.length}/{MAX_TEXTO_WA}</span>
+            </span>
+          </div>
+          {erro && <p className="error-text" role="alert">{erro}</p>}
+          <div className="cluster" style={{ justifyContent: "flex-end", gap: 8, marginTop: "auto" }}>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={fechar}>Cancelar</button>
+            <button type="submit" className="btn btn-primary btn-sm" disabled={pend}>{pend ? <Loader2 className="animate-spin" aria-hidden /> : <><MessageSquareText aria-hidden /> Salvar modelo</>}</button>
+          </div>
         </div>
-        <div className="field">
-          <label className="label" htmlFor="md-texto">Texto *</label>
-          <textarea ref={campo} id="md-texto" className="input" rows={6} style={{ height: "auto", paddingBlock: 12, resize: "vertical" }} maxLength={MAX_TEXTO_WA}
-            value={edit.texto} onChange={(e) => { setEdit({ ...edit, texto: e.target.value }); setErro(null); }} placeholder="Olá {primeiro_nome}, tudo bem? …" />
-          <span className="cluster" style={{ gap: 6 }}>
-            <span className="subtle caption">Inserir:</span>
-            {Object.entries(VARIAVEIS_MODELO).map(([v, d]) => <button key={v} type="button" className="chip" style={{ height: 24 }} title={d} onClick={() => inserir(v)}>{v}</button>)}
-          </span>
-        </div>
-        {edit.texto.trim() && (
-          <div className="wa-previa-modelo"><span className="subtle caption">Prévia com “Maria Souza”:</span><p>{formatar(preencherModelo(edit.texto, { nome: "Maria Souza", numero: "5531999999999", site: "seu site" }))}</p></div>
-        )}
-        {erro && <p className="error-text" role="alert">{erro}</p>}
-        <div className="cluster" style={{ justifyContent: "flex-end", gap: 8 }}>
-          <button type="button" className="btn btn-ghost btn-sm" onClick={fechar}>Cancelar</button>
-          <button type="submit" className="btn btn-primary btn-sm" disabled={pend}>{pend ? <Loader2 className="animate-spin" aria-hidden /> : <><MessageSquareText aria-hidden /> Salvar modelo</>}</button>
-        </div>
+        <section className="mdl-previa">
+          <header className="mdl-previa-topo"><span className="stack" style={{ gap: 2 }}><b>Prévia</b><small className="subtle">Como “{EXEMPLO.nome}” vai receber</small></span></header>
+          <div className="mdl-tela">
+            {edit.texto.trim()
+              ? <div className="wa-bolha mdl-bolha" data-lado="out"><p>{formatar(preencherModelo(edit.texto, EXEMPLO))}</p></div>
+              : <span className="subtle small" style={{ margin: "auto" }}>Escreva o texto para ver a prévia</span>}
+          </div>
+          {temLink(edit.texto) && <p className="mdl-alerta"><ShieldCheck aria-hidden /> Com link, só dá para mandar depois que a pessoa responder (anti-spam).</p>}
+        </section>
       </form>
     </Dialog>
   );

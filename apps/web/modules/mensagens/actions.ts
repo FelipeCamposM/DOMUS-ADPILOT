@@ -56,6 +56,51 @@ export async function enviarMensagem(input: unknown) {
   });
 }
 
+const agendaSchema = z.object({
+  para: numeroSchema, texto: texto.min(1, "Escreva a mensagem"),
+  quando: z.coerce.date({ error: "Data inválida" })
+    .refine((d) => d.getTime() > Date.now() + 60_000, "Escolha um horário daqui a pelo menos 1 minuto")
+    .refine((d) => d.getTime() < Date.now() + 90 * 86400_000, "Agende para no máximo 90 dias"),
+});
+
+/** Agenda uma mensagem de texto: fica PENDENTE com agendado_para e o job do worker só roda na hora (run_after). */
+export async function agendarMensagem(input: unknown) {
+  return run(async () => {
+    const ctx = await admin();
+    const m = agendaSchema.parse(input);
+    const sql = db();
+    const [contato] = await sql`select 1 from ads.whatsapp_contatos where numero = ${m.para}`;
+    if (!contato) throw new Error("Salve o contato (nome e número) antes de agendar");
+    await travasPrimeiroContato(m.para, m.texto);
+    const [n] = await sql<{ n: number }[]>`select count(*)::int as n from ads.whatsapp_envios where para = ${m.para} and status = 'PENDENTE' and agendado_para > now()`;
+    if ((n?.n ?? 0) >= 10) throw new Error("Já há 10 mensagens agendadas para esta conversa");
+    const [r] = await sql<{ id: string }[]>`insert into ads.whatsapp_envios (para, texto, status, direcao, tipo, autor, agendado_para, created_at)
+      values (${m.para}, ${m.texto}, 'PENDENTE', 'OUT', 'texto', ${ctx.user.email}, ${m.quando}, ${m.quando}) returning id`;
+    await enqueueJob(sql, { workspaceId: null, type: "WHATSAPP_ENVIAR", payload: { id: r!.id }, createdBy: ctx.user.id, maxAttempts: 1, runAfter: m.quando });
+    await audit(sql, { workspaceId: ctx.workspace.id, actor: ctx.actor, action: "Agendar mensagem do WhatsApp", entityType: "whatsapp_contato", entityId: m.para, entityName: m.quando.toISOString() });
+    revalidatePath("/crm", "layout");
+    return r!.id;
+  });
+}
+
+/** Cancela uma agendada que ainda não saiu (o job acha a mensagem fora da fila e não manda nada). */
+export async function cancelarAgendada(id: string) {
+  return run(async () => {
+    await admin();
+    const r = await db()`delete from ads.whatsapp_envios where id = ${z.string().uuid().parse(id)} and status = 'PENDENTE' and agendado_para > now() + interval '5 seconds'`;
+    if (!r.count) throw new Error("Esta mensagem já saiu ou está saindo agora");
+    revalidatePath("/crm", "layout");
+  });
+}
+
+/** Modelo usado numa conversa: sobe na lista de mais usados. */
+export async function usarModelo(id: string) {
+  return run(async () => {
+    await admin();
+    await db()`update ads.whatsapp_templates set usos = usos + 1, usado_em = now() where id = ${z.string().uuid().parse(id)}`;
+  });
+}
+
 /**
  * Contra ban: enquanto a pessoa nunca respondeu, a conversa é "fria". Nela: sem link, no máximo FRIO.porConversa
  * mensagens e um teto de conversas novas por hora e por dia (sem disparo em massa).
@@ -264,7 +309,7 @@ export async function reenviarMensagem(id: string) {
     await workerOnline();
     const sql = db();
     const r = await sql`update ads.whatsapp_envios set status = 'PENDENTE', erro = null where id = ${z.string().uuid().parse(id)} and direcao = 'OUT'
-      and (status = 'FALHOU' or (status = 'PENDENTE' and created_at < now() - interval '2 minutes'))`;
+      and (status = 'FALHOU' or (status = 'PENDENTE' and created_at < now() - interval '2 minutes' and coalesce(agendado_para, now()) <= now()))`;
     if (!r.count) throw new Error("Esta mensagem não pode ser reenviada");
     await enqueueJob(sql, { workspaceId: null, type: "WHATSAPP_ENVIAR", payload: { id }, createdBy: ctx.user.id, maxAttempts: 1 });
     revalidatePath("/crm", "layout");
@@ -314,11 +359,11 @@ export async function salvarTemplate(input: unknown) {
     const ctx = await admin();
     const t = templateSchema.extend({ id: z.string().uuid().nullable().default(null) }).parse(input);
     const sql = db();
-    if (t.id) await sql`update ads.whatsapp_templates set nome = ${t.nome}, texto = ${t.texto}, updated_at = now() where id = ${t.id}`;
+    if (t.id) await sql`update ads.whatsapp_templates set nome = ${t.nome}, texto = ${t.texto}, categoria = ${t.categoria}, updated_at = now() where id = ${t.id}`;
     else {
       const [n] = await sql<{ n: number }[]>`select count(*)::int as n from ads.whatsapp_templates`;
       if ((n?.n ?? 0) >= 100) throw new Error("Limite de 100 modelos");
-      await sql`insert into ads.whatsapp_templates (nome, texto, created_by) values (${t.nome}, ${t.texto}, ${ctx.user.id})`;
+      await sql`insert into ads.whatsapp_templates (nome, texto, categoria, created_by) values (${t.nome}, ${t.texto}, ${t.categoria}, ${ctx.user.id})`;
     }
     revalidatePath("/crm", "layout");
   });

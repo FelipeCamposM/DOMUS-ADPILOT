@@ -36,7 +36,10 @@ export const MAX_TEXTO_WA = 4000;
 export const templateSchema = z.object({
   nome: z.string().trim().min(2, "Dê um nome ao modelo").max(60, "Nome muito longo"),
   texto: z.string().trim().min(1, "Escreva o texto do modelo").max(MAX_TEXTO_WA, `Até ${MAX_TEXTO_WA} caracteres`),
+  categoria: z.string().trim().min(2, "Categoria muito curta").max(30, "Categoria muito longa").default("Geral"),
 });
+/** Sugestões de categoria no editor de modelos (pode escrever outra). */
+export const CATEGORIAS_MODELO = ["Geral", "Boas-vindas", "Ofertas", "Follow-up", "Cobrança", "Suporte"] as const;
 
 /** Variáveis dos modelos. {site} = site de onde o lead veio (vazio se não for lead). */
 export const VARIAVEIS_MODELO = { "{nome}": "nome do contato", "{primeiro_nome}": "primeiro nome", "{numero}": "telefone", "{site}": "site de onde o lead veio" } as const;

@@ -98,16 +98,26 @@ export const opcoesFiltro = cache(async (ws: string) => {
   return { contas, campanhas: camps };
 });
 
-/** Contadores do topo (sininho): ações da IA aguardando aprovação e jobs que falharam nas últimas 24 h. */
-export async function notificacoes(ws: string) {
+/**
+ * Sininho do topo: ações da IA aguardando aprovação, jobs que falharam nas últimas 24 h e (admin) leads dos últimos 7 dias.
+ * `lidasEm` = até quando a pessoa marcou tudo como lido; o número no sino conta só o que chegou depois.
+ */
+export async function notificacoes(ws: string, userId: string, admin: boolean) {
   const sql = db();
-  const acoes = await sql<{ id: string; type: string; summary: string; conversation_id: string | null; created_at: Date }[]>`
-    select id, type, summary, conversation_id, created_at from ads.ai_actions
-    where workspace_id = ${ws} and status = 'PENDING_APPROVAL' order by created_at desc limit 20`;
-  const falhas = await sql<{ id: string; type: string; error: string | null; finished_at: Date }[]>`
-    select id, type, error, finished_at from ads.jobs
-    where workspace_id = ${ws} and status = 'FAILED' and finished_at > now() - interval '24 hours' order by finished_at desc limit 10`;
-  return { acoes, falhas };
+  const [acoes, falhas, leads, [lidas]] = await Promise.all([
+    sql<{ id: string; type: string; summary: string; conversation_id: string | null; created_at: Date }[]>`
+      select id, type, summary, conversation_id, created_at from ads.ai_actions
+      where workspace_id = ${ws} and status = 'PENDING_APPROVAL' order by created_at desc limit 20`,
+    sql<{ id: string; type: string; error: string | null; finished_at: Date }[]>`
+      select id, type, error, finished_at from ads.jobs
+      where workspace_id = ${ws} and status = 'FAILED' and finished_at > now() - interval '24 hours' order by finished_at desc limit 10`,
+    admin ? sql<{ numero: string; nome: string; site: string | null; origem: string | null; lead_em: Date }[]>`
+      select c.numero, c.nome, s.nome as site, c.lead_dados->>'origem' as origem, c.lead_em from ads.whatsapp_contatos c
+      left join ads.lead_sites s on s.id = c.lead_site
+      where c.etapa is not null and c.lead_em > now() - interval '7 days' order by c.lead_em desc limit 15` : [],
+    sql<{ lidas_em: Date }[]>`select lidas_em from ads.notificacoes_lidas where user_id = ${userId}`,
+  ]);
+  return { acoes, falhas, leads, lidasEm: lidas?.lidas_em ?? null };
 }
 
 export const workerOnline = cache(async (): Promise<{ online: boolean; lastSeen: Date | null; info: Record<string, unknown> }> => {

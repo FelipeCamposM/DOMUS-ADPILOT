@@ -6,11 +6,11 @@ import type { EstadoWhatsapp } from "@/modules/settings/Whatsapp";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const ctx = await requireCtx();
+  const admin = isPlatformAdmin(ctx);
   // em paralelo: cada consulta é uma ida ao banco, em sequência somavam a cada navegação
   const [n, { campanhas }, w, contasIA, iaPref] = await Promise.all([
-    notificacoes(ctx.workspace.id), opcoesFiltro(ctx.workspace.id), workerOnline(), usoContasIA(), iaPreferencias(),
+    notificacoes(ctx.workspace.id, ctx.user.id, admin), opcoesFiltro(ctx.workspace.id), workerOnline(), usoContasIA(), iaPreferencias(),
   ]);
-  const admin = isPlatformAdmin(ctx);
   return (
     <Shell
       user={ctx.user}
@@ -20,6 +20,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       notificacoes={{
         acoes: n.acoes.map((a) => ({ ...a, created_at: a.created_at.toISOString() })),
         falhas: n.falhas.map((f) => ({ ...f, finished_at: f.finished_at.toISOString() })),
+        leads: n.leads.map((l) => ({ ...l, lead_em: l.lead_em.toISOString() })),
+        lidasEm: n.lidasEm?.toISOString() ?? null,
       }}
       worker={{ online: w.online, lastSeen: w.lastSeen?.toISOString() ?? null }}
       whatsapp={{

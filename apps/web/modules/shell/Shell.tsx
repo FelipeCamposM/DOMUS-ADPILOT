@@ -1,12 +1,13 @@
 "use client";
 
-import { AlertTriangle, Bell, Bot, Check, ChevronsUpDown, LogOut, Menu, MessageCircle, Search } from "lucide-react";
+import { Check, ChevronsUpDown, LogOut, Menu, MessageCircle, Search } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, useTransition, type ReactNode } from "react";
 import { ago } from "@/lib/format";
 import { Consultor } from "../ai/Consultor";
 import { Motion } from "../motion/Motion";
+import { Notificacoes, type DadosNotificacoes } from "./Notificacoes";
 import { Whatsapp, type EstadoWhatsapp } from "../settings/Whatsapp";
 import { Dialog } from "./Dialog";
 import { sair, trocarWorkspace } from "./actions";
@@ -25,10 +26,7 @@ export interface ShellProps {
   workspaces: { id: string; name: string; role: string }[];
   workspaceId: string;
   campanhas: { id: string; name: string }[];
-  notificacoes: {
-    acoes: { id: string; summary: string; conversation_id: string | null; created_at: string }[];
-    falhas: { id: string; type: string; error: string | null; finished_at: string }[];
-  };
+  notificacoes: DadosNotificacoes;
   worker: { online: boolean; lastSeen: string | null };
   whatsapp: { estado: EstadoWhatsapp | null; qr: string | null; erro: string | null };
   admin: boolean;
@@ -46,7 +44,6 @@ export function Shell(p: ShellProps) {
   const fechar = useCallback(() => setMenu(null), []);
   const fecharPaleta = useCallback(() => setPaleta(false), []);
   const ws = p.workspaces.find((w) => w.id === p.workspaceId)!;
-  const total = p.notificacoes.acoes.length + p.notificacoes.falhas.length;
 
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
@@ -120,27 +117,7 @@ export function Shell(p: ShellProps) {
                 : <Link href="/settings#whatsapp" className="chip" title={titulo}>{conteudo}</Link>;
             })()}
 
-            <div style={{ position: "relative" }}>
-              <button className="chip" onClick={() => setMenu(menu === "bell" ? null : "bell")} aria-label={`Notificações (${total})`} style={{ position: "relative" }}>
-                <Bell aria-hidden />
-                {total > 0 && <span className="count" style={{ position: "absolute", top: -6, right: -6, minWidth: 18, height: 18, padding: "0 5px", borderRadius: 99, fontSize: 10.5, fontWeight: 800, display: "grid", placeItems: "center", background: "rgb(var(--c-brand))", color: "rgb(var(--c-brand-ink))" }}>{total}</span>}
-              </button>
-              <Popover open={menu === "bell"} onClose={fechar} align="right" width={360}>
-                {total === 0 && <div className="empty" style={{ padding: 24 }}>Tudo em dia.</div>}
-                {p.notificacoes.acoes.map((a) => (
-                  <Link key={a.id} href={a.conversation_id ? `/ai/${a.conversation_id}` : "/ai"} className="menu-item" onClick={fechar}>
-                    <Bot aria-hidden style={{ color: "rgb(var(--c-brand))" }} />
-                    <span style={{ flex: 1 }}><b style={{ fontWeight: 600 }}>Aprovar:</b> {a.summary}<br /><span className="subtle" style={{ fontSize: 11 }}>{ago(a.created_at)}</span></span>
-                  </Link>
-                ))}
-                {p.notificacoes.falhas.map((f) => (
-                  <Link key={f.id} href="/jobs" className="menu-item" onClick={fechar}>
-                    <AlertTriangle aria-hidden style={{ color: "rgb(var(--c-error))" }} />
-                    <span style={{ flex: 1 }}>Job {f.type} falhou<br /><span className="subtle" style={{ fontSize: 11 }}>{f.error?.slice(0, 80)}</span></span>
-                  </Link>
-                ))}
-              </Popover>
-            </div>
+            <Notificacoes n={p.notificacoes} aberto={menu === "bell"} onToggle={() => setMenu(menu === "bell" ? null : "bell")} onClose={fechar} />
 
             <div style={{ position: "relative" }}>
               <button className="chip" onClick={() => setMenu(menu === "user" ? null : "user")} aria-label="Conta">

@@ -4,7 +4,7 @@ import {
   CONSENTIMENTO, contatoSchema, ETAPA_ENTRADA, FRIO, formatarNumero, MAX_TEXTO_WA, preencherModelo, temLink, type EtapaCrm,
 } from "@domus-ads/core/mensagens";
 import {
-  AlertCircle, ArrowLeft, BellRing, Check, CheckCheck, Clock, Download, FileText, Globe, ImageIcon, Loader2, Mail, MessageCirclePlus, MessageSquareText,
+  AlertCircle, ArrowLeft, BellRing, CalendarClock, Check, CheckCheck, Clock, Download, FileText, Globe, ImageIcon, Loader2, Mail, MessageCirclePlus, MessageSquareText,
   Mic, Paperclip, Pencil, Play, RotateCcw, Search, Send, ShieldCheck, Sparkles, StickyNote, Trash2, UploadCloud, User, Video, WifiOff, X,
 } from "lucide-react";
 import Link from "next/link";
@@ -17,13 +17,15 @@ import { Dialog } from "../shell/Dialog";
 import { Popover } from "../shell/Popover";
 import { toast } from "../shell/toast";
 import {
-  apagarNota, definirEtapa, enviarMensagem, marcarLida, reenviarMensagem, salvarContato, salvarNota,
+  apagarNota, cancelarAgendada, definirEtapa, enviarMensagem, marcarLida, reenviarMensagem, salvarContato, salvarNota,
 } from "./actions";
 import { corEtapa, EtapaSeletor, EtapasCtx, useEtapas } from "./etapas";
+import { AgendarDialog, EscolherModelo } from "./ModelosDialog";
 
 export interface Mensagem {
   id: string; created_at: string; para: string; texto: string; status: string; erro: string | null;
   direcao: "OUT" | "IN" | "NOTA"; tipo: string; midia: boolean; midia_mime: string | null; midia_nome: string | null; autor: string | null;
+  agendado_para: string | null;
 }
 export interface Contato {
   numero: string; nome: string; salvo: boolean; lido_em: string;
@@ -31,7 +33,7 @@ export interface Contato {
   lead_dados: { mensagem?: string; pagina?: string | null; utm?: Record<string, string>; email?: string; origem?: string } | null;
 }
 export interface SiteLead { id: string; nome: string; chave: string; dominios: string[]; mensagem_inicial: string; ativo: boolean; ultimo_lead: string | null; leads: number }
-export interface Modelo { id: string; nome: string; texto: string }
+export interface Modelo { id: string; nome: string; texto: string; categoria: string; usos: number }
 export interface ItemBiblioteca { id: string; nome: string; tipo: "imagem" | "video"; thumb: boolean }
 type Anexo = { creativeId: string | null; nome: string; tipo: "imagem" | "video"; previa: string | null; pct: number };
 
@@ -78,7 +80,13 @@ export function Mensagens({ mensagens, contatos, modelos, biblioteca, avisos, on
   const router = useRouter();
   const conversas = useMemo(() => {
     const porNumero = new Map<string, Mensagem[]>();
-    for (const m of mensagens) porNumero.set(m.para, [...(porNumero.get(m.para) ?? []), m]);
+    const agendadas = new Map<string, Mensagem[]>();
+    // agendada que ainda não chegou a hora fica fora das bolhas (aparece na faixa "Agendadas" da conversa)
+    const agora = new Date().toISOString();
+    for (const m of mensagens) {
+      const mapa = m.status === "PENDENTE" && m.agendado_para && m.agendado_para > agora ? agendadas : porNumero;
+      mapa.set(m.para, [...(mapa.get(m.para) ?? []), m]);
+    }
     const nomes = new Map(contatos.map((c) => [c.numero, c]));
     const numeros = new Set([...porNumero.keys(), ...contatos.map((c) => c.numero)]);
     return [...numeros].filter((n) => n !== "—").map((numero) => {
@@ -86,7 +94,7 @@ export function Mensagens({ mensagens, contatos, modelos, biblioteca, avisos, on
       const contato = nomes.get(numero) ?? null;
       const ultima = msgs.findLast((m) => m.direcao !== "NOTA") ?? msgs.at(-1) ?? null;
       const naoLidas = contato ? msgs.filter((m) => m.direcao === "IN" && m.created_at > contato.lido_em).length : 0;
-      return { numero, msgs, contato, ultima, naoLidas, quando: ultima?.created_at ?? contato?.lido_em ?? "" };
+      return { numero, msgs, contato, ultima, naoLidas, agendadas: agendadas.get(numero) ?? [], quando: ultima?.created_at ?? contato?.lido_em ?? "" };
     }).sort((a, b) => b.quando.localeCompare(a.quando));
   }, [mensagens, contatos]);
 
@@ -148,6 +156,7 @@ export function Mensagens({ mensagens, contatos, modelos, biblioteca, avisos, on
                       {c.ultima?.direcao === "OUT" && <Status m={c.ultima} />}
                       {Ic && <Ic size={14} aria-hidden style={{ flex: "none" }} />}
                       <span>{c.ultima ? c.ultima.texto.split("\n")[0] || ROTULO_TIPO[c.ultima.tipo] : "Nenhuma mensagem ainda"}</span>
+                      {c.agendadas.length > 0 && <CalendarClock size={14} className="wa-tem-agenda" aria-label={`${c.agendadas.length} agendada(s)`} />}
                       {c.naoLidas > 0 && <em className="wa-badge">{c.naoLidas}</em>}
                     </span>
                   </span>
@@ -215,7 +224,7 @@ function Status({ m }: { m: Mensagem }) {
 // ───────────── Conversa aberta ─────────────
 
 function Conversa({ c, titulo, aviso, modelos, biblioteca, voltar, abrir, editarContato }: {
-  c: { numero: string; msgs: Mensagem[]; contato: Contato | null }; titulo: string; aviso: boolean; modelos: Modelo[]; biblioteca: ItemBiblioteca[];
+  c: { numero: string; msgs: Mensagem[]; agendadas: Mensagem[]; contato: Contato | null }; titulo: string; aviso: boolean; modelos: Modelo[]; biblioteca: ItemBiblioteca[];
   voltar: () => void; abrir: (m: Mensagem) => void; editarContato: () => void;
 }) {
   const router = useRouter();
@@ -227,7 +236,7 @@ function Conversa({ c, titulo, aviso, modelos, biblioteca, voltar, abrir, editar
   const [nota, setNota] = useState(false);
   const [anexo, setAnexo] = useState<Anexo | null>(null);
   const [menu, setMenu] = useState<"modelos" | "anexo" | null>(null);
-  const [filtroModelo, setFiltroModelo] = useState("");
+  const [agendar, setAgendar] = useState<string | null>(null); // texto inicial da janela de agendamento
   const [pend, start] = useTransition();
   useEffect(() => { fim.current?.scrollIntoView({ block: "end" }); }, [c.msgs.length]);
   // abrir a conversa: topo, faixa e as últimas bolhas sobem; mensagem nova (enviada ou recebida) entra com mola
@@ -294,8 +303,11 @@ function Conversa({ c, titulo, aviso, modelos, biblioteca, voltar, abrir, editar
     }
   };
 
-  const qm = filtroModelo.trim().toLowerCase();
-  const modelosVistos = qm ? modelos.filter((m) => m.nome.toLowerCase().includes(qm) || m.texto.toLowerCase().includes(qm)) : modelos;
+  const cancelar = async (m: Mensagem) => {
+    if (!(await confirmar("Cancelar esta mensagem agendada?"))) return;
+    const r = await cancelarAgendada(m.id);
+    if (!r.ok) toast.err(r.error); else { toast.ok("Agendamento cancelado"); router.refresh(); }
+  };
 
   return (
     <div className="wa-conversa" ref={raiz}>
@@ -351,6 +363,19 @@ function Conversa({ c, titulo, aviso, modelos, biblioteca, voltar, abrir, editar
         <div ref={fim} />
       </div>
 
+      {c.agendadas.length > 0 && (
+        <div className="wa-agendadas">
+          <span className="wa-agendadas-topo"><CalendarClock size={14} aria-hidden /> {c.agendadas.length} agendada{c.agendadas.length > 1 ? "s" : ""}</span>
+          {c.agendadas.map((m) => (
+            <div key={m.id} className="wa-agendada">
+              <b suppressHydrationWarning>{rotuloDia(m.agendado_para!)} · {hora(m.agendado_para!)}</b>
+              <span title={m.texto}>{m.texto.split("\n")[0]}</span>
+              <button className="btn btn-ghost btn-xs" aria-label="Cancelar agendamento" onClick={() => void cancelar(m)}><X aria-hidden /></button>
+            </div>
+          ))}
+        </div>
+      )}
+
       <footer className="wa-compor" data-nota={nota}>
         {anexo && (
           <div className="wa-anexo">
@@ -364,28 +389,7 @@ function Conversa({ c, titulo, aviso, modelos, biblioteca, voltar, abrir, editar
           </div>
         )}
         <div className="wa-compor-linha">
-          <span style={{ position: "relative" }}>
-            <button className="btn btn-ghost btn-sm" aria-label="Modelos de mensagem" title="Modelos" onClick={() => setMenu(menu === "modelos" ? null : "modelos")}><MessageSquareText aria-hidden /></button>
-            <Popover open={menu === "modelos"} onClose={() => setMenu(null)} width={340} style={{ top: "auto", bottom: "calc(100% + 8px)" }}>
-              <div className="stack" style={{ gap: 6, padding: 6 }}>
-                <input className="input-sm" placeholder="Buscar modelo" value={filtroModelo} onChange={(e) => setFiltroModelo(e.target.value)} autoFocus />
-                <div style={{ maxHeight: 280, overflowY: "auto" }}>
-                  {modelosVistos.map((m) => (
-                    <button key={m.id} className="menu-item" style={{ display: "block", width: "100%", textAlign: "left" }} onClick={() => {
-                      const t = preencherModelo(m.texto, contatoModelo);
-                      setTexto((x) => (x.trim() ? `${x}\n${t}` : t));
-                      setMenu(null);
-                      campo.current?.focus();
-                    }}>
-                      <b style={{ fontWeight: 600 }}>{m.nome}</b>
-                      <span className="subtle caption" style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{preencherModelo(m.texto, contatoModelo)}</span>
-                    </button>
-                  ))}
-                  {!modelosVistos.length && <p className="subtle caption" style={{ padding: 8 }}>{modelos.length ? "Nenhum modelo com isso." : "Nenhum modelo ainda: crie em CRM → Configurações."}</p>}
-                </div>
-              </div>
-            </Popover>
-          </span>
+          <button className="btn btn-ghost btn-sm" aria-label="Modelos de mensagem" title="Modelos" onClick={() => setMenu("modelos")}><MessageSquareText aria-hidden /></button>
           {!nota && (
             <span style={{ position: "relative" }}>
               <button className="btn btn-ghost btn-sm" aria-label="Anexar imagem ou vídeo" title="Anexar" onClick={() => setMenu(menu === "anexo" ? null : "anexo")}><Paperclip aria-hidden /></button>
@@ -410,6 +414,7 @@ function Conversa({ c, titulo, aviso, modelos, biblioteca, voltar, abrir, editar
           <textarea ref={campo} rows={1} value={texto} maxLength={MAX_TEXTO_WA} onChange={(e) => setTexto(e.target.value)}
             placeholder={nota ? "Nota interna (só a equipe vê, não vai para o WhatsApp)" : salvo ? "Mensagem" : "Salve o contato para mandar mensagem"}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); enviar(); } }} />
+          {!nota && salvo && !aviso && <button className="btn btn-ghost btn-sm" title="Agendar envio" aria-label="Agendar envio" disabled={!!anexo} onClick={() => setAgendar(texto)}><CalendarClock aria-hidden /></button>}
           <button className="btn btn-ghost btn-sm" aria-pressed={nota} title={nota ? "Voltar para mensagem" : "Escrever nota interna"} onClick={() => setNota((n) => !n)}><StickyNote aria-hidden /></button>
           <button className="btn btn-primary btn-sm" aria-label={nota ? "Salvar nota" : "Enviar"} disabled={pend || (nota ? !texto.trim() : !salvo || travado || (!texto.trim() && !anexo) || (!!anexo && !anexo.creativeId))} onClick={enviar}>
             {pend ? <Loader2 className="animate-spin" aria-hidden /> : nota ? <StickyNote aria-hidden /> : <Send aria-hidden />}
@@ -428,6 +433,14 @@ function Conversa({ c, titulo, aviso, modelos, biblioteca, voltar, abrir, editar
           : <><kbd>Enter</kbd> envia · <kbd>Shift</kbd>+<kbd>Enter</kbd> nova linha · <code>*negrito*</code> <code>_itálico_</code></>}</span>
         </div>
       </footer>
+      {menu === "modelos" && (
+        <EscolherModelo modelos={modelos} contato={contatoModelo} frio={frio} fechar={() => setMenu(null)}
+          usar={(t) => { setTexto((x) => (x.trim() ? `${x}\n${t}` : t)); setMenu(null); campo.current?.focus(); }}
+          agendar={(t) => { setMenu(null); setAgendar(t); }} />
+      )}
+      {agendar !== null && (
+        <AgendarDialog numero={c.numero} nome={titulo} inicial={agendar} fechar={() => setAgendar(null)} pronto={() => { if (agendar === texto) setTexto(""); setAgendar(null); }} />
+      )}
     </div>
   );
 }
