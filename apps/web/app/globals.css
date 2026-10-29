@@ -1567,7 +1567,8 @@ fieldset:disabled .chave { opacity: 0.6; cursor: default; }
   font-family: var(--font-mono); font-size: 11.5px; line-height: 1.55; color: rgb(var(--c-text-secondary)); white-space: pre; }
 .wa-site { display: flex; align-items: center; gap: 10px; padding: 10px 14px; }
 .wa-site[data-ativo="false"] { opacity: 0.6; }
-@media (max-width: 860px) { 
+@media (max-width: 860px) { .wa-etapa-sel { max-width: 120px; } }
+
 /* CRM: barra de abas fixa no topo; Mensagens ocupa o resto da altura, as outras abas rolam */
 .crm { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 .crm-topo { flex: none; display: flex; align-items: center; gap: 18px; height: 52px; padding: 0 18px; border-bottom: 1px solid rgb(var(--c-border));
