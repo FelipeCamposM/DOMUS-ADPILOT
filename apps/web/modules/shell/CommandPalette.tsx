@@ -20,7 +20,7 @@ export function CommandPalette({ open, onClose, campanhas }: { open: boolean; on
     const ir = (href: string) => () => { router.push(href); onClose(); };
     const base: Item[] = [
       { id: "new-ai", label: "Nova conversa com a IA", hint: "Ação", icon: Bot, go: ir("/ai?nova=1") },
-      ...NAV.map((n) => ({ id: n.href, label: n.label, hint: "Ir para", icon: n.icon, go: ir(n.href) })),
+      ...NAV.map((n) => ({ id: n.href, label: n.group === "CRM" ? `CRM · ${n.label}` : n.label, hint: "Ir para", icon: n.icon, go: ir(n.href) })),
       ...campanhas.map((c) => ({ id: c.id, label: c.name, hint: "Campanha", icon: Megaphone, go: ir(`/campaigns?campaign=${c.id}`) })),
     ];
     const t = q.trim().toLowerCase().normalize("NFD").replace(/\p{M}/gu, "");

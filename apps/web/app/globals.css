@@ -1083,7 +1083,7 @@ input[type="color"]:hover { transform: scale(1.08); box-shadow: 0 0 14px rgb(var
 .carrossel-faixa b { position: absolute; inset: 0; display: grid; place-items: center; font-size: 12px; color: #fff; background: rgb(0 0 0 / 0.55); }
 
 /* Mensagens: estrutura do WhatsApp Web com a paleta da aplicação */
-.content:has(> .wa), .content:has(> .crm) { overflow: hidden; }
+.content:has(> .wa) { overflow: hidden; }
 .wa { display: grid; grid-template-columns: minmax(280px, 360px) 1fr; height: 100%; overflow: hidden; }
 .wa-lado { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid rgb(var(--c-border)); background: rgb(var(--c-bg-surface)); }
 .wa-topo { display: flex; align-items: center; gap: 12px; height: 60px; flex: none; padding: 0 16px; background: rgb(var(--c-bg-elevated)); border-bottom: 1px solid rgb(var(--c-border)); }
@@ -1569,22 +1569,6 @@ fieldset:disabled .chave { opacity: 0.6; cursor: default; }
 .wa-site[data-ativo="false"] { opacity: 0.6; }
 @media (max-width: 860px) { .wa-etapa-sel { max-width: 120px; } }
 
-/* CRM: barra de abas fixa no topo; Mensagens ocupa o resto da altura, as outras abas rolam */
-.crm { display: flex; flex-direction: column; height: 100%; min-height: 0; }
-.crm-topo { flex: none; display: flex; align-items: center; gap: 18px; height: 52px; padding: 0 18px; border-bottom: 1px solid rgb(var(--c-border));
-  background: rgb(var(--c-bg-surface) / 0.85); backdrop-filter: blur(12px); }
-.crm-marca { font-size: 13px; font-weight: 800; letter-spacing: 0.12em; color: rgb(var(--c-glow)); text-shadow: 0 0 18px rgb(var(--c-brand) / 0.6); }
-.crm-abas { display: flex; gap: 2px; height: 100%; overflow-x: auto; scrollbar-width: none; }
-.crm-aba { position: relative; display: inline-flex; align-items: center; gap: 7px; padding: 0 14px; height: 100%; white-space: nowrap; font-size: 13.5px; font-weight: 550;
-  color: rgb(var(--c-text-secondary)); text-decoration: none; transition: color var(--dur-fast) var(--ease-out); }
-.crm-aba:hover { color: rgb(var(--c-text-primary)); }
-.crm-aba::after { content: ""; position: absolute; left: 10px; right: 10px; bottom: -1px; height: 2px; border-radius: 2px; background: var(--gradient-btn); opacity: 0; transform: scaleX(0.4); transition: opacity .2s, transform .25s var(--ease-out); }
-.crm-aba[aria-current="page"] { color: rgb(var(--c-text-primary)); }
-.crm-aba[aria-current="page"]::after { opacity: 1; transform: none; box-shadow: 0 0 12px rgb(var(--c-brand) / 0.7); }
-.crm-aba[aria-current="page"] svg { color: rgb(var(--c-glow)); }
-.crm-aba-n { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; display: inline-grid; place-items: center; font-size: 10.5px; font-weight: 700; background: rgb(var(--c-brand)); color: #fff; }
-.crm-corpo { flex: 1; min-height: 0; overflow-y: auto; }
-.crm-corpo:has(> .wa) { overflow: hidden; }
 .crm-trunc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .crm-h2 { margin: 0; font-size: 16px; font-weight: 700; }
 
@@ -1659,9 +1643,4 @@ fieldset:disabled .chave { opacity: 0.6; cursor: default; }
 @media (max-width: 900px) {
   .crm-passos { grid-template-columns: 1fr; }
   .crm-passo-seta { display: none; }
-}
-@media (max-width: 760px) {
-  .crm-topo { padding: 0 10px; gap: 10px; }
-  .crm-marca { display: none; }
-  .crm-aba { padding: 0 10px; }
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { gsap } from "gsap";
-import { Activity, Bot, Boxes, Cable, CalendarDays, Clapperboard, FolderOpen, Images, LayoutDashboard, Megaphone, MessageCircle, Palette, ScrollText, Settings } from "lucide-react";
+import { Activity, Bot, Boxes, Cable, CalendarDays, Clapperboard, FolderOpen, Globe, Images, LayoutDashboard, Megaphone, MessageCircle, Palette, ScrollText, Settings, Settings2, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { InstagramIcon } from "../connections/Logos";
 import { usePathname } from "next/navigation";
@@ -16,7 +16,10 @@ export const NAV = [
   { href: "/arquivos", label: "Arquivos", icon: FolderOpen, group: "Criação" },
   { href: "/instagram", label: "Instagram", icon: InstagramIcon, group: "Criação" },
   { href: "/conteudos", label: "Conteúdos", icon: CalendarDays, group: "Criação" },
-  { href: "/crm", label: "CRM", icon: MessageCircle, group: "Vendas" },
+  { href: "/crm", label: "Mensagens", icon: MessageCircle, group: "CRM" },
+  { href: "/crm/leads", label: "Leads", icon: Sparkles, group: "CRM" },
+  { href: "/crm/sites", label: "Sites", icon: Globe, group: "CRM" },
+  { href: "/crm/config", label: "Configurações", icon: Settings2, group: "CRM" },
   { href: "/ai", label: "IA", icon: Bot, group: "Inteligência" },
   { href: "/sistemas", label: "Sistemas", icon: Boxes, group: "Inteligência" },
   { href: "/jobs", label: "Jobs", icon: Activity, group: "Operação" },
@@ -25,7 +28,8 @@ export const NAV = [
   { href: "/settings", label: "Configurações", icon: Settings, group: "Operação" },
 ] as const;
 
-const ativo = (path: string, href: string) => (href === "/" ? path === "/" : path.startsWith(href));
+// "/" e "/crm" (Mensagens) têm itens filhos no menu: só ativam na própria página
+const ativo = (path: string, href: string) => (href === "/" || href === "/crm" ? path === href : path.startsWith(href));
 
 /** Sidebar com indicador que desliza (GSAP) até o item ativo, com leve "squash" no meio do caminho. */
 export function Sidebar({ pendentes, open }: { pendentes: number; open: boolean }) {
