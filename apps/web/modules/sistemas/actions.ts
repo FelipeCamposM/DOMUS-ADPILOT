@@ -18,8 +18,12 @@ export async function criarSistema(n: string) {
   return run(async () => {
     await exigirAdmin();
     const k = novaChave();
-    await db()`insert into ads.sistemas (nome, chave_hash, chave_fim) values (${nome.parse(n)}, ${k.hash}, ${k.fim})`;
+    const sql = db();
+    const [s] = await sql<{ id: string; nome: string }[]>`insert into ads.sistemas (nome, chave_hash, chave_fim) values (${nome.parse(n)}, ${k.hash}, ${k.fim}) returning id, nome`;
+    // já aparece em CRM → Sites, pronto para mandar leads pela API
+    await sql`insert into ads.lead_sites (nome, chave, mensagem_inicial) values (${s!.nome}, ${`sistema:${s!.id}`}, ${"Olá! Sou {nome}, vim pelo {site}."}) on conflict (chave) do nothing`;
     revalidatePath("/sistemas");
+    revalidatePath("/crm", "layout");
     return { chave: k.chave };
   });
 }
