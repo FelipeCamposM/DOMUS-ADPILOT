@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  CONSENTIMENTO, contatoSchema, ETAPAS, FRIO, formatarNumero, MAX_TEXTO_WA, preencherModelo, ROTULO_ETAPA, temLink, type Etapa,
+  CONSENTIMENTO, contatoSchema, ETAPA_ENTRADA, FRIO, formatarNumero, MAX_TEXTO_WA, preencherModelo, temLink, type EtapaCrm,
 } from "@domus-ads/core/mensagens";
 import {
   AlertCircle, ArrowLeft, BellRing, Check, CheckCheck, Clock, Download, FileText, Globe, ImageIcon, Loader2, Mail, MessageCirclePlus, MessageSquareText,
@@ -18,6 +18,7 @@ import { toast } from "../shell/toast";
 import {
   apagarNota, definirEtapa, enviarMensagem, marcarLida, reenviarMensagem, salvarContato, salvarNota,
 } from "./actions";
+import { corEtapa, EtapasCtx, useEtapas } from "./etapas";
 
 export interface Mensagem {
   id: string; created_at: string; para: string; texto: string; status: string; erro: string | null;
@@ -25,7 +26,7 @@ export interface Mensagem {
 }
 export interface Contato {
   numero: string; nome: string; salvo: boolean; lido_em: string;
-  etapa: Etapa | null; site: string | null; lead_em: string | null; consentimento_em: string | null;
+  etapa: string | null; site: string | null; lead_em: string | null; consentimento_em: string | null;
   lead_dados: { mensagem?: string; pagina?: string | null; utm?: Record<string, string>; email?: string; origem?: string } | null;
 }
 export interface SiteLead { id: string; nome: string; chave: string; dominios: string[]; mensagem_inicial: string; ativo: boolean; ultimo_lead: string | null; leads: number }
@@ -70,8 +71,8 @@ export function formatar(t: string): ReactNode[] {
  * Manda texto, imagem e vídeo (da biblioteca ou do computador), modelos com variáveis e notas internas (não enviadas).
  * Nova conversa exige nome e número. Atualiza sozinha a cada poucos segundos.
  */
-export function Mensagens({ mensagens, contatos, modelos, biblioteca, avisos, online, inicial }: {
-  mensagens: Mensagem[]; contatos: Contato[]; modelos: Modelo[]; biblioteca: ItemBiblioteca[]; avisos: string | null; online: boolean; inicial: string | null;
+export function Mensagens({ mensagens, contatos, modelos, biblioteca, avisos, online, inicial, etapas }: {
+  etapas: EtapaCrm[]; mensagens: Mensagem[]; contatos: Contato[]; modelos: Modelo[]; biblioteca: ItemBiblioteca[]; avisos: string | null; online: boolean; inicial: string | null;
 }) {
   const router = useRouter();
   const conversas = useMemo(() => {
@@ -116,6 +117,7 @@ export function Mensagens({ mensagens, contatos, modelos, biblioteca, avisos, on
   const totalNaoLidas = conversas.reduce((a, c) => a + c.naoLidas, 0);
 
   return (
+    <EtapasCtx.Provider value={etapas}>
     <div className="wa" data-aberta={aberta}>
       <aside className="wa-lado">
         <header className="wa-topo">
@@ -186,6 +188,7 @@ export function Mensagens({ mensagens, contatos, modelos, biblioteca, avisos, on
         )}
       </Dialog>
     </div>
+    </EtapasCtx.Provider>
   );
 }
 
@@ -194,8 +197,9 @@ function Avatar({ aviso, nome }: { aviso?: boolean; nome?: string }) {
   return <span className="wa-avatar">{aviso ? <BellRing size={18} aria-hidden /> : ini || <User size={18} aria-hidden />}</span>;
 }
 
-function Etiqueta({ etapa }: { etapa: Etapa }) {
-  return <span className="wa-etapa" data-etapa={etapa}>{ROTULO_ETAPA[etapa]}</span>;
+function Etiqueta({ etapa }: { etapa: string }) {
+  const e = useEtapas().find((x) => x.chave === etapa);
+  return <span className="wa-etapa" style={corEtapa(e)}>{e?.nome ?? "Lead"}</span>;
 }
 
 function Status({ m }: { m: Mensagem }) {
@@ -211,6 +215,7 @@ function Conversa({ c, titulo, aviso, modelos, biblioteca, voltar, abrir, editar
   voltar: () => void; abrir: (m: Mensagem) => void; editarContato: () => void;
 }) {
   const router = useRouter();
+  const etapas = useEtapas();
   const fim = useRef<HTMLDivElement>(null);
   const campo = useRef<HTMLTextAreaElement>(null);
   const arquivo = useRef<HTMLInputElement>(null);
@@ -281,9 +286,9 @@ function Conversa({ c, titulo, aviso, modelos, biblioteca, voltar, abrir, editar
           <small className="subtle">{formatarNumero(c.numero)}{c.contato && !c.contato.salvo ? " · nome do WhatsApp" : ""}</small>
         </span>
         {!aviso && c.contato && (
-          <select className="select wa-etapa-sel" data-etapa={c.contato.etapa ?? ""} value={c.contato.etapa ?? ""} onChange={(e) => mudarEtapa(e.target.value)} aria-label="Etapa do lead" disabled={pend}>
+          <select className="select wa-etapa-sel" data-etapa={c.contato.etapa ?? ""} style={c.contato.etapa ? corEtapa(etapas.find((e) => e.chave === c.contato!.etapa)) : undefined} value={c.contato.etapa ?? ""} onChange={(e) => mudarEtapa(e.target.value)} aria-label="Etapa do lead" disabled={pend}>
             <option value="">Não é lead</option>
-            {ETAPAS.map((e) => <option key={e} value={e}>{ROTULO_ETAPA[e]}</option>)}
+            {etapas.map((e) => <option key={e.chave} value={e.chave}>{e.nome}</option>)}
           </select>
         )}
         {!aviso && <button className="btn btn-ghost btn-xs" onClick={editarContato}>{salvo && c.contato?.salvo ? <><Pencil aria-hidden /> Editar contato</> : <><User aria-hidden /> Salvar contato</>}</button>}
@@ -410,9 +415,10 @@ function Conversa({ c, titulo, aviso, modelos, biblioteca, voltar, abrir, editar
 function FaixaLead({ c }: { c: Contato }) {
   const d = c.lead_dados ?? {};
   const utm = Object.entries(d.utm ?? {});
-  const esfriando = c.etapa === "NOVO" && Date.now() - new Date(c.lead_em!).getTime() > 6 * 3600_000;
+  const e = useEtapas().find((x) => x.chave === c.etapa);
+  const esfriando = c.etapa === ETAPA_ENTRADA && Date.now() - new Date(c.lead_em!).getTime() > 6 * 3600_000;
   return (
-    <div className="wa-lead" data-etapa={c.etapa}>
+    <div className="wa-lead" style={corEtapa(e)}>
       <span className="wa-lead-topo">
         <Sparkles size={14} aria-hidden />
         <b>Lead{d.origem ? ` · ${d.origem}${c.site ? ` (${c.site})` : ""}` : c.site ? ` do site ${c.site}` : ""}</b>

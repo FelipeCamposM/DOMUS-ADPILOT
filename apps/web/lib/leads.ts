@@ -25,12 +25,14 @@ export async function registrarLead(sql: ReturnType<typeof db>, s: SiteDoLead, l
     const [r] = await tx<{ n: number }[]>`select count(*)::int as n from ads.lead_entradas where site_id = ${s.id} and numero = ${numero} and created_at > now() - make_interval(mins => ${REPETIDO_MIN})`;
     await tx`insert into ads.lead_entradas (site_id, numero, ip_hash) values (${s.id}, ${numero}, ${o.ipHash})`;
     await tx`update ads.lead_sites set ultimo_lead = now() where id = ${s.id}`;
-    // fechou/perdeu e voltou = lead novo de novo
-    await tx`insert into ads.whatsapp_contatos (numero, nome, salvo, lido_em, etapa, lead_site, lead_em, lead_dados, consentimento_em, consentimento_texto)
-      values (${numero}, ${l.nome}, true, now() - interval '1 second', 'NOVO', ${s.id}, now(), ${tx.json(dados)}, now(), ${l.consentimento})
+    // fechou/perdeu (coluna de fim) ou coluna apagada e voltou = lead novo de novo
+    const volta = tx.unsafe("ads.whatsapp_contatos.etapa is null or ads.whatsapp_contatos.etapa not in (select chave from ads.crm_etapas where tipo = 'ABERTO')");
+    await tx`insert into ads.whatsapp_contatos (numero, nome, salvo, lido_em, etapa, etapa_em, lead_site, lead_em, lead_dados, consentimento_em, consentimento_texto)
+      values (${numero}, ${l.nome}, true, now() - interval '1 second', 'NOVO', now(), ${s.id}, now(), ${tx.json(dados)}, now(), ${l.consentimento})
       on conflict (numero) do update set
         nome = case when ads.whatsapp_contatos.salvo then ads.whatsapp_contatos.nome else excluded.nome end, salvo = true,
-        etapa = case when ads.whatsapp_contatos.etapa is null or ads.whatsapp_contatos.etapa in ('GANHO', 'PERDIDO') then 'NOVO' else ads.whatsapp_contatos.etapa end,
+        etapa = case when ${volta} then 'NOVO' else ads.whatsapp_contatos.etapa end,
+        etapa_em = case when ${volta} then now() else ads.whatsapp_contatos.etapa_em end,
         lead_site = excluded.lead_site, lead_em = now(), lead_dados = coalesce(ads.whatsapp_contatos.lead_dados, '{}'::jsonb) || excluded.lead_dados,
         consentimento_em = now(), consentimento_texto = excluded.consentimento_texto, updated_at = now()`;
     if (r!.n) return true;

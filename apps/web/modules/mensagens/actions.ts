@@ -1,7 +1,7 @@
 "use server";
 
 import {
-  audit, contatoSchema, db, enqueueJob, etapaSchema, FRIO, leadSiteSchema, MAX_TEXTO_WA, numeroSchema, ROTULO_ETAPA, temLink, templateSchema, tipoMidia, whatsappAvisos,
+  audit, chaveEtapa, contatoSchema, db, ETAPA_ENTRADA, etapaCrmSchema, enqueueJob, etapaSchema, FRIO, leadSiteSchema, MAX_TEXTO_WA, numeroSchema, temLink, templateSchema, tipoMidia, whatsappAvisos,
 } from "@domus-ads/core";
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
@@ -78,15 +78,101 @@ async function travasPrimeiroContato(para: string, texto: string) {
   if (n!.dia >= FRIO.porDia) throw new Error(`Limite de ${FRIO.porDia} conversas novas por dia (protege o número de ban). Amanhã libera.`);
 }
 
-/** Etapa do funil (null = deixa de ser lead). */
+/** Etapa do funil (null = deixa de ser lead). Mudar de etapa zera o "parado há". */
 export async function definirEtapa(numero: string, etapa: string | null) {
   return run(async () => {
     const ctx = await admin();
     const e = etapaSchema.parse(etapa);
     const n = numeroSchema.parse(numero);
-    const r = await db()`update ads.whatsapp_contatos set etapa = ${e}, lead_em = coalesce(lead_em, case when ${e}::text is not null then now() end), updated_at = now() where numero = ${n}`;
+    const sql = db();
+    const [et] = e ? await sql<{ nome: string }[]>`select nome from ads.crm_etapas where chave = ${e}` : [{ nome: "" }];
+    if (!et) throw new Error("Essa coluna não existe mais. Atualize a página.");
+    const r = await sql`update ads.whatsapp_contatos set etapa = ${e}, lead_em = coalesce(lead_em, case when ${e}::text is not null then now() end),
+      etapa_em = case when etapa is distinct from ${e} then now() else etapa_em end, updated_at = now() where numero = ${n}`;
     if (!r.count) throw new Error("Salve o contato antes de pôr no funil");
-    await audit(db(), { workspaceId: ctx.workspace.id, actor: ctx.actor, action: e ? `Lead: ${ROTULO_ETAPA[e]}` : "Tirar do funil", entityType: "whatsapp_contato", entityId: n, entityName: n });
+    await audit(sql, { workspaceId: ctx.workspace.id, actor: ctx.actor, action: e ? `Lead: ${et.nome}` : "Tirar do funil", entityType: "whatsapp_contato", entityId: n, entityName: n });
+    revalidatePath("/crm", "layout");
+  });
+}
+
+const valorSchema = z.string().trim().transform((v, c) => {
+  if (!v) return null;
+  const t = v.replace(/[R$\s]/g, "");
+  // "1.500,00" e "1.500" usam ponto de milhar; "1500.5" é decimal
+  const d = t.includes(",") ? t.replace(/\./g, "").replace(",", ".") : /^\d{1,3}(\.\d{3})+$/.test(t) ? t.replace(/\./g, "") : t;
+  if (!/^\d{1,10}(\.\d{1,2})?$/.test(d)) { c.addIssue({ code: "custom", message: "Valor inválido (ex.: 1.500,00)" }); return z.NEVER; }
+  return d;
+});
+
+/** Quanto vale o negócio (vazio = sem valor). Soma no pipeline e no ticket médio. */
+export async function definirValor(numero: string, valor: string) {
+  return run(async () => {
+    await admin();
+    const n = numeroSchema.parse(numero);
+    const v = valorSchema.parse(valor);
+    await db()`update ads.whatsapp_contatos set lead_valor = ${v}, updated_at = now() where numero = ${n} and etapa is not null`;
+    revalidatePath("/crm/leads");
+  });
+}
+
+// ───────────── Colunas do funil ─────────────
+
+/** Cria (chave null) ou edita uma coluna. A entrada (Novo) fica sempre aberta. */
+export async function salvarEtapa(chave: string | null, dados: z.input<typeof etapaCrmSchema>) {
+  return run(async () => {
+    const ctx = await admin();
+    const d = etapaCrmSchema.parse(dados);
+    const sql = db();
+    let k = chave;
+    if (chave) {
+      k = etapaSchema.unwrap().parse(chave);
+      if (k === ETAPA_ENTRADA && d.tipo !== "ABERTO") throw new Error("A coluna de entrada recebe os leads novos: fica como etapa aberta");
+      const r = await sql`update ads.crm_etapas set nome = ${d.nome}, cor = ${d.cor}, tipo = ${d.tipo}, dica = ${d.dica} where chave = ${k}`;
+      if (!r.count) throw new Error("Coluna não encontrada");
+    } else {
+      const [{ n }] = await sql<{ n: number }[]>`select count(*)::int as n from ads.crm_etapas`;
+      if (n >= 12) throw new Error("Até 12 colunas no funil");
+      const base = chaveEtapa(d.nome);
+      [{ k }] = await sql<{ k: string }[]>`select ${base}::text || case when exists (select 1 from ads.crm_etapas where chave = ${base}) then '_' || upper(substr(md5(random()::text), 1, 4)) else '' end as k`;
+      // coluna aberta entra antes das de fim (Fechou/Perdeu); coluna de fim vai para o final
+      await sql.begin(async (tx) => {
+        const [{ pos }] = await tx<{ pos: number }[]>`select coalesce(max(ordem) filter (where ${d.tipo} <> 'ABERTO' or tipo = 'ABERTO'), -1) + 1 as pos from ads.crm_etapas`;
+        await tx`update ads.crm_etapas set ordem = ordem + 1 where ordem >= ${pos}`;
+        await tx`insert into ads.crm_etapas (chave, nome, cor, tipo, dica, ordem) values (${k}, ${d.nome}, ${d.cor}, ${d.tipo}, ${d.dica}, ${pos})`;
+      });
+    }
+    await audit(sql, { workspaceId: ctx.workspace.id, actor: ctx.actor, action: chave ? "Funil: editou coluna" : "Funil: nova coluna", entityType: "crm_etapa", entityId: chave ?? d.nome, entityName: d.nome });
+    revalidatePath("/crm", "layout");
+    return k!;
+  });
+}
+
+/** Nova ordem das colunas (todas as chaves, da esquerda para a direita). */
+export async function ordenarEtapas(chaves: string[]) {
+  return run(async () => {
+    await admin();
+    const ks = z.array(etapaSchema.unwrap()).min(1).max(12).parse(chaves);
+    await db()`update ads.crm_etapas e set ordem = o.i from unnest(${ks}::text[]) with ordinality as o(chave, i) where e.chave = o.chave`;
+    revalidatePath("/crm", "layout");
+  });
+}
+
+/** Apaga uma coluna; os leads dela vão para `destino`. */
+export async function apagarEtapa(chave: string, destino: string) {
+  return run(async () => {
+    const ctx = await admin();
+    const k = etapaSchema.unwrap().parse(chave);
+    const para = etapaSchema.unwrap().parse(destino);
+    if (k === ETAPA_ENTRADA) throw new Error("A coluna de entrada não pode ser apagada (é onde os leads novos chegam)");
+    if (k === para) throw new Error("Escolha outra coluna para os leads");
+    const sql = db();
+    await sql.begin(async (tx) => {
+      const [d] = await tx`select 1 from ads.crm_etapas where chave = ${para}`;
+      if (!d) throw new Error("Coluna de destino não existe");
+      await tx`update ads.whatsapp_contatos set etapa = ${para}, etapa_em = now(), updated_at = now() where etapa = ${k}`;
+      await tx`delete from ads.crm_etapas where chave = ${k}`;
+    });
+    await audit(sql, { workspaceId: ctx.workspace.id, actor: ctx.actor, action: "Funil: apagou coluna", entityType: "crm_etapa", entityId: k, entityName: k });
     revalidatePath("/crm", "layout");
   });
 }

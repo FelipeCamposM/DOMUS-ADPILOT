@@ -51,10 +51,28 @@ export const tipoMidia = (mime: string): "imagem" | "video" | "audio" | "documen
 
 // ───────────── Leads dos sites (mini-CRM) ─────────────
 
-export const ETAPAS = ["NOVO", "CONTATO", "NEGOCIANDO", "GANHO", "PERDIDO"] as const;
-export type Etapa = (typeof ETAPAS)[number];
-export const ROTULO_ETAPA: Record<Etapa, string> = { NOVO: "Novo", CONTATO: "Em contato", NEGOCIANDO: "Negociando", GANHO: "Fechou", PERDIDO: "Perdeu" };
-export const etapaSchema = z.enum(ETAPAS, { message: "Etapa inválida" }).nullable();
+/** Colunas do funil (tabela ads.crm_etapas, configuráveis em Leads). A chave é o que fica no contato. */
+export const TIPOS_ETAPA = ["ABERTO", "GANHO", "PERDIDO"] as const;
+export type TipoEtapa = (typeof TIPOS_ETAPA)[number];
+export interface EtapaCrm { chave: string; nome: string; cor: string; ordem: number; tipo: TipoEtapa; dica: string | null }
+/** Etapa de entrada: todo lead chega nela; não pode ser apagada. */
+export const ETAPA_ENTRADA = "NOVO";
+export const etapaSchema = z.string().regex(/^[A-Z0-9_]{2,40}$/, "Etapa inválida").nullable();
+export const CORES_ETAPA = ["#c084fc", "#a855ff", "#5b8cff", "#22d3ee", "#2dd4bf", "#3ddc97", "#a3e635", "#facc15", "#ffb020", "#fb923c", "#ff4d5e", "#f472b6", "#9696a8"] as const;
+export const etapaCrmSchema = z.object({
+  nome: z.string().trim().min(1, "Dê um nome à coluna").max(30, "Nome muito longo (até 30)"),
+  cor: z.string().trim().toLowerCase().regex(/^#[0-9a-f]{6}$/, "Cor inválida"),
+  tipo: z.enum(TIPOS_ETAPA, { message: "Tipo inválido" }),
+  dica: z.string().trim().max(80, "Descrição muito longa (até 80)").transform((v) => v || null),
+});
+/** "Em proposta" → "EM_PROPOSTA" (chave nova; o banco garante que não repete). */
+export const chaveEtapa = (nome: string) =>
+  nome.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 30) || "ETAPA";
+/** "#22c55e" → "34 197 94", o formato das variáveis de cor do CSS (rgb(var(--e) / 0.1)). */
+export const rgbCor = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) || 0).join(" ");
+/** "1234.5" → "R$ 1.234,50"; inteiro sem centavos se `curto`. */
+export const reais = (v: string | number, curto = false) =>
+  Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: curto ? 0 : 2, minimumFractionDigits: curto ? 0 : 2 });
 
 export const CONSENTIMENTO = "Aceito ser contatado pelo WhatsApp.";
 const curto = (max: number) => z.string().trim().max(max).optional().catch(undefined);
