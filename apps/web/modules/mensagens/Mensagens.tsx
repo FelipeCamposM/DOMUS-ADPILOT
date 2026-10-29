@@ -1,12 +1,13 @@
 "use client";
 
 import {
-  CONSENTIMENTO, contatoSchema, ETAPAS, FRIO, formatarNumero, leadSiteSchema, MAX_TEXTO_WA, preencherModelo, ROTULO_ETAPA, temLink, templateSchema, VARIAVEIS_MODELO, type Etapa,
+  CONSENTIMENTO, contatoSchema, ETAPAS, FRIO, formatarNumero, MAX_TEXTO_WA, preencherModelo, ROTULO_ETAPA, temLink, type Etapa,
 } from "@domus-ads/core/mensagens";
 import {
-  AlertCircle, ArrowLeft, BellRing, Check, CheckCheck, Clock, Code2, Copy, Download, FileText, Globe, ImageIcon, Loader2, MessageCirclePlus, MessageSquareText,
+  AlertCircle, ArrowLeft, BellRing, Check, CheckCheck, Clock, Download, FileText, Globe, ImageIcon, Loader2, Mail, MessageCirclePlus, MessageSquareText,
   Mic, Paperclip, Pencil, Play, RotateCcw, Search, Send, ShieldCheck, Sparkles, StickyNote, Trash2, UploadCloud, User, Video, WifiOff, X,
 } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Fragment, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { enviarArquivo } from "../creatives/upload";
@@ -15,7 +16,7 @@ import { Dialog } from "../shell/Dialog";
 import { Popover } from "../shell/Popover";
 import { toast } from "../shell/toast";
 import {
-  alternarSite, apagarNota, apagarSite, apagarTemplate, definirEtapa, enviarMensagem, marcarLida, reenviarMensagem, salvarContato, salvarNota, salvarSite, salvarTemplate,
+  apagarNota, definirEtapa, enviarMensagem, marcarLida, reenviarMensagem, salvarContato, salvarNota,
 } from "./actions";
 
 export interface Mensagem {
@@ -25,7 +26,7 @@ export interface Mensagem {
 export interface Contato {
   numero: string; nome: string; salvo: boolean; lido_em: string;
   etapa: Etapa | null; site: string | null; lead_em: string | null; consentimento_em: string | null;
-  lead_dados: { mensagem?: string; pagina?: string | null; utm?: Record<string, string> } | null;
+  lead_dados: { mensagem?: string; pagina?: string | null; utm?: Record<string, string>; email?: string; origem?: string } | null;
 }
 export interface SiteLead { id: string; nome: string; chave: string; dominios: string[]; mensagem_inicial: string; ativo: boolean; ultimo_lead: string | null; leads: number }
 export interface Modelo { id: string; nome: string; texto: string }
@@ -46,7 +47,7 @@ const quando = (d: string) => {
 };
 const midiaUrl = (id: string) => `/api/mensagens/${id}/midia`;
 /** "há 5 min", "há 3 h", "há 2 dias" */
-function ha(d: string) {
+export function ha(d: string) {
   const min = Math.max(0, Math.round((Date.now() - new Date(d).getTime()) / 60_000));
   return min < 60 ? `há ${min} min` : min < 48 * 60 ? `há ${Math.round(min / 60)} h` : `há ${Math.round(min / 1440)} dias`;
 }
@@ -54,7 +55,7 @@ const ROTULO_TIPO: Record<string, string> = { imagem: "Foto", video: "Vídeo", a
 const ICONE_TIPO: Record<string, typeof ImageIcon> = { imagem: ImageIcon, video: Video, audio: Mic, documento: FileText };
 
 /** *negrito*, _itálico_, ~riscado~ e links, como o WhatsApp mostra. */
-function formatar(t: string): ReactNode[] {
+export function formatar(t: string): ReactNode[] {
   return t.split(/(\*[^*\n]+\*|_[^_\n]+_|~[^~\n]+~|https?:\/\/\S+)/g).map((p, i) => {
     if (/^\*.+\*$/.test(p)) return <b key={i}>{p.slice(1, -1)}</b>;
     if (/^_.+_$/.test(p)) return <i key={i}>{p.slice(1, -1)}</i>;
@@ -69,9 +70,8 @@ function formatar(t: string): ReactNode[] {
  * Manda texto, imagem e vídeo (da biblioteca ou do computador), modelos com variáveis e notas internas (não enviadas).
  * Nova conversa exige nome e número. Atualiza sozinha a cada poucos segundos.
  */
-export function Mensagens({ mensagens, contatos, modelos, biblioteca, avisos, online, sites, inicial }: {
-  mensagens: Mensagem[]; contatos: Contato[]; modelos: Modelo[]; biblioteca: ItemBiblioteca[]; avisos: string | null; online: boolean;
-  sites: SiteLead[]; inicial: string | null;
+export function Mensagens({ mensagens, contatos, modelos, biblioteca, avisos, online, inicial }: {
+  mensagens: Mensagem[]; contatos: Contato[]; modelos: Modelo[]; biblioteca: ItemBiblioteca[]; avisos: string | null; online: boolean; inicial: string | null;
 }) {
   const router = useRouter();
   const conversas = useMemo(() => {
@@ -91,10 +91,8 @@ export function Mensagens({ mensagens, contatos, modelos, biblioteca, avisos, on
   const [busca, setBusca] = useState("");
   const [sel, setSel] = useState<string | null>(inicial); // ?c= do aviso de lead novo abre a conversa
   const [aberta, setAberta] = useState(!!inicial); // celular: lista ou conversa
-  const [filtro, setFiltro] = useState<"todas" | "leads" | Etapa>("todas");
-  const [sitesDlg, setSitesDlg] = useState(false);
+  const [filtro, setFiltro] = useState<"todas" | "naoLidas" | "leads">("todas");
   const [contatoDlg, setContatoDlg] = useState<{ numero: string; nome: string; travado: boolean } | null>(null);
-  const [modelosDlg, setModelosDlg] = useState(false);
   const [ver, setVer] = useState<Mensagem | null>(null);
   const atual = conversas.find((c) => c.numero === sel) ?? conversas[0] ?? null;
 
@@ -113,7 +111,7 @@ export function Mensagens({ mensagens, contatos, modelos, biblioteca, avisos, on
   const q = busca.trim().toLowerCase();
   const digitos = q.replace(/\D/g, "");
   const leads = conversas.filter((c) => c.contato?.etapa);
-  const doFiltro = filtro === "todas" ? conversas : filtro === "leads" ? leads : leads.filter((c) => c.contato?.etapa === filtro);
+  const doFiltro = filtro === "todas" ? conversas : filtro === "leads" ? leads : conversas.filter((c) => c.naoLidas);
   const lista = q ? doFiltro.filter((c) => nome(c).toLowerCase().includes(q) || (digitos && c.numero.includes(digitos)) || c.msgs.some((m) => m.texto.toLowerCase().includes(q))) : doFiltro;
   const totalNaoLidas = conversas.reduce((a, c) => a + c.naoLidas, 0);
 
@@ -121,28 +119,16 @@ export function Mensagens({ mensagens, contatos, modelos, biblioteca, avisos, on
     <div className="wa" data-aberta={aberta}>
       <aside className="wa-lado">
         <header className="wa-topo">
-          <span style={{ display: "flex", flexDirection: "column" }}><b>Mensagens</b><span className="subtle caption">{totalNaoLidas ? `${totalNaoLidas} não lida(s)` : `${conversas.length} conversa(s)`}</span></span>
-          <span className="cluster" style={{ gap: 4 }}>
-            <button className="btn btn-ghost btn-xs" onClick={() => setSitesDlg(true)} title="Sites que mandam leads"><Globe aria-hidden /> Sites</button>
-            <button className="btn btn-ghost btn-xs" onClick={() => setModelosDlg(true)} title="Modelos de mensagem"><MessageSquareText aria-hidden /> Modelos</button>
-            <button className="btn btn-primary btn-xs" onClick={() => setContatoDlg({ numero: "", nome: "", travado: false })} title="Nova conversa"><MessageCirclePlus aria-hidden /> Nova</button>
-          </span>
+          <span className="wa-titulo"><b>Conversas</b><small>{totalNaoLidas ? `${totalNaoLidas} não lida(s)` : `${conversas.length} no total`}</small></span>
+          <button className="btn btn-primary btn-sm" onClick={() => setContatoDlg({ numero: "", nome: "", travado: false })}><MessageCirclePlus aria-hidden /> Nova</button>
         </header>
         {!online && <div className="wa-alerta"><WifiOff size={14} aria-hidden /> WhatsApp ou worker offline: mensagens ficam na fila até voltar.</div>}
         <label className="wa-busca"><Search size={15} aria-hidden /><input placeholder="Pesquisar nome, número ou mensagem" value={busca} onChange={(e) => setBusca(e.target.value)} /></label>
         <div className="wa-filtros" role="tablist" aria-label="Filtrar conversas">
-          <button role="tab" aria-selected={filtro === "todas"} className="chip" data-active={filtro === "todas"} onClick={() => setFiltro("todas")}>Todas</button>
-          <button role="tab" aria-selected={filtro !== "todas"} className="chip" data-active={filtro !== "todas"} onClick={() => setFiltro("leads")}><Sparkles aria-hidden /> Leads{leads.length ? ` · ${leads.length}` : ""}</button>
+          {([["todas", "Todas", conversas.length], ["naoLidas", "Não lidas", conversas.filter((c) => c.naoLidas).length], ["leads", "Leads", leads.length]] as const).map(([k, l, n]) => (
+            <button key={k} role="tab" aria-selected={filtro === k} className="chip" data-active={filtro === k} onClick={() => setFiltro(k)}>{l}{n ? <span className="wa-filtro-n">{n}</span> : null}</button>
+          ))}
         </div>
-        {filtro !== "todas" && (
-          <div className="wa-funil">
-            {ETAPAS.map((e) => (
-              <button key={e} data-etapa={e} aria-pressed={filtro === e} onClick={() => setFiltro(filtro === e ? "leads" : e)}>
-                <b>{leads.filter((c) => c.contato?.etapa === e).length}</b><span>{ROTULO_ETAPA[e]}</span>
-              </button>
-            ))}
-          </div>
-        )}
         <ul className="wa-lista">
           {lista.map((c) => {
             const Ic = c.ultima && c.ultima.tipo !== "texto" ? ICONE_TIPO[c.ultima.tipo] : null;
@@ -166,7 +152,8 @@ export function Mensagens({ mensagens, contatos, modelos, biblioteca, avisos, on
           {!lista.length && (
             <li className="subtle small" style={{ padding: 20, textAlign: "center" }}>
               {q && doFiltro.length ? "Nada encontrado"
-                : filtro !== "todas" ? (sites.length ? "Nenhum lead aqui ainda." : <>Nenhum lead ainda.<br /><button className="btn btn-ghost btn-xs" style={{ marginTop: 8 }} onClick={() => setSitesDlg(true)}><Globe aria-hidden /> Ligar um site</button></>)
+                : filtro === "leads" ? <>Nenhum lead ainda.<br /><Link className="btn btn-ghost btn-xs" style={{ marginTop: 8 }} href="/crm/sites"><Globe aria-hidden /> Ligar um site</Link></>
+                : filtro === "naoLidas" ? "Tudo lido."
                 : conversas.length ? "Nada encontrado" : "Nenhuma conversa ainda. Clique em Nova para começar."}
             </li>
           )}
@@ -188,8 +175,6 @@ export function Mensagens({ mensagens, contatos, modelos, biblioteca, avisos, on
       </section>
 
       {contatoDlg && <ContatoDialog inicial={contatoDlg} fechar={() => setContatoDlg(null)} pronto={(n) => { setContatoDlg(null); setSel(n); setAberta(true); router.refresh(); }} />}
-      <ModelosDialog open={modelosDlg} fechar={() => setModelosDlg(false)} modelos={modelos} />
-      <SitesDialog open={sitesDlg} fechar={() => setSitesDlg(false)} sites={sites} />
       <Dialog open={!!ver} onClose={() => setVer(null)} title={ver ? (ver.midia_nome || ROTULO_TIPO[ver.tipo] || "Mídia") : ""} largo>
         {ver && (
           <div className="stack" style={{ gap: 12 }}>
@@ -373,7 +358,7 @@ function Conversa({ c, titulo, aviso, modelos, biblioteca, voltar, abrir, editar
                       <span className="subtle caption" style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{preencherModelo(m.texto, contatoModelo)}</span>
                     </button>
                   ))}
-                  {!modelosVistos.length && <p className="subtle caption" style={{ padding: 8 }}>{modelos.length ? "Nenhum modelo com isso." : "Nenhum modelo ainda: crie em Modelos, no topo da lista."}</p>}
+                  {!modelosVistos.length && <p className="subtle caption" style={{ padding: 8 }}>{modelos.length ? "Nenhum modelo com isso." : "Nenhum modelo ainda: crie em CRM → Configurações."}</p>}
                 </div>
               </div>
             </Popover>
@@ -430,14 +415,15 @@ function FaixaLead({ c }: { c: Contato }) {
     <div className="wa-lead" data-etapa={c.etapa}>
       <span className="wa-lead-topo">
         <Sparkles size={14} aria-hidden />
-        <b>Lead{c.site ? ` do site ${c.site}` : ""}</b>
+        <b>Lead{d.origem ? ` · ${d.origem}${c.site ? ` (${c.site})` : ""}` : c.site ? ` do site ${c.site}` : ""}</b>
         <span className="subtle" data-esfriando={esfriando} suppressHydrationWarning title={new Date(c.lead_em!).toLocaleString("pt-BR")}>
           · chegou {ha(c.lead_em!)}{esfriando ? " · responda logo: lead esfria rápido" : ""}
         </span>
       </span>
       {d.mensagem && <p className="wa-lead-msg">“{d.mensagem}”</p>}
-      {(d.pagina || utm.length > 0 || c.consentimento_em) && (
+      {(d.pagina || d.email || utm.length > 0 || c.consentimento_em) && (
         <span className="wa-lead-info">
+          {d.email && <a href={`mailto:${d.email}`}><Mail size={12} aria-hidden /> {d.email}</a>}
           {d.pagina && <a href={d.pagina} target="_blank" rel="noreferrer noopener" title={d.pagina}><Globe size={12} aria-hidden /> {d.pagina.replace(/^https?:\/\/(www\.)?/, "").slice(0, 60)}</a>}
           {utm.map(([k, v]) => <span key={k} className="wa-lead-utm">{k}: {v}</span>)}
           {c.consentimento_em && (
@@ -492,227 +478,6 @@ function ContatoDialog({ inicial, fechar, pronto }: { inicial: { numero: string;
           </button>
         </div>
       </form>
-    </Dialog>
-  );
-}
-
-function ModelosDialog({ open, fechar, modelos }: { open: boolean; fechar: () => void; modelos: Modelo[] }) {
-  const router = useRouter();
-  const [edit, setEdit] = useState<{ id: string | null; nome: string; texto: string } | null>(null);
-  const [erro, setErro] = useState<string | null>(null);
-  const [pend, start] = useTransition();
-  const campo = useRef<HTMLTextAreaElement>(null);
-  const salvar = () => start(async () => {
-    if (!edit) return;
-    const v = templateSchema.safeParse(edit);
-    if (!v.success) return setErro(v.error.issues[0]?.message ?? "Dados inválidos");
-    const r = await salvarTemplate({ ...v.data, id: edit.id });
-    if (!r.ok) return setErro(r.error);
-    toast.ok("Modelo salvo");
-    setEdit(null);
-    router.refresh();
-  });
-  const inserir = (v: string) => {
-    const el = campo.current;
-    if (!el || !edit) return;
-    const t = edit.texto.slice(0, el.selectionStart) + v + edit.texto.slice(el.selectionEnd);
-    setEdit({ ...edit, texto: t });
-    requestAnimationFrame(() => { el.focus(); el.selectionStart = el.selectionEnd = el.selectionStart + v.length; });
-  };
-  return (
-    <Dialog open={open} onClose={() => { setEdit(null); fechar(); }} title="Modelos de mensagem" largo>
-      {edit ? (
-        <form className="stack" style={{ gap: 12 }} onSubmit={(e) => { e.preventDefault(); salvar(); }}>
-          <div className="field">
-            <label className="label" htmlFor="md-nome">Nome do modelo *</label>
-            <input id="md-nome" className="input" value={edit.nome} maxLength={60} onChange={(e) => { setEdit({ ...edit, nome: e.target.value }); setErro(null); }} autoFocus placeholder="Ex.: Boas-vindas, Proposta enviada, Cobrança" />
-          </div>
-          <div className="field">
-            <label className="label" htmlFor="md-texto">Texto *</label>
-            <textarea ref={campo} id="md-texto" className="input" rows={6} style={{ height: "auto", paddingBlock: 12, resize: "vertical" }} maxLength={MAX_TEXTO_WA}
-              value={edit.texto} onChange={(e) => { setEdit({ ...edit, texto: e.target.value }); setErro(null); }} placeholder="Olá {primeiro_nome}, tudo bem? …" />
-            <span className="cluster" style={{ gap: 6 }}>
-              <span className="subtle caption">Inserir:</span>
-              {Object.entries(VARIAVEIS_MODELO).map(([v, d]) => <button key={v} type="button" className="chip" style={{ height: 24 }} title={d} onClick={() => inserir(v)}>{v}</button>)}
-            </span>
-          </div>
-          {edit.texto.trim() && (
-            <div className="wa-previa-modelo"><span className="subtle caption">Prévia com “Maria Souza”:</span><p>{formatar(preencherModelo(edit.texto, { nome: "Maria Souza", numero: "5531999999999" }))}</p></div>
-          )}
-          {erro && <p className="error-text" role="alert">{erro}</p>}
-          <div className="cluster" style={{ justifyContent: "flex-end", gap: 8 }}>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEdit(null)}>Voltar</button>
-            <button type="submit" className="btn btn-primary btn-sm" disabled={pend}>{pend ? <Loader2 className="animate-spin" aria-hidden /> : "Salvar modelo"}</button>
-          </div>
-        </form>
-      ) : (
-        <div className="stack" style={{ gap: 10 }}>
-          <button className="btn btn-primary btn-sm" style={{ alignSelf: "flex-start" }} onClick={() => setEdit({ id: null, nome: "", texto: "" })}><MessageSquareText aria-hidden /> Novo modelo</button>
-          {modelos.map((m) => (
-            <div key={m.id} className="panel" style={{ padding: "10px 14px", display: "flex", gap: 10, alignItems: "flex-start" }}>
-              <span className="stack" style={{ gap: 4, flex: 1, minWidth: 0 }}>
-                <b style={{ fontWeight: 600 }}>{m.nome}</b>
-                <span className="subtle small" style={{ whiteSpace: "pre-line", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{m.texto}</span>
-              </span>
-              <button className="btn btn-ghost btn-xs" onClick={() => setEdit({ ...m })} aria-label={`Editar ${m.nome}`}><Pencil aria-hidden /></button>
-              <button className="btn btn-ghost btn-xs" aria-label={`Apagar ${m.nome}`} onClick={async () => {
-                if (!(await confirmar(`Apagar o modelo “${m.nome}”?`))) return;
-                const r = await apagarTemplate(m.id);
-                if (!r.ok) toast.err(r.error); else router.refresh();
-              }}><Trash2 aria-hidden /></button>
-            </div>
-          ))}
-          {!modelos.length && <p className="subtle small">Nenhum modelo ainda. Modelos aceitam {Object.keys(VARIAVEIS_MODELO).join(", ")}, trocados pelos dados do contato na hora de usar.</p>}
-        </div>
-      )}
-    </Dialog>
-  );
-}
-
-// ───────────── Sites que mandam leads ─────────────
-
-/** Formulário pronto para colar no site: manda o lead e abre o WhatsApp dele já com a mensagem escrita. */
-function codigoFormulario(origem: string, chave: string) {
-  return `<!-- Formulário de contato · DOMUS AdPilot -->
-<form class="domus-lead" action="${origem}/api/leads" method="post">
-  <input type="hidden" name="site" value="${chave}">
-  <input name="nome" placeholder="Seu nome" required minlength="2" maxlength="80" autocomplete="name">
-  <input name="numero" type="tel" placeholder="WhatsApp com DDD" required autocomplete="tel">
-  <textarea name="mensagem" placeholder="Como podemos ajudar? (opcional)" maxlength="1000" rows="3"></textarea>
-  <label class="domus-lead-ok"><input type="checkbox" name="consentimento" value="sim" required> ${CONSENTIMENTO}</label>
-  <input name="_hp" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px">
-  <button type="submit">Falar no WhatsApp</button>
-  <p class="domus-lead-erro" role="alert" hidden></p>
-</form>
-<style>
-  .domus-lead { --cor: #25d366; display: grid; gap: 10px; max-width: 420px; font: inherit; }
-  .domus-lead input:not([type=checkbox]), .domus-lead textarea { padding: 12px 14px; border: 1px solid #d0d5dd; border-radius: 10px; font: inherit; }
-  .domus-lead-ok { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; }
-  .domus-lead button { padding: 13px; border: 0; border-radius: 10px; background: var(--cor); color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
-  .domus-lead button:disabled { opacity: .6; }
-  .domus-lead-erro { margin: 0; color: #d92d20; font-size: 14px; }
-</style>
-<script>
-  document.querySelectorAll("form.domus-lead").forEach(function (f) {
-    f.addEventListener("submit", async function (e) {
-      e.preventDefault();
-      var b = f.querySelector("button"), erro = f.querySelector(".domus-lead-erro");
-      var d = Object.fromEntries(new FormData(f));
-      d.pagina = location.href;
-      new URLSearchParams(location.search).forEach(function (v, k) { if (k.indexOf("utm_") === 0) d[k] = v; });
-      b.disabled = true; erro.hidden = true;
-      try {
-        var r = await fetch(f.action, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(d) });
-        var j = await r.json();
-        if (!r.ok) throw new Error(j.erro);
-        f.innerHTML = "<p>Recebemos seu contato! " + (j.whatsapp ? "Abrindo o WhatsApp…" : "Em breve falamos com você pelo WhatsApp.") + "</p>";
-        if (j.whatsapp) location.href = j.whatsapp;
-      } catch (err) {
-        erro.textContent = err.message || "Não deu para enviar. Tente de novo.";
-        erro.hidden = false; b.disabled = false;
-      }
-    });
-  });
-</script>`;
-}
-
-function SitesDialog({ open, fechar, sites }: { open: boolean; fechar: () => void; sites: SiteLead[] }) {
-  const router = useRouter();
-  const [edit, setEdit] = useState<{ id: string | null; nome: string; dominios: string; mensagem_inicial: string } | null>(null);
-  const [codigo, setCodigo] = useState<SiteLead | null>(null);
-  const [erro, setErro] = useState<string | null>(null);
-  const [pend, start] = useTransition();
-  const salvar = () => start(async () => {
-    if (!edit) return;
-    const v = leadSiteSchema.safeParse(edit);
-    if (!v.success) return setErro(v.error.issues[0]?.message ?? "Dados inválidos");
-    const r = await salvarSite(edit.id, edit);
-    if (!r.ok) return setErro(r.error);
-    toast.ok(edit.id ? "Site salvo" : "Site criado: agora copie o código do formulário");
-    setEdit(null);
-    router.refresh();
-  });
-  const fecharTudo = () => { setEdit(null); setCodigo(null); setErro(null); fechar(); };
-  const html = codigo ? codigoFormulario(window.location.origin, codigo.chave) : "";
-
-  return (
-    <Dialog open={open} onClose={fecharTudo} title={codigo ? `Formulário · ${codigo.nome}` : edit ? (edit.id ? "Editar site" : "Novo site") : "Sites que mandam leads"} largo>
-      {codigo ? (
-        <div className="stack" style={{ gap: 12 }}>
-          <p className="subtle small" style={{ margin: 0 }}>
-            Cole no HTML do site, onde o formulário deve aparecer. Quem preencher entra em <b>Leads</b>, você recebe um aviso no WhatsApp,
-            e o WhatsApp da pessoa abre com a mensagem pronta para <b>ela</b> começar a conversa (o que menos dá ban).
-          </p>
-          <pre className="wa-codigo"><code>{html}</code></pre>
-          <span className="subtle caption">A cor do botão muda em <code>--cor</code>. Sem JavaScript o formulário também funciona (vai direto para o WhatsApp).</span>
-          <div className="cluster" style={{ justifyContent: "space-between", gap: 8 }}>
-            <button className="btn btn-ghost btn-sm" onClick={() => setCodigo(null)}><ArrowLeft aria-hidden /> Voltar</button>
-            <button className="btn btn-primary btn-sm" onClick={async () => { await navigator.clipboard.writeText(html); toast.ok("Código copiado"); }}><Copy aria-hidden /> Copiar código</button>
-          </div>
-        </div>
-      ) : edit ? (
-        <form className="stack" style={{ gap: 12 }} onSubmit={(e) => { e.preventDefault(); salvar(); }}>
-          <div className="field">
-            <label className="label" htmlFor="st-nome">Nome do site *</label>
-            <input id="st-nome" className="input" value={edit.nome} maxLength={60} autoFocus onChange={(e) => { setEdit({ ...edit, nome: e.target.value }); setErro(null); }} placeholder="Ex.: Castilho Advogados" />
-          </div>
-          <div className="field">
-            <label className="label" htmlFor="st-dom">Domínios que podem mandar</label>
-            <input id="st-dom" className="input" value={edit.dominios} onChange={(e) => { setEdit({ ...edit, dominios: e.target.value }); setErro(null); }} placeholder="castilho.adv.br, outro-dominio.com" />
-            <span className="subtle caption">Subdomínios valem (www.). Vazio = qualquer site pode usar: preencha assim que o site estiver no ar.</span>
-          </div>
-          <div className="field">
-            <label className="label" htmlFor="st-msg">Mensagem que o lead manda ao abrir o WhatsApp *</label>
-            <textarea id="st-msg" className="input" rows={3} style={{ height: "auto", paddingBlock: 12, resize: "vertical" }} maxLength={500}
-              value={edit.mensagem_inicial} onChange={(e) => { setEdit({ ...edit, mensagem_inicial: e.target.value }); setErro(null); }} />
-            <span className="subtle caption">Aceita {"{nome}"}, {"{primeiro_nome}"} e {"{site}"}. A pessoa ainda pode mudar antes de mandar.</span>
-          </div>
-          {edit.mensagem_inicial.trim() && (
-            <div className="wa-previa-modelo"><span className="subtle caption">Prévia com “Maria Souza”:</span>
-              <p>{preencherModelo(edit.mensagem_inicial, { nome: "Maria Souza", numero: "5531999999999", site: edit.nome || "seu site" })}</p></div>
-          )}
-          {erro && <p className="error-text" role="alert">{erro}</p>}
-          <div className="cluster" style={{ justifyContent: "flex-end", gap: 8 }}>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setEdit(null); setErro(null); }}>Voltar</button>
-            <button type="submit" className="btn btn-primary btn-sm" disabled={pend}>{pend ? <Loader2 className="animate-spin" aria-hidden /> : edit.id ? "Salvar" : "Criar site"}</button>
-          </div>
-        </form>
-      ) : (
-        <div className="stack" style={{ gap: 10 }}>
-          <div className="cluster" style={{ justifyContent: "space-between", gap: 8 }}>
-            <span className="subtle small">Cada site tem um formulário. Os leads caem em Mensagens → Leads.</span>
-            <button className="btn btn-primary btn-sm" onClick={() => setEdit({ id: null, nome: "", dominios: "", mensagem_inicial: "Olá! Vim pelo site {site} e quero saber mais." })}><Globe aria-hidden /> Novo site</button>
-          </div>
-          {sites.map((st) => (
-            <div key={st.id} className="panel wa-site" data-ativo={st.ativo}>
-              <span className="wa-avatar"><Globe size={18} aria-hidden /></span>
-              <span className="stack" style={{ gap: 3, flex: 1, minWidth: 0 }}>
-                <b style={{ fontWeight: 600 }}>{st.nome}{!st.ativo && <span className="subtle caption"> · pausado</span>}</b>
-                <span className="subtle caption" suppressHydrationWarning style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {st.dominios.length ? st.dominios.join(", ") : "qualquer domínio"} · {st.leads} lead(s){st.ultimo_lead ? ` · último ${ha(st.ultimo_lead)}` : ""}
-                </span>
-              </span>
-              <button className="btn btn-secondary btn-xs" onClick={() => setCodigo(st)}><Code2 aria-hidden /> Código</button>
-              <button className="btn btn-ghost btn-xs" title={st.ativo ? "Pausar: o formulário para de aceitar leads" : "Reativar o formulário"} onClick={async () => {
-                const r = await alternarSite(st.id, !st.ativo);
-                if (!r.ok) toast.err(r.error); else router.refresh();
-              }}>{st.ativo ? "Pausar" : "Ativar"}</button>
-              <button className="btn btn-ghost btn-xs" aria-label={`Editar ${st.nome}`} onClick={() => setEdit({ id: st.id, nome: st.nome, dominios: st.dominios.join(", "), mensagem_inicial: st.mensagem_inicial })}><Pencil aria-hidden /></button>
-              <button className="btn btn-ghost btn-xs" aria-label={`Apagar ${st.nome}`} onClick={async () => {
-                if (!(await confirmar(`Apagar o site “${st.nome}”? O formulário dele para de funcionar; os leads que já chegaram continuam nas Mensagens.`))) return;
-                const r = await apagarSite(st.id);
-                if (!r.ok) toast.err(r.error); else router.refresh();
-              }}><Trash2 aria-hidden /></button>
-            </div>
-          ))}
-          {!sites.length && (
-            <div className="wa-vazio" style={{ padding: "28px 12px" }}>
-              <Globe size={36} aria-hidden /><b>Nenhum site ainda</b>
-              <span className="subtle small" style={{ textAlign: "center", maxWidth: 420 }}>Crie um site, copie o formulário e cole no HTML. Cada pessoa que preencher vira um lead aqui, com a página e o anúncio de onde veio.</span>
-            </div>
-          )}
-        </div>
-      )}
     </Dialog>
   );
 }

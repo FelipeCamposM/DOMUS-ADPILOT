@@ -16,11 +16,11 @@ export const NAV = [
   { href: "/arquivos", label: "Arquivos", icon: FolderOpen, group: "Criação" },
   { href: "/instagram", label: "Instagram", icon: InstagramIcon, group: "Criação" },
   { href: "/conteudos", label: "Conteúdos", icon: CalendarDays, group: "Criação" },
+  { href: "/crm", label: "CRM", icon: MessageCircle, group: "Vendas" },
   { href: "/ai", label: "IA", icon: Bot, group: "Inteligência" },
   { href: "/sistemas", label: "Sistemas", icon: Boxes, group: "Inteligência" },
   { href: "/jobs", label: "Jobs", icon: Activity, group: "Operação" },
   { href: "/connections", label: "Conexões", icon: Cable, group: "Operação" },
-  { href: "/mensagens", label: "Mensagens", icon: MessageCircle, group: "Operação" },
   { href: "/audit", label: "Auditoria", icon: ScrollText, group: "Operação" },
   { href: "/settings", label: "Configurações", icon: Settings, group: "Operação" },
 ] as const;

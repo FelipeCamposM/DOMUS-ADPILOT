@@ -74,6 +74,20 @@ export const leadSchema = z.object({
 }));
 export type Lead = z.output<typeof leadSchema>;
 
+/**
+ * Lead mandado por um sistema conectado (servidor→servidor, com a chave domus_). O consentimento é o texto que a
+ * pessoa aceitou lá (ex.: a Política de Privacidade do teste grátis): obrigatório, fica guardado no contato.
+ */
+export const leadSistemaSchema = z.object({
+  nome,
+  numero: numeroSchema,
+  consentimento: z.string({ message: "Mande o texto que a pessoa aceitou (consentimento)" }).trim().min(5, "Mande o texto que a pessoa aceitou (consentimento)").max(300),
+  origem: z.string().trim().min(2).max(60).optional(),
+  mensagem: z.string().trim().max(1000, "Mensagem muito longa (até 1000 caracteres)").optional(),
+  email: z.email("E-mail inválido").max(200).optional(),
+  pagina: curto(500),
+});
+
 /** "https://www.castilho.adv.br/, outro.com" → ["castilho.adv.br", "outro.com"]. */
 export const lerDominios = (t: string) =>
   [...new Set(t.split(/[\s,;]+/).map((d) => d.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/[/:].*$/, "")).filter(Boolean))];

@@ -51,7 +51,7 @@ export async function enviarMensagem(input: unknown) {
     await enqueueJob(sql, { workspaceId: null, type: "WHATSAPP_ENVIAR", payload: { id: r!.id }, createdBy: ctx.user.id, maxAttempts: 1 });
     // lead novo que recebeu a primeira mensagem passa para "em contato"
     await sql`update ads.whatsapp_contatos set lido_em = now(), etapa = case when etapa = 'NOVO' then 'CONTATO' else etapa end where numero = ${m.para}`;
-    revalidatePath("/mensagens");
+    revalidatePath("/crm", "layout");
     return r!.id;
   });
 }
@@ -87,7 +87,7 @@ export async function definirEtapa(numero: string, etapa: string | null) {
     const r = await db()`update ads.whatsapp_contatos set etapa = ${e}, lead_em = coalesce(lead_em, case when ${e}::text is not null then now() end), updated_at = now() where numero = ${n}`;
     if (!r.count) throw new Error("Salve o contato antes de pôr no funil");
     await audit(db(), { workspaceId: ctx.workspace.id, actor: ctx.actor, action: e ? `Lead: ${ROTULO_ETAPA[e]}` : "Tirar do funil", entityType: "whatsapp_contato", entityId: n, entityName: n });
-    revalidatePath("/mensagens");
+    revalidatePath("/crm", "layout");
   });
 }
 
@@ -100,14 +100,17 @@ export async function salvarSite(id: string | null, input: unknown) {
     const ctx = await admin();
     const s = leadSiteSchema.parse(input);
     const sql = db();
+    let chave: string | null = null;
     if (id) await sql`update ads.lead_sites set nome = ${s.nome}, dominios = ${s.dominios}, mensagem_inicial = ${s.mensagem_inicial} where id = ${siteId.parse(id)}`;
     else {
       const [n] = await sql<{ n: number }[]>`select count(*)::int as n from ads.lead_sites`;
       if ((n?.n ?? 0) >= 50) throw new Error("Limite de 50 sites");
-      await sql`insert into ads.lead_sites (nome, chave, dominios, mensagem_inicial, created_by)
-        values (${s.nome}, ${`lead_${randomBytes(12).toString("base64url")}`}, ${s.dominios}, ${s.mensagem_inicial}, ${ctx.user.id})`;
+      const [r] = await sql<{ chave: string }[]>`insert into ads.lead_sites (nome, chave, dominios, mensagem_inicial, created_by)
+        values (${s.nome}, ${`lead_${randomBytes(12).toString("base64url")}`}, ${s.dominios}, ${s.mensagem_inicial}, ${ctx.user.id}) returning chave`;
+      chave = r!.chave;
     }
-    revalidatePath("/mensagens");
+    revalidatePath("/crm", "layout");
+    return chave; // site novo: a tela já abre o código do formulário
   });
 }
 
@@ -115,7 +118,7 @@ export async function alternarSite(id: string, ativo: boolean) {
   return run(async () => {
     await admin();
     await db()`update ads.lead_sites set ativo = ${ativo} where id = ${siteId.parse(id)}`;
-    revalidatePath("/mensagens");
+    revalidatePath("/crm", "layout");
   });
 }
 
@@ -124,7 +127,7 @@ export async function apagarSite(id: string) {
   return run(async () => {
     await admin();
     await db()`delete from ads.lead_sites where id = ${siteId.parse(id)}`;
-    revalidatePath("/mensagens");
+    revalidatePath("/crm", "layout");
   });
 }
 
@@ -138,7 +141,7 @@ export async function reenviarMensagem(id: string) {
       and (status = 'FALHOU' or (status = 'PENDENTE' and created_at < now() - interval '2 minutes'))`;
     if (!r.count) throw new Error("Esta mensagem não pode ser reenviada");
     await enqueueJob(sql, { workspaceId: null, type: "WHATSAPP_ENVIAR", payload: { id }, createdBy: ctx.user.id, maxAttempts: 1 });
-    revalidatePath("/mensagens");
+    revalidatePath("/crm", "layout");
   });
 }
 
@@ -148,7 +151,7 @@ export async function salvarNota(input: unknown) {
     const ctx = await admin();
     const n = z.object({ para: numeroSchema, texto: texto.min(1, "Escreva a nota") }).parse(input);
     await db()`insert into ads.whatsapp_envios (para, texto, status, direcao, autor) values (${n.para}, ${n.texto}, 'NOTA', 'NOTA', ${ctx.user.email})`;
-    revalidatePath("/mensagens");
+    revalidatePath("/crm", "layout");
   });
 }
 
@@ -156,7 +159,7 @@ export async function apagarNota(id: string) {
   return run(async () => {
     await admin();
     await db()`delete from ads.whatsapp_envios where id = ${z.string().uuid().parse(id)} and direcao = 'NOTA'`;
-    revalidatePath("/mensagens");
+    revalidatePath("/crm", "layout");
   });
 }
 
@@ -168,7 +171,7 @@ export async function salvarContato(input: unknown) {
     await db()`insert into ads.whatsapp_contatos (numero, nome, salvo, created_by) values (${c.numero}, ${c.nome}, true, ${ctx.user.id})
       on conflict (numero) do update set nome = excluded.nome, salvo = true, updated_at = now()`;
     await audit(db(), { workspaceId: ctx.workspace.id, actor: ctx.actor, action: "Salvar contato do WhatsApp", entityType: "whatsapp_contato", entityId: c.numero, entityName: c.nome });
-    revalidatePath("/mensagens");
+    revalidatePath("/crm", "layout");
     return c.numero;
   });
 }
@@ -191,7 +194,7 @@ export async function salvarTemplate(input: unknown) {
       if ((n?.n ?? 0) >= 100) throw new Error("Limite de 100 modelos");
       await sql`insert into ads.whatsapp_templates (nome, texto, created_by) values (${t.nome}, ${t.texto}, ${ctx.user.id})`;
     }
-    revalidatePath("/mensagens");
+    revalidatePath("/crm", "layout");
   });
 }
 
@@ -199,6 +202,6 @@ export async function apagarTemplate(id: string) {
   return run(async () => {
     await admin();
     await db()`delete from ads.whatsapp_templates where id = ${z.string().uuid().parse(id)}`;
-    revalidatePath("/mensagens");
+    revalidatePath("/crm", "layout");
   });
 }
