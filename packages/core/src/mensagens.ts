@@ -68,6 +68,18 @@ export const etapaCrmSchema = z.object({
 /** "Em proposta" → "EM_PROPOSTA" (chave nova; o banco garante que não repete). */
 export const chaveEtapa = (nome: string) =>
   nome.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 30) || "ETAPA";
+/** Filtros do funil (salvos em ads.crm_filtros). Campo ausente = padrão, então filtro salvo antigo continua válido. */
+export const filtroCrmSchema = z.object({
+  busca: z.string().trim().max(100).default(""),
+  periodo: z.enum(["hoje", "7", "30", "90", "tudo"]).default("30"),
+  situacao: z.enum(["todas", "esperando", "esfriando", "respondeu", "silencio", "parado"]).default("todas"),
+  sites: z.array(z.string().max(60)).max(30).default([]),
+  origens: z.array(z.string().max(80)).max(30).default([]),
+  valor: z.enum(["todos", "com", "sem"]).default("todos"),
+  ordem: z.enum(["recentes", "antigos", "valor", "parado", "nome"]).default("recentes"),
+});
+export type FiltrosCrm = z.output<typeof filtroCrmSchema>;
+export interface FiltroSalvo { id: string; nome: string; filtros: FiltrosCrm; favorito: boolean; padrao: boolean }
 /** "#22c55e" → "34 197 94", o formato das variáveis de cor do CSS (rgb(var(--e) / 0.1)). */
 export const rgbCor = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) || 0).join(" ");
 /** "1234.5" → "R$ 1.234,50"; inteiro sem centavos se `curto`. */

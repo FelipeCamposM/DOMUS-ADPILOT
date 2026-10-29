@@ -23,3 +23,26 @@ alter table ads.whatsapp_contatos
   add column if not exists lead_valor numeric(12, 2) check (lead_valor >= 0), -- quanto vale o negócio (R$)
   add column if not exists etapa_em timestamptz; -- quando entrou na etapa atual (lead parado = alerta)
 update ads.whatsapp_contatos set etapa_em = coalesce(lead_em, updated_at) where etapa is not null and etapa_em is null;
+
+-- Filtros salvos do funil (visões). Um só favorito: abre já aplicado e aparece com estrela.
+create table if not exists ads.crm_filtros (
+  id uuid primary key default gen_random_uuid(),
+  nome text not null check (length(btrim(nome)) between 1 and 40),
+  filtros jsonb not null,
+  favorito boolean not null default false,
+  padrao boolean not null default false, -- veio pronto (pode apagar)
+  created_at timestamptz not null default now()
+);
+create unique index if not exists crm_filtros_um_favorito on ads.crm_filtros ((true)) where favorito;
+alter table ads.crm_filtros enable row level security;
+
+insert into ads.crm_filtros (nome, filtros, padrao)
+select v.nome, v.filtros::jsonb, true from (values
+  ('Sua vez de responder', '{"periodo":"tudo","situacao":"esperando"}'),
+  ('Esfriando agora', '{"periodo":"tudo","situacao":"esfriando"}'),
+  ('Leads de hoje', '{"periodo":"hoje"}'),
+  ('Maiores negócios', '{"periodo":"tudo","valor":"com","ordem":"valor"}'),
+  ('Parados há +7 dias', '{"periodo":"tudo","situacao":"parado","ordem":"parado"}'),
+  ('Sem valor definido', '{"periodo":"90","valor":"sem"}')
+) as v(nome, filtros)
+where not exists (select 1 from ads.crm_filtros where padrao);

@@ -1,17 +1,18 @@
 "use client";
 
-import { ETAPA_ENTRADA, formatarNumero, reais, type EtapaCrm } from "@domus-ads/core/mensagens";
+import { ETAPA_ENTRADA, filtroCrmSchema, formatarNumero, reais, type EtapaCrm, type FiltroSalvo, type FiltrosCrm } from "@domus-ads/core/mensagens";
 import { gsap } from "gsap";
 import { Flip } from "gsap/Flip";
 import {
   ArrowDownRight, ArrowRightLeft, ArrowUpRight, CircleDollarSign, Clock, Flame, Globe, Hourglass, Megaphone, MessageCircle, Search,
-  Settings2, SlidersHorizontal, Sparkles, Target, Timer, Trophy, X,
+  Bookmark, Settings2, SlidersHorizontal, Sparkles, Star, Target, Timer, Trophy, X,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
+import { confirmar } from "../shell/confirmar";
 import { toast } from "../shell/toast";
-import { definirEtapa, definirValor } from "./actions";
+import { apagarFiltro, definirEtapa, definirValor, favoritarFiltro, salvarFiltro } from "./actions";
 import { EditarFunil } from "./EditarFunil";
 import { corEtapa } from "./etapas";
 
@@ -26,15 +27,18 @@ export interface Lead {
 const H = 3_600_000;
 const DIA = 24 * H;
 const PERIODOS = [["hoje", "Hoje", DIA], ["7", "7 dias", 7 * DIA], ["30", "30 dias", 30 * DIA], ["90", "90 dias", 90 * DIA], ["tudo", "Tudo", Infinity]] as const;
-type Periodo = (typeof PERIODOS)[number][0];
-const SITUACOES = {
+type Periodo = FiltrosCrm["periodo"];
+const SITUACOES: Record<FiltrosCrm["situacao"], string> = {
   todas: "Todas", esperando: "Sua vez de responder", esfriando: "Esfriando (+6 h)", respondeu: "Já responderam", silencio: "Nunca responderam", parado: "Parados (+7 dias)",
-} as const;
-type Situacao = keyof typeof SITUACOES;
-const ORDENS = { recentes: "Mais recentes", antigos: "Mais antigos", valor: "Maior valor", parado: "Mais tempo parado", nome: "Nome (A–Z)" } as const;
-type Ordem = keyof typeof ORDENS;
-const VALORES = { todos: "Com ou sem valor", com: "Com valor", sem: "Sem valor" } as const;
-type FiltroValor = keyof typeof VALORES;
+};
+type Situacao = FiltrosCrm["situacao"];
+const ORDENS: Record<FiltrosCrm["ordem"], string> = { recentes: "Mais recentes", antigos: "Mais antigos", valor: "Maior valor", parado: "Mais tempo parado", nome: "Nome (A–Z)" };
+type Ordem = FiltrosCrm["ordem"];
+const VALORES: Record<FiltrosCrm["valor"], string> = { todos: "Com ou sem valor", com: "Com valor", sem: "Sem valor" };
+type FiltroValor = FiltrosCrm["valor"];
+const PADRAO = filtroCrmSchema.parse({});
+/** Mesmos filtros (ordem dos sites/origens não importa). */
+const chaveFiltro = (f: FiltrosCrm) => JSON.stringify({ ...f, busca: f.busca.trim(), sites: [...f.sites].sort(), origens: [...f.origens].sort() });
 
 const desde = (d: string) => Date.now() - new Date(d).getTime();
 const num = (v: string | null) => (v ? Number(v) : 0);
@@ -53,17 +57,21 @@ const reduzido = () => typeof window !== "undefined" && matchMedia("(prefers-red
 const alternar = (s: string[], v: string) => (s.includes(v) ? s.filter((x) => x !== v) : [...s, v]);
 
 /** Funil de leads: KPIs do período, filtros e quadro com colunas configuráveis. Arraste o cartão para mudar a etapa. */
-export function Leads({ leads, etapas, sites }: { leads: Lead[]; etapas: EtapaCrm[]; sites: string[] }) {
+export function Leads({ leads, etapas, sites, salvos }: { leads: Lead[]; etapas: EtapaCrm[]; sites: string[]; salvos: FiltroSalvo[] }) {
   const router = useRouter();
   const [lista, setLista] = useState(leads);
   useEffect(() => setLista(leads), [leads]);
-  const [busca, setBusca] = useState("");
-  const [periodo, setPeriodo] = useState<Periodo>("30");
-  const [situacao, setSituacao] = useState<Situacao>("todas");
-  const [filtroSites, setFiltroSites] = useState<string[]>([]);
-  const [origens, setOrigens] = useState<string[]>([]);
-  const [valor, setValor] = useState<FiltroValor>("todos");
-  const [ordem, setOrdem] = useState<Ordem>("recentes");
+  // abre com o filtro favorito aplicado
+  const [inicial] = useState(() => salvos.find((f) => f.favorito)?.filtros ?? PADRAO);
+  const [busca, setBusca] = useState(inicial.busca);
+  const [periodo, setPeriodo] = useState<Periodo>(inicial.periodo);
+  const [situacao, setSituacao] = useState<Situacao>(inicial.situacao);
+  const [filtroSites, setFiltroSites] = useState<string[]>(inicial.sites);
+  const [origens, setOrigens] = useState<string[]>(inicial.origens);
+  const [valor, setValor] = useState<FiltroValor>(inicial.valor);
+  const [ordem, setOrdem] = useState<Ordem>(inicial.ordem);
+  const atual: FiltrosCrm = { busca, periodo, situacao, sites: filtroSites, origens, valor, ordem };
+  const aplicar = (f: FiltrosCrm) => { setBusca(f.busca); setPeriodo(f.periodo); setSituacao(f.situacao); setFiltroSites(f.sites); setOrigens(f.origens); setValor(f.valor); setOrdem(f.ordem); };
   const [abrirFiltros, setAbrirFiltros] = useState(false);
   const [funil, setFunil] = useState(false);
   const [arrastando, setArrastando] = useState<string | null>(null);
@@ -243,6 +251,8 @@ export function Leads({ leads, etapas, sites }: { leads: Lead[]; etapas: EtapaCr
         </div>
       )}
 
+      <Visoes salvos={salvos} atual={atual} aplicar={aplicar} />
+
       <div className="crm-barra">
         <label className="crm-busca"><Search size={15} aria-hidden /><input placeholder="Buscar nome, número, e-mail, mensagem ou campanha" value={busca} onChange={(e) => setBusca(e.target.value)} />
           {busca && <button onClick={() => setBusca("")} aria-label="Limpar busca"><X size={14} /></button>}</label>
@@ -310,6 +320,49 @@ export function Leads({ leads, etapas, sites }: { leads: Lead[]; etapas: EtapaCr
       </div>
 
       {funil && <EditarFunil etapas={etapas} contagem={Object.fromEntries(etapas.map((e) => [e.chave, lista.filter((l) => colunaDe(l) === e.chave).length]))} fechar={() => setFunil(false)} />}
+    </div>
+  );
+}
+
+/** Filtros salvos: um clique aplica; a estrela marca o favorito (abre já aplicado). */
+function Visoes({ salvos, atual, aplicar }: { salvos: FiltroSalvo[]; atual: FiltrosCrm; aplicar: (f: FiltrosCrm) => void }) {
+  const router = useRouter();
+  const [nome, setNome] = useState<string | null>(null);
+  const [pend, start] = useTransition();
+  const chave = chaveFiltro(atual);
+  const ativo = salvos.find((f) => chaveFiltro(f.filtros) === chave);
+  const padrao = chave === chaveFiltro(PADRAO);
+  const feito = (r: { ok: true } | { ok: false; error: string }, msg?: string) => { if (!r.ok) return toast.err(r.error); if (msg) toast.ok(msg); router.refresh(); };
+  const salvar = () => start(async () => {
+    const r = await salvarFiltro(nome ?? "", atual);
+    if (r.ok) setNome(null);
+    feito(r, "Filtro salvo");
+  });
+  return (
+    <div className="crm-visoes" role="toolbar" aria-label="Filtros salvos">
+      <span className="crm-visoes-rot"><Bookmark aria-hidden /> Filtros</span>
+      <button className="crm-visao" data-ativo={padrao} onClick={() => aplicar(PADRAO)}>Todos os leads</button>
+      {salvos.map((f) => (
+        <span key={f.id} className="crm-visao" data-ativo={ativo?.id === f.id} data-favorito={f.favorito}>
+          <button className="crm-visao-nome" onClick={() => aplicar(f.filtros)} title={f.padrao ? "Filtro pronto" : "Filtro salvo"}>{f.nome}</button>
+          <button className="crm-visao-estrela" aria-pressed={f.favorito} disabled={pend} title={f.favorito ? "Favorito: abre já aplicado. Clique para tirar" : "Favoritar: abre já aplicado"}
+            aria-label={f.favorito ? `Tirar ${f.nome} dos favoritos` : `Favoritar ${f.nome}`}
+            onClick={() => start(async () => feito(await favoritarFiltro(f.favorito ? null : f.id), f.favorito ? undefined : `“${f.nome}” abre sempre aplicado ⭐`))}>
+            <Star aria-hidden />
+          </button>
+          <button className="crm-visao-x" aria-label={`Apagar ${f.nome}`} title="Apagar filtro" disabled={pend}
+            onClick={async () => { if (await confirmar(`Apagar o filtro “${f.nome}”?`)) start(async () => feito(await apagarFiltro(f.id))); }}><X aria-hidden /></button>
+        </span>
+      ))}
+      {nome !== null ? (
+        <form className="crm-visao-form" onSubmit={(e) => { e.preventDefault(); salvar(); }}>
+          <input className="input" autoFocus value={nome} maxLength={40} placeholder="Nome do filtro" onChange={(e) => setNome(e.target.value)} onKeyDown={(e) => e.key === "Escape" && setNome(null)} aria-label="Nome do filtro" />
+          <button className="btn btn-primary btn-xs" disabled={pend || !nome.trim()}>Salvar</button>
+          <button type="button" className="btn btn-ghost btn-xs" onClick={() => setNome(null)}>Cancelar</button>
+        </form>
+      ) : !ativo && !padrao && (
+        <button className="crm-visao crm-visao-nova" onClick={() => setNome("")}><Bookmark aria-hidden /> Salvar filtro atual</button>
+      )}
     </div>
   );
 }

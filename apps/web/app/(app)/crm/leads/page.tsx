@@ -1,5 +1,5 @@
 import { db } from "@domus-ads/core";
-import type { EtapaCrm } from "@domus-ads/core/mensagens";
+import { filtroCrmSchema, type EtapaCrm, type FiltroSalvo } from "@domus-ads/core/mensagens";
 import { Leads, type Lead } from "@/modules/mensagens/Leads";
 
 export const metadata = { title: "CRM · Leads" };
@@ -9,7 +9,7 @@ const iso = (d: Date | null) => d?.toISOString() ?? null;
 
 export default async function CrmLeadsPage() {
   const sql = db();
-  const [leads, etapas, sites] = await Promise.all([
+  const [leads, etapas, sites, filtros] = await Promise.all([
     sql<Linha[]>`
       select c.numero, c.nome, c.etapa, s.nome as site, c.lead_valor::text as valor,
         coalesce(c.lead_em, c.updated_at) as lead_em, coalesce(c.etapa_em, c.lead_em, c.updated_at) as etapa_em,
@@ -28,10 +28,13 @@ export default async function CrmLeadsPage() {
       where c.etapa is not null order by coalesce(c.lead_em, c.updated_at) desc`,
     sql<EtapaCrm[]>`select chave, nome, cor, ordem, tipo, dica from ads.crm_etapas order by ordem, created_at`,
     sql<{ nome: string }[]>`select nome from ads.lead_sites order by nome`,
+    sql<(Omit<FiltroSalvo, "filtros"> & { filtros: unknown })[]>`select id, nome, filtros, favorito, padrao from ads.crm_filtros order by favorito desc, padrao desc, created_at`,
   ]);
+  // filtro salvo com campo que mudou de formato é ignorado em vez de quebrar a tela
+  const salvos = filtros.flatMap((f) => { const v = filtroCrmSchema.safeParse(f.filtros); return v.success ? [{ ...f, filtros: v.data }] : []; });
   return (
     <div className="page" style={{ maxWidth: 1600 }}>
-      <Leads etapas={etapas} sites={sites.map((s) => s.nome)}
+      <Leads etapas={etapas} sites={sites.map((s) => s.nome)} salvos={salvos}
         leads={leads.map((l) => ({ ...l, respondeu: !!l.respondeu, msgs: l.msgs ?? 0, lead_em: l.lead_em.toISOString(), etapa_em: l.etapa_em.toISOString(), ultima: iso(l.ultima), primeira_resp: iso(l.primeira_resp) }))} />
     </div>
   );

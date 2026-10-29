@@ -1,7 +1,7 @@
 "use server";
 
 import {
-  audit, chaveEtapa, contatoSchema, db, ETAPA_ENTRADA, etapaCrmSchema, enqueueJob, etapaSchema, FRIO, leadSiteSchema, MAX_TEXTO_WA, numeroSchema, temLink, templateSchema, tipoMidia, whatsappAvisos,
+  audit, chaveEtapa, contatoSchema, db, ETAPA_ENTRADA, etapaCrmSchema, filtroCrmSchema, enqueueJob, etapaSchema, FRIO, leadSiteSchema, MAX_TEXTO_WA, numeroSchema, temLink, templateSchema, tipoMidia, whatsappAvisos,
 } from "@domus-ads/core";
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
@@ -174,6 +174,46 @@ export async function apagarEtapa(chave: string, destino: string) {
     });
     await audit(sql, { workspaceId: ctx.workspace.id, actor: ctx.actor, action: "Funil: apagou coluna", entityType: "crm_etapa", entityId: k, entityName: k });
     revalidatePath("/crm", "layout");
+  });
+}
+
+// ───────────── Filtros salvos do funil ─────────────
+
+const filtroId = z.string().uuid("Filtro inválido");
+
+/** Guarda os filtros atuais com um nome. Devolve o id. */
+export async function salvarFiltro(nome: string, filtros: unknown) {
+  return run(async () => {
+    await admin();
+    const n = z.string().trim().min(1, "Dê um nome ao filtro").max(40, "Nome muito longo (até 40)").parse(nome);
+    const f = filtroCrmSchema.parse(filtros);
+    const sql = db();
+    const [{ total }] = await sql<{ total: number }[]>`select count(*)::int as total from ads.crm_filtros`;
+    if (total >= 30) throw new Error("Até 30 filtros salvos: apague algum antes");
+    const [r] = await sql<{ id: string }[]>`insert into ads.crm_filtros (nome, filtros) values (${n}, ${sql.json(f)}) returning id`;
+    revalidatePath("/crm/leads");
+    return r!.id;
+  });
+}
+
+/** Favorito abre já aplicado (só um). id null = nenhum. */
+export async function favoritarFiltro(id: string | null) {
+  return run(async () => {
+    await admin();
+    const f = id ? filtroId.parse(id) : null;
+    await db().begin(async (tx) => {
+      await tx`update ads.crm_filtros set favorito = false where favorito`;
+      if (f) await tx`update ads.crm_filtros set favorito = true where id = ${f}`;
+    });
+    revalidatePath("/crm/leads");
+  });
+}
+
+export async function apagarFiltro(id: string) {
+  return run(async () => {
+    await admin();
+    await db()`delete from ads.crm_filtros where id = ${filtroId.parse(id)}`;
+    revalidatePath("/crm/leads");
   });
 }
 
