@@ -347,6 +347,28 @@ export async function salvarContato(input: unknown) {
   });
 }
 
+/** Tira a conversa da caixa (quem não é lead). Nada é apagado; volta sozinha se a pessoa mandar mensagem depois. */
+export async function ocultarConversa(numero: string) {
+  return run(async () => {
+    const ctx = await admin();
+    const n = numeroSchema.parse(numero);
+    if (n === (await whatsappAvisos())) throw new Error("A conversa dos avisos da plataforma não pode ser removida");
+    const sql = db();
+    await sql`insert into ads.whatsapp_ocultas (numero, oculta_em, created_by) values (${n}, now(), ${ctx.user.id})
+      on conflict (numero) do update set oculta_em = now(), created_by = excluded.created_by`;
+    await sql`update ads.whatsapp_contatos set lido_em = now() where numero = ${n}`;
+    revalidatePath("/crm", "layout");
+  });
+}
+
+export async function reexibirConversa(numero: string) {
+  return run(async () => {
+    await admin();
+    await db()`delete from ads.whatsapp_ocultas where numero = ${numeroSchema.parse(numero)}`;
+    revalidatePath("/crm", "layout");
+  });
+}
+
 export async function marcarLida(numero: string) {
   return run(async () => {
     await admin();

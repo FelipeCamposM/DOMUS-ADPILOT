@@ -15,6 +15,7 @@ import { arquivarExcesso, restaurar } from "./video/arquivo";
 import { gerarLegenda, type LegendaPayload } from "./instagram/legenda";
 import { publicarInstagram } from "./instagram/publicar";
 import { automatizarCalendario, expirarAtrasados, gerarCalendario, responderWhatsapp, type CalendarioPayload } from "./instagram/calendario";
+import { desligarMotor, runProspeccao } from "./prospeccao";
 import { acaoWhatsapp, avisar, enviarDaFila, estadoWhatsapp, gravarQr, ouvirWhatsapp, vigiarQueda } from "./whatsapp";
 
 /**
@@ -25,13 +26,16 @@ import { acaoWhatsapp, avisar, enviarDaFila, estadoWhatsapp, gravarQr, ouvirWhat
 const TIPOS: readonly JobType[] = ["SYNC_META", "SYNC_GOOGLE", "AI_CHAT", "AI_LOGIN", "AI_DETECT", "WORKER_STARTUP", "GENERATE_VIDEO", "GENERATE_IMAGE", "AI_CAMPAIGN", "RESTORE_MEDIA", "SYNC_INSTAGRAM", "PUBLISH_INSTAGRAM", "AI_INSTAGRAM_CAPTION", "AI_USAGE", "WHATSAPP", "AI_CALENDARIO", "GENERATE_AUDIO", "AI_SISTEMA", "WHATSAPP_ENVIAR"];
 const sql = db();
 const ativos = new Map<string, AbortController>();
+// prospecção (Google Maps) tem fila e vaga próprias: uma busca por vez, sem tirar vaga de imagem, vídeo ou chat
+const PROSPECCAO: readonly JobType[] = ["PROSPECTAR"];
+const prospeccoes = new Map<string, AbortController>();
 let parando = false;
 const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const agora = () => new Date().toLocaleTimeString("pt-BR");
 
-async function executar(job: Job) {
+async function executar(job: Job, vagas = ativos) {
   const ctl = new AbortController();
-  ativos.set(job.id, ctl);
+  vagas.set(job.id, ctl);
   const log = async (m: string) => { console.log(`[${agora()}] ${job.type} ${job.id.slice(0, 8)}: ${m}`); await jobLog(sql, job.id, m); };
   // cancelamento pela web: o job vira CANCELLED e o processo do CLI é encerrado
   const vigia = setInterval(async () => {
@@ -80,6 +84,9 @@ async function executar(job: Job) {
     } else if (job.type === "WHATSAPP_ENVIAR") {
       // mensagem escrita na tela Mensagens
       result = await enviarDaFila(String(job.payload.id));
+    } else if (job.type === "PROSPECTAR") {
+      // CRM → Prospecção: busca de empresas no Google Maps (motor do kit, processo à parte)
+      result = await runProspeccao(String(job.payload.prospeccaoId), ctl.signal, log, async (p) => { await sql`update ads.jobs set progress = ${p} where id = ${job.id}`; });
     } else if (job.type === "RESTORE_MEDIA") {
       result = await restaurar(String(job.payload.creativeId));
     } else if (job.type === "WORKER_STARTUP") {
@@ -97,7 +104,7 @@ async function executar(job: Job) {
     if (!ctl.signal.aborted) await failJob(sql, job, msg, job.type === "SYNC_META" || job.type === "SYNC_GOOGLE"); // só sync repete sozinho
   } finally {
     clearInterval(vigia);
-    ativos.delete(job.id);
+    vagas.delete(job.id);
   }
 }
 
@@ -115,6 +122,21 @@ async function loop() {
       await dormir(5000);
     }
     await dormir(1200);
+  }
+}
+
+/** Fila só da prospecção: roda ao lado do loop principal. */
+async function loopProspeccao() {
+  while (!parando) {
+    try {
+      if (!prospeccoes.size) {
+        const job = await claimJob(sql, WORKER_ID, PROSPECCAO);
+        if (job) { void executar(job, prospeccoes); continue; }
+      }
+    } catch (e) {
+      console.error(`[${agora()}] fila de prospecção indisponível:`, (e as Error).message);
+    }
+    await dormir(4000);
   }
 }
 
@@ -159,7 +181,8 @@ async function parar() {
   if (parando) return;
   parando = true;
   console.log("encerrando: devolvendo jobs em andamento para a fila…");
-  for (const ctl of ativos.values()) ctl.abort();
+  for (const ctl of [...ativos.values(), ...prospeccoes.values()]) ctl.abort();
+  desligarMotor();
   await sql`update ads.jobs set status = 'PENDING', locked_by = null where status = 'RUNNING' and locked_by = ${WORKER_ID} and type <> 'AI_CHAT'`.catch(() => {});
   await sql`update ads.jobs set status = 'FAILED', error = 'Worker reiniciado durante a resposta', finished_at = now() where status = 'RUNNING' and locked_by = ${WORKER_ID} and type = 'AI_CHAT'`.catch(() => {});
   await sql`update ads.ai_conversations set status = 'IDLE' where status = 'RUNNING'`.catch(() => {});
@@ -206,4 +229,5 @@ ouvirWhatsapp(responderWhatsapp); // respostas "sim"/"não" das artes mandadas p
 repetir(async function usoDasContas() { await atualizarUsoContas((m) => console.log(`[${agora()}] ${m}`)); }, 5 * 60_000);
 repetir(async function arquivarNoDrive() { await arquivarExcesso((m) => console.log(`[${agora()}] arquivo: ${m}`)); }, 30 * 60_000);
 repetir(async function detectarContas() { await publicarDetectadas(await detectar()); }, 10 * 60_000);
+void loopProspeccao();
 await loop();

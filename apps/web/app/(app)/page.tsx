@@ -25,8 +25,9 @@ async function crm(): Promise<DadosPulso["crm"]> {
         (select count(*) from ads.whatsapp_contatos where etapa is not null and lead_em > now() - interval '7 days')::int as semana,
         (select count(*) from ads.whatsapp_contatos where etapa is not null and lead_em between now() - interval '14 days' and now() - interval '7 days')::int as anterior,
         (select count(*) from ads.whatsapp_contatos where etapa is not null and (lead_em at time zone ${TZ})::date = (now() at time zone ${TZ})::date)::int as hoje,
-        (select count(*) from (select distinct on (para) direcao from ads.whatsapp_envios where direcao <> 'NOTA' and (agendado_para is null or agendado_para <= now())
-           order by para, created_at desc) u where direcao = 'IN')::int as sua_vez,
+        (select count(*) from (select distinct on (para) para, direcao, created_at from ads.whatsapp_envios where direcao <> 'NOTA' and (agendado_para is null or agendado_para <= now())
+           order by para, created_at desc) u where direcao = 'IN'
+           and not exists (select 1 from ads.whatsapp_ocultas o where o.numero = u.para and o.oculta_em >= u.created_at))::int as sua_vez,
         (select count(*) from ads.whatsapp_envios e join ads.whatsapp_contatos c on c.numero = e.para where e.direcao = 'IN' and e.created_at > c.lido_em)::int as nao_lidas,
         (select coalesce(sum(c.lead_valor), 0) from ads.whatsapp_contatos c join ads.crm_etapas k on k.chave = c.etapa where k.tipo = 'ABERTO')::text as pipeline,
         (select coalesce(sum(c.lead_valor), 0) from ads.whatsapp_contatos c join ads.crm_etapas k on k.chave = c.etapa

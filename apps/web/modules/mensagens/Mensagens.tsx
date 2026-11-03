@@ -4,8 +4,8 @@ import {
   CONSENTIMENTO, contatoSchema, ETAPA_ENTRADA, FRIO, formatarNumero, MAX_TEXTO_WA, preencherModelo, temLink, type EtapaCrm,
 } from "@domus-ads/core/mensagens";
 import {
-  AlertCircle, ArrowLeft, BellRing, CalendarClock, Check, CheckCheck, Clock, Download, FileText, Globe, ImageIcon, Loader2, Mail, MessageCirclePlus, MessageSquareText,
-  Mic, Paperclip, Pencil, Play, RotateCcw, Search, Send, ShieldCheck, Sparkles, StickyNote, Trash2, UploadCloud, User, Video, WifiOff, X,
+  AlertCircle, Archive, ArrowLeft, BellRing, CalendarClock, Check, CheckCheck, Clock, Download, FileText, Globe, ImageIcon, Loader2, Mail, MessageCirclePlus, MessageSquareText,
+  Mic, Paperclip, Pencil, Play, RotateCcw, Search, Send, ShieldCheck, Sparkles, StickyNote, Trash2, Undo2, UploadCloud, User, Video, WifiOff, X,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -17,7 +17,7 @@ import { Dialog } from "../shell/Dialog";
 import { Popover } from "../shell/Popover";
 import { toast } from "../shell/toast";
 import {
-  apagarNota, cancelarAgendada, definirEtapa, enviarMensagem, marcarLida, reenviarMensagem, salvarContato, salvarNota,
+  apagarNota, cancelarAgendada, definirEtapa, ocultarConversa, reexibirConversa, enviarMensagem, marcarLida, reenviarMensagem, salvarContato, salvarNota,
 } from "./actions";
 import { corEtapa, EtapaSeletor, EtapasCtx, useEtapas } from "./etapas";
 import { AgendarDialog, EscolherModelo } from "./ModelosDialog";
@@ -74,8 +74,8 @@ export function formatar(t: string): ReactNode[] {
  * Manda texto, imagem e vídeo (da biblioteca ou do computador), modelos com variáveis e notas internas (não enviadas).
  * Nova conversa exige nome e número. Atualiza sozinha a cada poucos segundos.
  */
-export function Mensagens({ mensagens, contatos, modelos, biblioteca, avisos, online, inicial, etapas }: {
-  etapas: EtapaCrm[]; mensagens: Mensagem[]; contatos: Contato[]; modelos: Modelo[]; biblioteca: ItemBiblioteca[]; avisos: string | null; online: boolean; inicial: string | null;
+export function Mensagens({ mensagens, contatos, modelos, biblioteca, avisos, online, inicial, etapas, ocultas }: {
+  ocultas: Record<string, string>; etapas: EtapaCrm[]; mensagens: Mensagem[]; contatos: Contato[]; modelos: Modelo[]; biblioteca: ItemBiblioteca[]; avisos: string | null; online: boolean; inicial: string | null;
 }) {
   const router = useRouter();
   const conversas = useMemo(() => {
@@ -94,17 +94,19 @@ export function Mensagens({ mensagens, contatos, modelos, biblioteca, avisos, on
       const contato = nomes.get(numero) ?? null;
       const ultima = msgs.findLast((m) => m.direcao !== "NOTA") ?? msgs.at(-1) ?? null;
       const naoLidas = contato ? msgs.filter((m) => m.direcao === "IN" && m.created_at > contato.lido_em).length : 0;
-      return { numero, msgs, contato, ultima, naoLidas, agendadas: agendadas.get(numero) ?? [], quando: ultima?.created_at ?? contato?.lido_em ?? "" };
+      // removida da caixa: só volta se a pessoa mandar mensagem depois
+      const oculta = !!ocultas[numero] && !msgs.some((m) => m.direcao === "IN" && m.created_at > ocultas[numero]!);
+      return { numero, msgs, contato, ultima, naoLidas: oculta ? 0 : naoLidas, oculta, agendadas: agendadas.get(numero) ?? [], quando: ultima?.created_at ?? contato?.lido_em ?? "" };
     }).sort((a, b) => b.quando.localeCompare(a.quando));
-  }, [mensagens, contatos]);
+  }, [mensagens, contatos, ocultas]);
 
   const [busca, setBusca] = useState("");
   const [sel, setSel] = useState<string | null>(inicial); // ?c= do aviso de lead novo abre a conversa
   const [aberta, setAberta] = useState(!!inicial); // celular: lista ou conversa
-  const [filtro, setFiltro] = useState<"todas" | "naoLidas" | "leads">("todas");
+  const [filtro, setFiltro] = useState<"todas" | "naoLidas" | "leads" | "ocultas">("todas");
   const [contatoDlg, setContatoDlg] = useState<{ numero: string; nome: string; travado: boolean } | null>(null);
   const [ver, setVer] = useState<Mensagem | null>(null);
-  const atual = conversas.find((c) => c.numero === sel) ?? conversas[0] ?? null;
+  const atual = conversas.find((c) => c.numero === sel) ?? conversas.find((c) => !c.oculta) ?? null;
 
   const nome = (c: { numero: string; contato: Contato | null }) => (c.numero === avisos ? "Avisos da plataforma" : c.contato?.nome ?? formatarNumero(c.numero));
 
@@ -120,8 +122,10 @@ export function Mensagens({ mensagens, contatos, modelos, biblioteca, avisos, on
 
   const q = busca.trim().toLowerCase();
   const digitos = q.replace(/\D/g, "");
-  const leads = conversas.filter((c) => c.contato?.etapa);
-  const doFiltro = filtro === "todas" ? conversas : filtro === "leads" ? leads : conversas.filter((c) => c.naoLidas);
+  const visiveis = conversas.filter((c) => !c.oculta);
+  const removidas = conversas.filter((c) => c.oculta);
+  const leads = visiveis.filter((c) => c.contato?.etapa);
+  const doFiltro = filtro === "todas" ? visiveis : filtro === "leads" ? leads : filtro === "ocultas" ? removidas : visiveis.filter((c) => c.naoLidas);
   const lista = q ? doFiltro.filter((c) => nome(c).toLowerCase().includes(q) || (digitos && c.numero.includes(digitos)) || c.msgs.some((m) => m.texto.toLowerCase().includes(q))) : doFiltro;
   const totalNaoLidas = conversas.reduce((a, c) => a + c.naoLidas, 0);
   // conversas entram em cascata ao abrir a tela e ao trocar o filtro (não a cada atualização de 5 s)
@@ -139,7 +143,8 @@ export function Mensagens({ mensagens, contatos, modelos, biblioteca, avisos, on
         {!online && <div className="wa-alerta"><WifiOff size={14} aria-hidden /> WhatsApp ou worker offline: mensagens ficam na fila até voltar.</div>}
         <label className="wa-busca"><Search size={15} aria-hidden /><input placeholder="Pesquisar nome, número ou mensagem" value={busca} onChange={(e) => setBusca(e.target.value)} /></label>
         <div className="wa-filtros" role="tablist" aria-label="Filtrar conversas">
-          {([["todas", "Todas", conversas.length], ["naoLidas", "Não lidas", conversas.filter((c) => c.naoLidas).length], ["leads", "Leads", leads.length]] as const).map(([k, l, n]) => (
+          {([["todas", "Todas", visiveis.length], ["naoLidas", "Não lidas", visiveis.filter((c) => c.naoLidas).length], ["leads", "Leads", leads.length],
+            ...(removidas.length || filtro === "ocultas" ? [["ocultas", "Removidas", removidas.length]] as const : [])] as const).map(([k, l, n]) => (
             <button key={k} role="tab" aria-selected={filtro === k} className="chip" data-active={filtro === k} onClick={() => setFiltro(k)}>{l}{n ? <span className="wa-filtro-n">{n}</span> : null}</button>
           ))}
         </div>
@@ -169,6 +174,7 @@ export function Mensagens({ mensagens, contatos, modelos, biblioteca, avisos, on
               {q && doFiltro.length ? "Nada encontrado"
                 : filtro === "leads" ? <>Nenhum lead ainda.<br /><Link className="btn btn-ghost btn-xs" style={{ marginTop: 8 }} href="/crm/sites"><Globe aria-hidden /> Ligar um site</Link></>
                 : filtro === "naoLidas" ? "Tudo lido."
+                : filtro === "ocultas" ? "Nenhuma conversa removida."
                 : conversas.length ? "Nada encontrado" : "Nenhuma conversa ainda. Clique em Nova para começar."}
             </li>
           )}
@@ -177,7 +183,7 @@ export function Mensagens({ mensagens, contatos, modelos, biblioteca, avisos, on
 
       <section className="wa-chat">
         {atual ? (
-          <Conversa key={atual.numero} c={atual} titulo={nome(atual)} aviso={atual.numero === avisos} modelos={modelos} biblioteca={biblioteca}
+          <Conversa key={atual.numero} c={atual} removida={atual.oculta} titulo={nome(atual)} aviso={atual.numero === avisos} modelos={modelos} biblioteca={biblioteca}
             voltar={() => setAberta(false)} abrir={setVer}
             editarContato={() => setContatoDlg({ numero: atual.numero, nome: atual.contato?.nome ?? "", travado: true })} />
         ) : (
@@ -223,7 +229,8 @@ function Status({ m }: { m: Mensagem }) {
 
 // ───────────── Conversa aberta ─────────────
 
-function Conversa({ c, titulo, aviso, modelos, biblioteca, voltar, abrir, editarContato }: {
+function Conversa({ c, titulo, aviso, modelos, biblioteca, voltar, abrir, editarContato, removida }: {
+  removida: boolean;
   c: { numero: string; msgs: Mensagem[]; agendadas: Mensagem[]; contato: Contato | null }; titulo: string; aviso: boolean; modelos: Modelo[]; biblioteca: ItemBiblioteca[];
   voltar: () => void; abrir: (m: Mensagem) => void; editarContato: () => void;
 }) {
@@ -321,6 +328,13 @@ function Conversa({ c, titulo, aviso, modelos, biblioteca, voltar, abrir, editar
         {!aviso && c.contato && (
           <EtapaSeletor etapas={etapas} valor={c.contato.etapa} onChange={(k) => mudarEtapa(k ?? "")} nenhum="Não é lead" pendente={pend} />
         )}
+        {!aviso && (removida
+          ? <button className="btn btn-ghost btn-xs" onClick={() => start(async () => { const r = await reexibirConversa(c.numero); if (!r.ok) toast.err(r.error); else router.refresh(); })}><Undo2 aria-hidden /> Voltar para a caixa</button>
+          : <button className="btn btn-ghost btn-xs" title="Remover conversa da caixa" aria-label="Remover conversa" onClick={async () => {
+              if (!(await confirmar(`Remover a conversa com ${titulo} da caixa? O histórico fica guardado em “Removidas” e ela volta sozinha se a pessoa mandar mensagem.`))) return;
+              const r = await ocultarConversa(c.numero);
+              if (!r.ok) toast.err(r.error); else { toast.ok("Conversa removida"); router.refresh(); }
+            }}><Archive aria-hidden /></button>)}
         {!aviso && <button className="btn btn-ghost btn-xs" onClick={editarContato}>{salvo && c.contato?.salvo ? <><Pencil aria-hidden /> Editar contato</> : <><User aria-hidden /> Salvar contato</>}</button>}
       </header>
 
