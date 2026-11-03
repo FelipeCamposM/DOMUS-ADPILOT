@@ -14,7 +14,7 @@ import { revisarComposicao } from "./qa";
 import { gerarTrilha } from "./music";
 import { ttsPara } from "./tts";
 import { runEdicao } from "./editar";
-import { corrigir, encaixarNaFala, legendaRevisada, prepararVozPropria, promptVoz, SISTEMA_ROTEIRO_VOZ, type VozPropria } from "./voz-propria";
+import { corrigir, encaixarNaFala, encaixarRoteiro, legendaRevisada, prepararVozPropria, promptVoz, SISTEMA_ROTEIRO_VOZ, type VozPropria } from "./voz-propria";
 
 type Etapa = "SCRIPTING" | "VOICE" | "COMPOSING" | "RENDERING" | "MIXING" | "UPLOADING" | "READY";
 export interface Ctx { signal: AbortSignal; log: (m: string) => Promise<void>; progress: (p: number) => Promise<void> }
@@ -100,9 +100,10 @@ export async function runVideo(payload: VideoPayload, c: Ctx) {
     const vozes: { file: string; start: number }[] = [];
     const arquivoVoz = (i: number) => [join(pasta, `voz-${i}.mp3`), join(pasta, `voz-${i}.wav`)].find(existsSync);
     if (propria) {
-      // o áudio não muda; texto editado na revisão só mexe na legenda
+      // regravou lendo o roteiro (modo voz): cenas reencaixadas na fala nova. Senão o áudio não muda e o texto editado só mexe na legenda
+      if (modo === "voz") await etapa("VOICE", "Transcrevendo a sua gravação…");
       const v = await vozPropria();
-      sb = legendaRevisada(sb);
+      sb = modo === "voz" ? encaixarRoteiro(sb, v) : legendaRevisada(sb);
       vozes.push({ file: v.arquivo, start: 0 });
     } else if (modo !== "adjust" && brief.voz !== "none") {
       await etapa("VOICE", brief.voz.startsWith("el:") ? "Gravando a narração (ElevenLabs)…" : "Gravando a narração…");
@@ -164,7 +165,7 @@ export async function runVideo(payload: VideoPayload, c: Ctx) {
     const ajuste = modo === "adjust" || (modo === "voz" && !!p.composition && !p.composition.includes("assets/cenas.js"));
     const porIA = !modelo || ajuste;
     const pedido = modo === "voz"
-      ? "A narração foi regravada com outra voz e os tempos das cenas mudaram (storyboard abaixo). Ajuste só os tempos das animações para casar com as cenas novas; não mude visual, textos, cores nem estilo."
+      ? "A narração foi regravada (outra voz ou a do próprio cliente) e os tempos das cenas mudaram (storyboard abaixo). Ajuste só os tempos das animações para casar com as cenas novas; não mude visual, textos, cores nem estilo."
       : payload.instruction ?? "";
     await etapa("COMPOSING", ajuste ? "Ajustando a animação…" : modelo ? "Montando as cenas…" : "Criando a animação (Motion Kit + GSAP)…");
     mkdirSync(join(pasta, "assets"), { recursive: true });

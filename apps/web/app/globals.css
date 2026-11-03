@@ -2116,3 +2116,9 @@ button.mdl-var:hover { background: rgb(var(--c-brand) / 0.22); border-color: rgb
 @media (max-width: 980px) { .vg-grade { grid-template-columns: 1fr; } }
 @media (max-width: 560px) { .vg-kpi[data-hero="true"] { grid-column: span 1; } .vg-quando { display: none; } }
 
+
+/* Studio · roteiro para ler enquanto grava a própria voz */
+.roteiro-ler { list-style: none; margin: 0; padding: 12px 14px; max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px;
+  border-radius: var(--radius-md); border: 1px solid rgb(var(--c-border)); background: rgb(var(--c-bg-inset)); font-size: 16px; line-height: 1.55; }
+.roteiro-ler li { display: flex; flex-direction: column; gap: 2px; }
+.roteiro-ler small { font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: rgb(var(--c-glow)); }

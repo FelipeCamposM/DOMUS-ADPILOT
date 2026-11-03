@@ -22,6 +22,8 @@ export async function prepararVozPropria(workspaceId: string, brief: Brief, past
     select storage, r2_key, arquivado, mime from ads.creatives where id = ${brief.audioProprio} and workspace_id = ${workspaceId} and type = 'VOICE' and status = 'READY' and r2_key is not null`;
   if (!a) throw new Error("O áudio com a sua voz não existe mais. Grave ou envie de novo.");
   const fonte = join(pasta, "voz-fonte");
+  // gravação nova (regravou lendo o roteiro): o áudio baixado antes não serve mais
+  if (existsSync(cache) && (JSON.parse(readFileSync(cache, "utf8")) as { audio: string }).audio !== brief.audioProprio) rmSync(fonte, { force: true });
   if (!existsSync(fonte)) {
     await baixarArquivo(a, `${fonte}.parcial`);
     renameSync(`${fonte}.parcial`, fonte);
@@ -116,6 +118,32 @@ export function encaixarNaFala(sb: Storyboard, v: VozPropria): Storyboard {
     };
   });
   return { ...sb, scenes, duration: total, sfx: sb.sfx.filter((e) => e.time < total) };
+}
+
+const norm = (w: string | undefined) => (w ?? "").toLowerCase().normalize("NFD").replace(/[^a-z0-9]/g, "");
+
+/**
+ * Regravação lendo o roteiro de um vídeo pronto: cada cena começa na fatia da fala proporcional ao tamanho do texto dela,
+ * ajustada para a 1ª palavra da cena se ela aparecer por perto. Depois o encaixe normal (tempos, legenda = fala real).
+ */
+// ponytail: proporcional + 1ª palavra (janela ±8); improviso grande desalinha as cenas. Alinhamento por texto se precisar.
+export function encaixarRoteiro(sb: Storyboard, v: VozPropria): Storyboard {
+  const ps = v.palavras.filter((p) => p.w);
+  const peso = sb.scenes.map((s) => Math.max(3, (s.narration ?? "").split(/\s+/).filter(Boolean).length));
+  const soma = peso.reduce((a, b) => a + b, 0);
+  let acc = 0;
+  const scenes = sb.scenes.map((s, i) => {
+    const est = Math.min(ps.length - 1, Math.round((acc / soma) * ps.length));
+    acc += peso[i]!;
+    const primeira = norm(s.narration?.trim().split(/\s+/)[0]);
+    let idx = est;
+    if (primeira) for (let d = 0; d <= 8; d++) {
+      if (norm(ps[est + d]?.w) === primeira) { idx = est + d; break; }
+      if (norm(ps[est - d]?.w) === primeira) { idx = est - d; break; }
+    }
+    return { ...s, start: i === 0 ? 0 : ps[idx]?.s ?? 0 };
+  });
+  return encaixarNaFala({ ...sb, scenes }, v);
 }
 
 /** Texto revisado pelo cliente: o áudio não muda, a legenda acompanha a edição (ver legendaEditada). */

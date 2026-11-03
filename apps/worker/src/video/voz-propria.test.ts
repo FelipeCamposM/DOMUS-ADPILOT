@@ -1,6 +1,6 @@
 import { legendaEditada, type Storyboard } from "@domus-ads/core";
 import { describe, expect, it } from "vitest";
-import { encaixarNaFala } from "./voz-propria";
+import { encaixarNaFala, encaixarRoteiro } from "./voz-propria";
 
 const palavras = "Olá eu sou o Felipe e hoje vou mostrar como o DOMUS cria vídeos sozinho teste grátis".split(" ")
   .map((w, i) => ({ w, s: i * 0.5, e: i * 0.5 + 0.4 }));
@@ -17,6 +17,13 @@ describe("encaixarNaFala", () => {
     expect(r.scenes.length).toBe(3); // "c" (0,5 s) some
     expect(r.scenes.map((s) => s.narration).join(" ")).toBe(palavras.map((p) => p.w).join(" "));
     expect(r.sfx).toEqual([]);
+  });
+  it("regravação lendo o roteiro: cada cena começa na 1ª palavra dela", () => {
+    const n = (start: number, narration: string) => ({ ...cena(start, start + 3, "x"), narration });
+    const sb: Storyboard = { title: "t", duration: 30, fps: 30, scenes: [n(0, "Olá eu sou o Felipe e hoje vou"), n(10, "mostrar como o DOMUS cria vídeos"), n(20, "sozinho teste grátis")], sfx: [], music: null };
+    const r = encaixarRoteiro(sb, { arquivo: "", dur: 8.5, palavras });
+    expect(r.scenes.map((s) => s.narration?.split(" ")[0])).toEqual(["Olá", "mostrar", "sozinho"]);
+    expect(r.scenes[1]!.start).toBe(3.92); // "mostrar" (4,0 s) − 0,08
   });
   it("legenda editada na revisão", () => {
     const w = [{ w: "domus", start: 1 }, { w: "cria", start: 1.5 }];

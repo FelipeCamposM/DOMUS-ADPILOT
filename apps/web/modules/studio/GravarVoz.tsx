@@ -15,7 +15,7 @@ const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).
  * Narração com a voz do cliente: grava no navegador (com medidor de nível) ou envia um arquivo de áudio.
  * O arquivo sobe na hora (criativo VOICE); o worker transcreve, corta as pausas e escreve o roteiro em cima da fala.
  */
-export function GravarVoz({ valor, onChange }: { valor: VozGravada | null; onChange: (v: VozGravada | null) => void }) {
+export function GravarVoz({ valor, onChange, dica = "o roteiro sai da sua fala" }: { valor: VozGravada | null; onChange: (v: VozGravada | null) => void; dica?: string }) {
   const input = useRef<HTMLInputElement>(null);
   const rec = useRef<{ mr: MediaRecorder; stream: MediaStream; ctx: AudioContext; raf: number; t0: number } | null>(null);
   const [gravando, setGravando] = useState(false);
@@ -122,7 +122,7 @@ export function GravarVoz({ valor, onChange }: { valor: VozGravada | null; onCha
       <audio controls src={valor.url} style={{ width: "100%", height: 36 }} />
       <div className="cluster" style={{ gap: 8, justifyContent: "space-between" }}>
         <span className="subtle caption">
-          {valor.pct < 100 ? <><Loader2 size={12} className="animate-spin" aria-hidden /> Enviando… {valor.pct}%</> : `Pronto${valor.dur ? ` · ${mmss(valor.dur)}` : ""} · o roteiro sai da sua fala`}
+          {valor.pct < 100 ? <><Loader2 size={12} className="animate-spin" aria-hidden /> Enviando… {valor.pct}%</> : `Pronto${valor.dur ? ` · ${mmss(valor.dur)}` : ""} · ${dica}`}
         </span>
         <button type="button" className="btn btn-ghost btn-xs" onClick={() => { URL.revokeObjectURL(valor.url); onChange(null); }} disabled={valor.pct < 100}>
           <RotateCcw aria-hidden /> Gravar ou enviar de novo
