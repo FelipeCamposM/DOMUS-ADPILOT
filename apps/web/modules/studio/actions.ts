@@ -1,6 +1,6 @@
 "use server";
 
-import { anexosSchema, apagarArquivo, audit, briefEdicaoSchema, briefImagemSchema, briefSchema, db, enqueueJob, MAX_FONTE_S, MUSICA_TAGS, paletaSchema, planoEdicaoSchema, planoImagemSchema, reescrever, storyboardSchema, violacoes, VOZ_PROPRIA, type Json } from "@domus-ads/core";
+import { anexosSchema, apagarArquivo, audit, briefEdicaoSchema, briefImagemSchema, briefSchema, db, enqueueJob, MAX_FONTE_S, MUSICA_TAGS, paletaSchema, planoEdicaoSchema, planoImagemSchema, reescrever, storyboardSchema, violacoes, VOZ_FALAS, VOZ_PROPRIA, type Json } from "@domus-ads/core";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { run } from "@/lib/action";
@@ -187,11 +187,11 @@ export async function trocarVoz(projectId: string, voz: string, vozNome: string)
     const p = await doWorkspace(ctx, projectId);
     if (p.ocupado) throw new Error("Este vídeo já está sendo gerado");
     const v = z.object({ voz: briefSchema.shape.voz, vozNome: briefSchema.shape.vozNome }).parse({ voz, vozNome });
-    if (v.voz === "none" || v.voz === VOZ_PROPRIA) throw new Error("Escolha uma voz");
+    if (v.voz === "none" || v.voz === VOZ_PROPRIA || v.voz === VOZ_FALAS) throw new Error("Escolha uma voz");
     const [row] = await db()<{ composition: string | null; voz: string }[]>`select composition, brief->>'voz' as voz from ads.video_projects where id = ${p.id} and kind = 'video'`;
     if (!row?.composition) throw new Error("Gere o vídeo antes de trocar a voz");
     await workerOnline();
-    await db()`update ads.video_projects set brief = brief || ${db().json({ ...v, audioProprio: null })} where id = ${p.id}`;
+    await db()`update ads.video_projects set brief = brief || ${db().json({ ...v, audioProprio: null, falas: [] })} where id = ${p.id}`;
     await enfileirar(ctx, p.id, { mode: "voz" });
     await db()`update ads.calendario_itens set status = 'GERANDO', aprovacao = null, updated_at = now() where project_id = ${p.id} and status = 'REVISAO'`;
     await audit(db(), { workspaceId: ctx.workspace.id, actor: ctx.actor, action: "Trocar voz do vídeo", entityType: "video_project", entityId: p.id, entityName: p.title, after: v });
@@ -212,11 +212,38 @@ export async function narrarComMinhaVoz(projectId: string, audioId: string) {
     const [a] = await db()`select 1 from ads.creatives where id = ${audio} and workspace_id = ${ctx.workspace.id} and type = 'VOICE' and status = 'READY'`;
     if (!a) throw new Error("A gravação da sua voz não foi encontrada. Grave ou envie de novo.");
     await workerOnline();
-    const v = { voz: VOZ_PROPRIA, vozNome: "", audioProprio: audio };
+    const v = { voz: VOZ_PROPRIA, vozNome: "", audioProprio: audio, falas: [] };
     await db()`update ads.video_projects set brief = brief || ${db().json(v)} where id = ${p.id}`;
     await enfileirar(ctx, p.id, { mode: "voz" });
     await db()`update ads.calendario_itens set status = 'GERANDO', aprovacao = null, updated_at = now() where project_id = ${p.id} and status = 'REVISAO'`;
     await audit(db(), { workspaceId: ctx.workspace.id, actor: ctx.actor, action: "Narrar vídeo com a própria voz", entityType: "video_project", entityId: p.id, entityName: p.title, after: v });
+    revalidatePath(`/studio/${p.id}`);
+  });
+}
+
+/** Narração gravada fala por fala (uma por cena, lendo o roteiro); o worker trata o som de cada uma e junta. */
+export async function narrarComMinhasFalas(projectId: string, falas: unknown) {
+  return run(async () => {
+    const ctx = await requireCtx();
+    requireRole(ctx, "editor");
+    const p = await doWorkspace(ctx, projectId);
+    if (p.ocupado) throw new Error("Este vídeo já está sendo gerado");
+    const lista = briefSchema.shape.falas.parse(falas);
+    const [row] = await db()<{ composition: string | null; storyboard: unknown }[]>`select composition, storyboard from ads.video_projects where id = ${p.id} and kind = 'video'`;
+    if (!row?.composition || !row.storyboard) throw new Error("Gere o vídeo antes de trocar a voz");
+    const sb = storyboardSchema.parse(row.storyboard);
+    if (lista.length !== sb.scenes.length) throw new Error("O roteiro mudou. Recarregue a página.");
+    const falta = sb.scenes.findIndex((s, i) => s.narration?.trim() && !lista[i]);
+    if (falta >= 0) throw new Error(`Falta gravar a fala da cena ${falta + 1}`);
+    const ids = lista.filter((x): x is string => !!x);
+    const [{ n }] = await db()<{ n: number }[]>`select count(*)::int as n from ads.creatives where id = any(${ids}) and workspace_id = ${ctx.workspace.id} and type = 'VOICE' and status = 'READY'`;
+    if (n !== new Set(ids).size) throw new Error("Alguma fala não foi encontrada. Grave de novo.");
+    await workerOnline();
+    const v = { voz: VOZ_FALAS, vozNome: "", audioProprio: null, falas: lista };
+    await db()`update ads.video_projects set brief = brief || ${db().json(v)} where id = ${p.id}`;
+    await enfileirar(ctx, p.id, { mode: "voz" });
+    await db()`update ads.calendario_itens set status = 'GERANDO', aprovacao = null, updated_at = now() where project_id = ${p.id} and status = 'REVISAO'`;
+    await audit(db(), { workspaceId: ctx.workspace.id, actor: ctx.actor, action: "Narrar vídeo com falas gravadas", entityType: "video_project", entityId: p.id, entityName: p.title, after: { falas: ids.length } });
     revalidatePath(`/studio/${p.id}`);
   });
 }
@@ -228,6 +255,8 @@ export async function gerarDeNovo(projectId: string) {
     const p = await doWorkspace(ctx, projectId);
     if (p.ocupado) throw new Error("Este vídeo já está sendo gerado");
     await workerOnline();
+    // roteiro novo não casa com falas gravadas cena a cena: volta para a voz padrão
+    await db()`update ads.video_projects set brief = brief || '{"voz":"pf_dora","vozNome":"","falas":[]}'::jsonb where id = ${p.id} and brief->>'voz' = ${VOZ_FALAS}`;
     await enfileirar(ctx, p.id, { mode: "full" });
     revalidatePath(`/studio/${p.id}`);
   });

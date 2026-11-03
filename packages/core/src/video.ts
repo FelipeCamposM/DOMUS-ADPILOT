@@ -11,6 +11,8 @@ export const ehVozLocal = (v: string) => v in VOZES;
 export const VOZES = { pf_dora: "Dora (feminina)", pm_alex: "Alex (masculina)", pm_santa: "Santa (masculina, grave)", none: "Sem narração" } as const;
 /** Narração com a voz do próprio cliente (áudio gravado na plataforma ou enviado): até 2 min (limite do storyboard). */
 export const VOZ_PROPRIA = "propria";
+/** Narração gravada pelo cliente cena a cena (falas[i] = áudio da cena i). */
+export const VOZ_FALAS = "falas";
 export const MAX_VOZ_S = 120;
 export const MAX_VOZ_MB = 50;
 
@@ -65,9 +67,10 @@ export const briefSchema = z.object({
   cores: z.string().trim().max(200).default(""),
   // voz local (Kokoro) ou do ElevenLabs ("el:<voice_id>", com o nome em vozNome)
   // "propria" = o áudio que o cliente gravou/enviou (audioProprio) é a narração; o roteiro nasce da transcrição dele
-  voz: z.string().refine((v) => v in VOZES || v === VOZ_PROPRIA || /^el:[A-Za-z0-9]{8,40}$/.test(v), "Voz inválida").default("pf_dora"),
+  voz: z.string().refine((v) => v in VOZES || v === VOZ_PROPRIA || v === VOZ_FALAS || /^el:[A-Za-z0-9]{8,40}$/.test(v), "Voz inválida").default("pf_dora"),
   vozNome: z.string().trim().max(80).default(""),
   audioProprio: z.string().uuid("Áudio inválido").nullable().default(null),
+  falas: z.array(z.string().uuid("Áudio inválido").nullable()).max(40).default([]),
   cortarPausas: z.coerce.boolean().default(true),
   // auto = a IA escolhe o clima; sem música licenciada na biblioteca, a trilha é composta (original) no worker
   musica: z.enum(["none", "auto", ...MUSICA_TAGS]).default("auto"),
@@ -78,7 +81,8 @@ export const briefSchema = z.object({
   // estilo salvo (modo Livre): a IA repete a linguagem visual de um vídeo aprovado
   estiloSalvo: z.string().uuid("Estilo inválido").nullable().default(null),
 }).refine((b) => b.voz === VOZ_PROPRIA || temObjetivo(b), MSG_OBJETIVO) // a própria fala já diz do que se trata
-  .refine((b) => (b.voz === VOZ_PROPRIA) === !!b.audioProprio, { message: "Grave ou envie o áudio com a sua voz", path: ["audioProprio"] });
+  .refine((b) => (b.voz === VOZ_PROPRIA) === !!b.audioProprio, { message: "Grave ou envie o áudio com a sua voz", path: ["audioProprio"] })
+  .refine((b) => (b.voz === VOZ_FALAS) === b.falas.some(Boolean), { message: "Grave as falas das cenas", path: ["falas"] });
 export type Brief = z.infer<typeof briefSchema>;
 
 /** Efeitos sonoros e climas de música: o que pedir ao ElevenLabs quando a biblioteca não tem (o gerado fica salvo). */

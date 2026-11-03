@@ -1,4 +1,4 @@
-import { apagarArquivo, briefSchema, VOZ_PROPRIA, db, FORMATOS, guardarArquivo, PAPEIS_COR, paletaSchema, r2Key, retimeScenes, tempoLeitura, type Brief, type Json, type Storyboard } from "@domus-ads/core";
+import { apagarArquivo, briefSchema, VOZ_FALAS, VOZ_PROPRIA, db, FORMATOS, guardarArquivo, PAPEIS_COR, paletaSchema, r2Key, retimeScenes, tempoLeitura, type Brief, type Json, type Storyboard } from "@domus-ads/core";
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { DATA_DIR } from "../env";
@@ -14,7 +14,7 @@ import { revisarComposicao } from "./qa";
 import { gerarTrilha } from "./music";
 import { ttsPara } from "./tts";
 import { runEdicao } from "./editar";
-import { corrigir, encaixarNaFala, encaixarRoteiro, legendaRevisada, prepararVozPropria, promptVoz, SISTEMA_ROTEIRO_VOZ, type VozPropria } from "./voz-propria";
+import { corrigir, encaixarNaFala, encaixarRoteiro, legendaRevisada, prepararFala, prepararVozPropria, promptVoz, SISTEMA_ROTEIRO_VOZ, type VozPropria } from "./voz-propria";
 
 type Etapa = "SCRIPTING" | "VOICE" | "COMPOSING" | "RENDERING" | "MIXING" | "UPLOADING" | "READY";
 export interface Ctx { signal: AbortSignal; log: (m: string) => Promise<void>; progress: (p: number) => Promise<void> }
@@ -106,9 +106,11 @@ export async function runVideo(payload: VideoPayload, c: Ctx) {
       sb = modo === "voz" ? encaixarRoteiro(sb, v) : legendaRevisada(sb);
       vozes.push({ file: v.arquivo, start: 0 });
     } else if (modo !== "adjust" && brief.voz !== "none") {
-      await etapa("VOICE", brief.voz.startsWith("el:") ? "Gravando a narração (ElevenLabs)…" : "Gravando a narração…");
+      // falas gravadas pelo cliente cena a cena entram no lugar do TTS (som tratado e nivelado)
+      const deFalas = brief.voz === VOZ_FALAS;
+      await etapa("VOICE", deFalas ? "Juntando as suas falas e ajustando o som…" : brief.voz.startsWith("el:") ? "Gravando a narração (ElevenLabs)…" : "Gravando a narração…");
       for (const i of sb.scenes.keys()) for (const f of [`voz-${i}.mp3`, `voz-${i}.wav`]) rmSync(join(pasta, f), { force: true });
-      const tts = ttsPara(brief.voz, c.log);
+      const tts = deFalas ? null : ttsPara(brief.voz, c.log);
       const minimos: number[] = [];
       const falas: (number | undefined)[] = [];
       const palavras: ({ w: string; start: number }[] | undefined)[] = [];
@@ -116,7 +118,10 @@ export async function runVideo(payload: VideoPayload, c: Ctx) {
       try {
         for (const [i, s] of sb.scenes.entries()) {
           if (!s.narration?.trim()) { minimos.push(tempoLeitura(s)); palavras.push(undefined); falas.push(undefined); continue; }
-          const v = await tts.generateVoice({ text: s.narration, voice: brief.voz, out: join(pasta, `voz-${i}.wav`) });
+          const fala = brief.falas[i];
+          if (deFalas && !fala) throw new Error(`Falta gravar a fala da cena ${i + 1}`);
+          const v = tts ? await tts.generateVoice({ text: s.narration, voice: brief.voz, out: join(pasta, `voz-${i}.wav`) })
+            : { seconds: await prepararFala(p.workspace_id, fala!, join(pasta, `voz-${i}.wav`), pasta, c.signal), words: undefined, credits: 0 };
           minimos.push(Math.max(v.seconds + 0.6, tempoLeitura(s))); // a fala com respiro, ou o tempo de ler, o que for maior
           falas.push(+v.seconds.toFixed(2));
           palavras.push(v.words);
