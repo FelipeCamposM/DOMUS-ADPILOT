@@ -23,4 +23,3 @@ export * from "./calendario";
 export * from "./sistemas";
 export * from "./mensagens";
 export * from "./contatos";
-export * from "./prospeccao";
