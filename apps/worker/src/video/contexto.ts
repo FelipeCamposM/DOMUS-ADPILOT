@@ -1,6 +1,7 @@
 import { anexosSchema, brandSchema, db, guardarArquivo, lerArquivo, r2Key, type Brand, type Json } from "@domus-ads/core";
 import { mkdir, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { blocoConhecimento } from "../ai/marca-conhecimento";
 import { buscarSeguro, garimpar, lerReferencia, linksDoTexto, paletaDeImagem, papeis, privado, type Referencia } from "./referencias";
 import { rodar, FFPROBE } from "./tools";
 
@@ -19,8 +20,8 @@ const MAX_IMAGENS_IA = 12; // imagens que a IA abre e olha (anexos primeiro, dep
 
 export async function contextoCriativo(projectId: string, workspaceId: string, pasta: string, log: (m: string) => Promise<void>): Promise<ContextoCriativo> {
   const sql = db();
-  const [w] = await sql<{ name: string; brand: unknown }[]>`
-    select b.nome as name, b.brand from ads.video_projects p join ads.brands b on b.id = p.brand_id where p.id = ${projectId} and b.workspace_id = ${workspaceId}`;
+  const [w] = await sql<{ name: string; brand: unknown; conhecimento: string }[]>`
+    select b.nome as name, b.brand, b.conhecimento from ads.video_projects p join ads.brands b on b.id = p.brand_id where p.id = ${projectId} and b.workspace_id = ${workspaceId}`;
   const marca = brandSchema.parse(w?.brand ?? {});
   const [p] = await sql<{ assets: unknown; links: unknown; orientacao: string | null; identidade: string | null; storyboard: string | null }[]>`
     select assets, links, brief->>'orientacao' as orientacao, brief->>'identidade' as identidade, storyboard::text as storyboard from ads.video_projects where id = ${projectId}`;
@@ -108,6 +109,7 @@ Se ele pedir para usar fotos ou cores de um site, perfil ou imagem, use o que es
 ${p.orientacao.trim()}
 </orientacoes_do_cliente>` : "",
     b.length ? `<identidade_visual marca="${w?.name ?? ""}">\n${b.join("\n")}\n</identidade_visual>` : "",
+    p?.identidade !== "referencias" ? blocoConhecimento(w?.name ?? null, w?.conhecimento) : "",
     dasReferencias ? `<identidade_visual origem="referencias">
 Esta peça NÃO usa uma marca salva: é de outra marca. Monte a identidade a partir das
 referências (site, Instagram, imagens enviadas) e das orientações.${extraida.length ? `

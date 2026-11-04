@@ -1,6 +1,6 @@
 "use server";
 
-import { audit, brandSchema, db, type Json } from "@domus-ads/core";
+import { audit, brandSchema, db, enqueueJob, type Json } from "@domus-ads/core";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { run } from "@/lib/action";
@@ -42,6 +42,36 @@ export async function salvarMarca(id: string, input: { nome: unknown; brand: unk
     const [antes] = await sql<{ nome: string; brand: unknown }[]>`select nome, brand from ads.brands where id = ${mid}`;
     await sql`update ads.brands set nome = ${n}, brand = ${sql.json(brand as unknown as Json)}, updated_at = now() where id = ${mid}`;
     await audit(sql, { workspaceId: ctx.workspace.id, actor: ctx.actor, action: "Alterar marca", entityType: "brand", entityId: mid, entityName: n, before: (antes ?? null) as Json, after: { nome: n, brand } as unknown as Json });
+    revalidatePath("/marcas");
+  });
+}
+
+const siteSchema = z.string().trim().max(500).refine((u) => /^https?:\/\/[^\s.]+\.[^\s]+$/i.test(u), "Site inválido: use o endereço completo, ex.: https://digitaldomus.com.br");
+
+/** Base de conhecimento: o worker vasculha o site e a IA organiza os fatos da marca (roda no PC do worker). */
+export async function gerarConhecimento(id: string, url: string) {
+  return run(async () => {
+    const ctx = await requireCtx();
+    requireRole(ctx, "editor");
+    const mid = (await marcaDoWorkspace(ctx.workspace.id, id))!;
+    const site = siteSchema.parse(url);
+    const sql = db();
+    const [rodando] = await sql`select 1 from ads.jobs where type = 'MARCA_CONHECIMENTO' and status in ('PENDING','RUNNING') and payload->>'brandId' = ${mid}`;
+    if (rodando) throw new Error("A base desta marca já está sendo gerada");
+    await enqueueJob(sql, { workspaceId: ctx.workspace.id, type: "MARCA_CONHECIMENTO", payload: { brandId: mid, url: site }, createdBy: ctx.user.id, maxAttempts: 1 });
+    await audit(sql, { workspaceId: ctx.workspace.id, actor: ctx.actor, action: "Gerar base de conhecimento", entityType: "brand", entityId: mid, after: { site } });
+    revalidatePath("/marcas");
+  });
+}
+
+/** Texto da base revisado à mão pelo cliente. */
+export async function salvarConhecimento(id: string, texto: string) {
+  return run(async () => {
+    const ctx = await requireCtx();
+    requireRole(ctx, "editor");
+    const mid = (await marcaDoWorkspace(ctx.workspace.id, id))!;
+    const t = z.string().trim().max(30_000, "Base muito longa (até 30 mil caracteres)").parse(texto);
+    await db()`update ads.brands set conhecimento = ${t}, conhecimento_em = now(), updated_at = now() where id = ${mid}`;
     revalidatePath("/marcas");
   });
 }

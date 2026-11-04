@@ -10,6 +10,7 @@ import { runImagem, type ImagemPayload } from "./video/imagem";
 import { runVideo, type VideoPayload } from "./video/pipeline";
 import { gerarAudio, type PedidoAudio } from "./video/audio-ia";
 import { runCampanhaIA, type CampanhaPayload } from "./ai/campanha";
+import { runConhecimento, type ConhecimentoPayload } from "./ai/marca-conhecimento";
 import { inicializacaoAtiva, configurarInicializacao } from "./startup";
 import { arquivarExcesso, restaurar } from "./video/arquivo";
 import { gerarLegenda, type LegendaPayload } from "./instagram/legenda";
@@ -22,7 +23,7 @@ import { acaoWhatsapp, avisar, enviarDaFila, estadoWhatsapp, gravarQr, ouvirWhat
  * FOR UPDATE SKIP LOCKED e grava progresso/resultado no banco; a web só lê. A web nunca manda comando de shell:
  * cada tipo de job tem um handler fixo aqui (allowlist).
  */
-const TIPOS: readonly JobType[] = ["SYNC_META", "SYNC_GOOGLE", "AI_CHAT", "AI_LOGIN", "AI_DETECT", "WORKER_STARTUP", "GENERATE_VIDEO", "GENERATE_IMAGE", "AI_CAMPAIGN", "RESTORE_MEDIA", "SYNC_INSTAGRAM", "PUBLISH_INSTAGRAM", "AI_INSTAGRAM_CAPTION", "AI_USAGE", "WHATSAPP", "AI_CALENDARIO", "GENERATE_AUDIO", "AI_SISTEMA", "WHATSAPP_ENVIAR"];
+const TIPOS: readonly JobType[] = ["SYNC_META", "SYNC_GOOGLE", "AI_CHAT", "AI_LOGIN", "AI_DETECT", "WORKER_STARTUP", "GENERATE_VIDEO", "GENERATE_IMAGE", "AI_CAMPAIGN", "RESTORE_MEDIA", "SYNC_INSTAGRAM", "PUBLISH_INSTAGRAM", "AI_INSTAGRAM_CAPTION", "AI_USAGE", "WHATSAPP", "AI_CALENDARIO", "GENERATE_AUDIO", "AI_SISTEMA", "WHATSAPP_ENVIAR", "MARCA_CONHECIMENTO"];
 const sql = db();
 const ativos = new Map<string, AbortController>();
 let parando = false;
@@ -65,6 +66,9 @@ async function executar(job: Job) {
       result = await publicarInstagram(String(job.payload.postId), { signal: ctl.signal, log });
     } else if (job.type === "AI_INSTAGRAM_CAPTION") {
       result = await gerarLegenda(job.payload as unknown as LegendaPayload, { signal: ctl.signal, log });
+    } else if (job.type === "MARCA_CONHECIMENTO") {
+      // Marcas → Base de conhecimento: vasculha o site e a IA organiza os fatos da marca
+      result = await runConhecimento(job.payload as unknown as ConhecimentoPayload, { signal: ctl.signal, log, progress: async (p) => { await sql`update ads.jobs set progress = ${p} where id = ${job.id}`; } });
     } else if (job.type === "AI_CALENDARIO") {
       result = await gerarCalendario(job.payload as unknown as CalendarioPayload, { signal: ctl.signal, log });
     } else if (job.type === "GENERATE_AUDIO") {
@@ -179,7 +183,7 @@ await migrate(process.env.DIRECT_URL, (m) => console.log(m)); // banco sempre em
 await sql`update ads.ai_logins set status = 'FAILED', error = 'Worker reiniciado durante o login', updated_at = now()
            where status in ('STARTING','AWAITING_USER','CODE_SUBMITTED')`;
 await sql`update ads.jobs set status = 'FAILED', error = 'Worker reiniciado', finished_at = now()
-           where status = 'RUNNING' and type in ('AI_LOGIN','WORKER_STARTUP','GENERATE_VIDEO','GENERATE_IMAGE','GENERATE_AUDIO','PUBLISH_INSTAGRAM','AI_INSTAGRAM_CAPTION','WHATSAPP','AI_CALENDARIO','AI_SISTEMA')`;
+           where status = 'RUNNING' and type in ('AI_LOGIN','WORKER_STARTUP','GENERATE_VIDEO','GENERATE_IMAGE','GENERATE_AUDIO','PUBLISH_INSTAGRAM','AI_INSTAGRAM_CAPTION','WHATSAPP','AI_CALENDARIO','AI_SISTEMA','MARCA_CONHECIMENTO')`;
 await sql`update ads.sistema_pedidos set status = 'ERRO', erro = 'Worker reiniciado durante a resposta.', instrucoes = null, prompt = null, updated_at = now() where status = 'RODANDO'`;
 await sql`update ads.calendarios set status = 'ERRO', erro = 'Worker reiniciado durante o planejamento. Gere de novo.' where status = 'GERANDO'`;
 await sql`update ads.calendario_itens set refazendo = null where refazendo is not null`;

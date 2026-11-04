@@ -1,5 +1,6 @@
 import { ESTILOS, FORMATOS, MUSICA_TAGS, SFX_CATEGORIAS, storyboardSchema, TIPOS_CENA, VOZ_FALAS, VOZ_PROPRIA, VOZES, type Brief, type Storyboard } from "@domus-ads/core";
 import { KIT_DOC } from "./kit/motion-kit";
+import { SKILL_COPY } from "../ai/copy";
 
 /** Animações que o storyboard pode pedir (o Claude implementa cada uma em GSAP na composição). */
 export const ANIMACOES = ["fade-up", "scale", "slide", "split-words", "mask-reveal", "counter", "glitch", "cta"] as const;
@@ -39,7 +40,9 @@ Regras:
 - animation: uma de ${ANIMACOES.join(", ")}.
 - sfx: só nos momentos de transição/impacto (3 a 8 no total); effect: um de ${SFX_CATEGORIAS.join(", ")}. Se o briefing pedir sem efeitos, "sfx": [].
 - music: se o briefing pedir uma tag, use-a; se for "auto", escolha a que combina com o produto e o tom; se for "none", "music": null. Tags: ${MUSICA_TAGS.join(", ")}.
-- Use só fatos do briefing. Não invente preço, prazo, estatística ou promessa que não esteja nele.`;
+- Use só fatos do briefing e da <base_de_conhecimento>. Não invente preço, prazo, estatística ou promessa que não esteja neles.
+
+${SKILL_COPY}`;
 
 export function promptRoteiro(b: Brief, contexto = ""): string {
   return `${contexto ? `${contexto}\n\n` : ""}<briefing>

@@ -1,5 +1,5 @@
 import { can, requireCtx } from "@/lib/ctx";
-import { marcasDoWorkspace } from "@/lib/marcas";
+import { conhecimentoDaMarca, marcasDoWorkspace } from "@/lib/marcas";
 import { Marcas } from "@/modules/marcas/Marcas";
 
 export const metadata = { title: "Marcas" };
@@ -8,6 +8,8 @@ export default async function MarcasPage({ searchParams }: { searchParams: Promi
   const ctx = await requireCtx();
   const { m } = await searchParams;
   const marcas = await marcasDoWorkspace(ctx.workspace.id);
+  const atual = marcas.find((x) => x.id === m) ?? marcas[0] ?? null;
+  const kb = atual ? await conhecimentoDaMarca(ctx.workspace.id, atual.id) : null;
   return (
     <div className="page" style={{ maxWidth: 1100 }}>
       <div className="page-head">
@@ -17,7 +19,7 @@ export default async function MarcasPage({ searchParams }: { searchParams: Promi
         </div>
       </div>
       <div className="stack" style={{ gap: 16 }}>
-        <Marcas marcas={marcas} atual={marcas.find((x) => x.id === m) ?? marcas[0] ?? null} podeEditar={can(ctx, "editor")} />
+        <Marcas marcas={marcas} atual={atual} kb={kb} podeEditar={can(ctx, "editor")} />
       </div>
     </div>
   );

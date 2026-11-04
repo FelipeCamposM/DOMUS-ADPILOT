@@ -1,4 +1,6 @@
 import { brandSchema, db, LIMITES_IG, lerArquivo, type Json } from "@domus-ads/core";
+import { blocoConhecimento } from "../ai/marca-conhecimento";
+import { SKILL_COPY } from "../ai/copy";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { bloco, perguntarIA } from "../ai/ask";
@@ -36,13 +38,15 @@ ${TEXTO_HUMANO}
 - Hashtags: 8 a 15, misturando nicho, local (cidade/estado, se fizer sentido) e marca; nada genérico demais (#love, #instagood).
   Todas começam com #, sem espaços nem acentos. Máximo ${LIMITES_IG.hashtags}.
 - A legenda inteira (com as hashtags) precisa caber em ${LIMITES_IG.legenda} caracteres.
-- Use só fatos da marca, das mídias e do pedido. Não invente preço, prazo, número, depoimento ou garantia.`;
+- Use só fatos da marca, das mídias e do pedido. Não invente preço, prazo, número, depoimento ou garantia.
+
+${SKILL_COPY}`;
 
 /** Gera legenda + hashtags para uma publicação (vendo as próprias imagens) e grava em instagram_posts.sugestao. */
 export async function gerarLegenda(payload: LegendaPayload, c: { signal: AbortSignal; log: (m: string) => Promise<void> }) {
   const sql = db();
-  const [p] = await sql<{ id: string; workspace_id: string; tipo: string; legenda: string; midias: { creativeId: string }[]; username: string; nome: string | null; bio: string | null; brand: unknown; marca: string | null }[]>`
-    select p.id, p.workspace_id, p.tipo, p.legenda, p.midias, a.username, a.nome, a.bio, b.brand, b.nome as marca
+  const [p] = await sql<{ id: string; workspace_id: string; tipo: string; legenda: string; midias: { creativeId: string }[]; username: string; nome: string | null; bio: string | null; brand: unknown; marca: string | null; conhecimento: string | null }[]>`
+    select p.id, p.workspace_id, p.tipo, p.legenda, p.midias, a.username, a.nome, a.bio, b.brand, b.nome as marca, b.conhecimento
     from ads.instagram_posts p join ads.instagram_accounts a on a.id = p.ig_account_id
     left join ads.brands b on b.id = p.brand_id and b.workspace_id = p.workspace_id
     where p.id = ${payload.postId}`;
@@ -71,6 +75,7 @@ export async function gerarLegenda(payload: LegendaPayload, c: { signal: AbortSi
       `Perfil: @${p.username}${p.nome ? ` (${p.nome})` : ""}${p.bio ? `\nBio: ${p.bio}` : ""}`,
       p.marca && `Marca do post: ${p.marca} (o perfil pode ser da empresa-mãe; escreva sobre esta marca)`,
       b?.sobre && `Sobre a marca: ${b.sobre}`, b?.tom && `Tom de voz: ${b.tom}`, b?.regras && `Regras da marca: ${b.regras}`, b?.site && `Site da marca: ${b.site}`,
+      blocoConhecimento(p.marca, p.conhecimento, 8000),
       `Tipo de publicação: ${p.tipo}`,
       `<midias>\n${midias.map((m) => `- ${m.type} “${m.name}”${m.metadata?.brief ? ` · briefing: ${JSON.stringify(m.metadata.brief).slice(0, 800)}` : ""}${m.metadata?.conceito ? ` · conceito: ${String(m.metadata.conceito).slice(0, 400)}` : ""}`).join("\n")}\n</midias>`,
       imagens.length ? `As imagens da publicação estão nos arquivos: ${imagens.join(", ")} (abra e olhe antes de escrever).` : "",

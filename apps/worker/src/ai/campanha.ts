@@ -1,4 +1,5 @@
 import { brandSchema, db, googleSearchSchema, LIMITES_RSA, type GoogleSearchSpec, type Json } from "@domus-ads/core";
+import { blocoConhecimento } from "./marca-conhecimento";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { DATA_DIR } from "../env";
@@ -52,8 +53,8 @@ Regras (o Google rejeita o que passar dos limites; CONTE os caracteres, espaços
 /** IA escreve (ou refaz, com um pedido) o rascunho da campanha. Nada vai para o Google aqui. */
 export async function runCampanhaIA(payload: CampanhaPayload, c: { signal: AbortSignal; log: (m: string) => Promise<void> }) {
   const sql = db();
-  const [d] = await sql<{ id: string; workspace_id: string; prompt: string | null; spec: Record<string, unknown>; currency: string | null; brand: unknown; ws: string }[]>`
-    select d.id, d.workspace_id, d.prompt, d.spec, a.currency, b.brand, coalesce(b.nome, w.name) as ws
+  const [d] = await sql<{ id: string; workspace_id: string; prompt: string | null; spec: Record<string, unknown>; currency: string | null; brand: unknown; ws: string; conhecimento: string | null }[]>`
+    select d.id, d.workspace_id, d.prompt, d.spec, a.currency, b.brand, coalesce(b.nome, w.name) as ws, b.conhecimento
     from ads.campaign_drafts d join ads.workspaces w on w.id = d.workspace_id left join ads.ad_accounts a on a.id = d.ad_account_id
     left join ads.brands b on b.id = d.brand_id and b.workspace_id = d.workspace_id
     where d.id = ${payload.draftId}`;
@@ -62,7 +63,7 @@ export async function runCampanhaIA(payload: CampanhaPayload, c: { signal: Abort
     const pasta = join(DATA_DIR, "campanhas", d.id);
     mkdirSync(pasta, { recursive: true });
     const brand = brandSchema.parse(d.brand ?? {});
-    const marca = [brand.sobre && `Sobre a marca: ${brand.sobre}`, brand.tom && `Tom de voz: ${brand.tom}`, brand.regras && `Regras da marca: ${brand.regras}`, brand.site && `Site da marca: ${brand.site}`].filter(Boolean).join("\n");
+    const marca = [brand.sobre && `Sobre a marca: ${brand.sobre}`, brand.tom && `Tom de voz: ${brand.tom}`, brand.regras && `Regras da marca: ${brand.regras}`, brand.site && `Site da marca: ${brand.site}`, blocoConhecimento(d.ws, d.conhecimento, 10_000)].filter(Boolean).join("\n");
 
     // páginas citadas no pedido: o texto público vira contexto (sem login, sem rede interna)
     const urls = [...new Set(`${d.prompt ?? ""} ${String(d.spec?.urlFinal ?? "")}`.match(/https?:\/\/[^\s"'<>]+/g) ?? [])].slice(0, 3);

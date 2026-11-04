@@ -61,7 +61,7 @@ async function lerAte(r: Response, max: number): Promise<{ corpo: Buffer; cortad
 }
 
 const ehInstagram = (u: URL) => /(^|\.)instagram\.com$/i.test(u.hostname);
-const decodificar = (t: string) => t.replace(/&#(\d{1,6});/g, (_, n) => String.fromCodePoint(Number(n))).replace(/&#x([0-9a-f]{1,6});/gi, (_, n) => String.fromCodePoint(parseInt(n, 16))).replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+export const decodificar = (t: string) => t.replace(/&#(\d{1,6});/g, (_, n) => String.fromCodePoint(Number(n))).replace(/&#x([0-9a-f]{1,6});/gi, (_, n) => String.fromCodePoint(parseInt(n, 16))).replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
 
 /** Hex de 6 dígitos em minúsculas; aceita #abc, #aabbcc e rgb()/rgba() opacos. */
 function normalizarCor(c: string): string | null {

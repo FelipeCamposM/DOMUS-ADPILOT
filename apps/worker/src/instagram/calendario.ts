@@ -2,6 +2,8 @@ import {
   brandSchema, briefImagemSchema, briefSchema, chaveElevenLabs, configCalendario, db, enqueueJob, FORMATOS_CAL, hashtagsSchema, instagramDaConexao, itemCalSchema,
   lerArquivo, LIMITES_IG, roteiroSchema, vozesElevenLabs, type Brand, type ConfigCal, type CampoRefazer, type FormatoCal, type Json, type Roteiro,
 } from "@domus-ads/core";
+import { blocoConhecimento } from "../ai/marca-conhecimento";
+import { SKILL_COPY } from "../ai/copy";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { bloco, perguntarIA } from "../ai/ask";
@@ -47,21 +49,25 @@ Regras:
 - Os posts de melhor desempenho mostram o que o público gosta (assunto, formato, gancho): use como pista, sem copiar.
 - Varie os pilares: educar, inspirar, provar (bastidores, cases), vender e engajar. Não repita temas já planejados.
 - "objetivo" diz o que o post quer causar (ex.: salvar, comentar, clicar no link da bio).
-${REGRAS_POST}`;
+${REGRAS_POST}
+
+${SKILL_COPY}`;
 
 const SISTEMA_AJUSTE = `Você é social media sênior no Brasil e ajusta UM post de um calendário de Instagram já planejado.
 Responda APENAS com um bloco \`\`\`json no formato pedido.
 
 ${ROTEIROS}
 
-${REGRAS_POST}`;
+${REGRAS_POST}
+
+${SKILL_COPY}`;
 
 interface Contexto { workspace_id: string; ig_account_id: string; username: string; bio: string | null; marca: string | null; brand: Brand | null; credentials_enc: string; ig_user_id: string }
 
 /** Marca e perfil. completo: também o texto do site e os posts de melhor desempenho (só no plano do período). */
 async function contexto(calendarioId: string, completo: boolean, log: (m: string) => Promise<void>): Promise<{ ctx: Contexto; texto: string }> {
-  const [c] = await db()<(Omit<Contexto, "brand"> & { brand: unknown })[]>`
-    select c.workspace_id, c.ig_account_id, a.username, a.bio, a.ig_user_id, k.credentials_enc, b.nome as marca, b.brand
+  const [c] = await db()<(Omit<Contexto, "brand"> & { brand: unknown; conhecimento: string | null })[]>`
+    select c.workspace_id, c.ig_account_id, a.username, a.bio, a.ig_user_id, k.credentials_enc, b.nome as marca, b.brand, b.conhecimento
     from ads.calendarios c join ads.instagram_accounts a on a.id = c.ig_account_id join ads.ad_connections k on k.id = a.connection_id
     left join ads.brands b on b.id = c.brand_id and b.workspace_id = c.workspace_id
     where c.id = ${calendarioId}`;
@@ -75,7 +81,9 @@ async function contexto(calendarioId: string, completo: boolean, log: (m: string
     brand?.tom && `Tom de voz: ${brand.tom}`,
     brand?.regras && `Regras da marca: ${completo ? brand.regras : brand.regras.slice(0, 400)}`,
   ];
-  if (completo && brand?.site) {
+  // base de conhecimento da marca (já resume o site); sem ela, lê a página inicial na hora
+  if (c.conhecimento?.trim()) partes.push(blocoConhecimento(c.marca, c.conhecimento, completo ? 16_000 : 6000));
+  else if (completo && brand?.site) {
     try { partes.push(`<site url="${brand.site}">\n${(await lerPagina(brand.site)).slice(0, 5000)}\n</site>`); } catch (e) { await log(`site não lido: ${(e as Error).message}`); }
   }
   if (completo) {

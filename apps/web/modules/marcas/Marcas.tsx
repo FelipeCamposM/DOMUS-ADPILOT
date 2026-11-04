@@ -6,12 +6,13 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "../shell/toast";
 import { apagarMarca, criarMarca } from "./actions";
+import { BaseConhecimento, type ConhecimentoTela } from "./BaseConhecimento";
 import { BrandEditor, type BrandValor } from "./BrandEditor";
 
 export interface MarcaTela { id: string; nome: string; brand: BrandValor }
 
 /** Marcas do workspace (abas) + editor da escolhida. Cada marca tem a própria identidade. */
-export function Marcas({ marcas, atual, podeEditar }: { marcas: MarcaTela[]; atual: MarcaTela | null; podeEditar: boolean }) {
+export function Marcas({ marcas, atual, kb, podeEditar }: { marcas: MarcaTela[]; atual: MarcaTela | null; kb: ConhecimentoTela | null; podeEditar: boolean }) {
   const router = useRouter();
   const [pend, start] = useTransition();
   const [nova, setNova] = useState("");
@@ -70,7 +71,9 @@ export function Marcas({ marcas, atual, podeEditar }: { marcas: MarcaTela[]; atu
             <BrandEditor key={atual.id} marcaId={atual.id} nome={atual.nome} inicial={atual.brand} podeEditar={podeEditar} />
           </div>
         </section>
-      ) : (
+      ) : null}
+      {atual && kb ? <BaseConhecimento key={`kb-${atual.id}`} marcaId={atual.id} site={atual.brand.site} kb={kb} podeEditar={podeEditar} /> : null}
+      {atual ? null : (
         <div className="panel empty" data-enter style={{ padding: 40, textAlign: "center" }}>
           <Palette size={28} aria-hidden style={{ opacity: 0.6 }} />
           <p style={{ marginTop: 10 }}><b>Nenhuma marca ainda.</b></p>

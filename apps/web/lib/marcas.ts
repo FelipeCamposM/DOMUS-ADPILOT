@@ -12,6 +12,20 @@ export async function marcasDoWorkspace(workspaceId: string): Promise<Marca[]> {
   return r.map((m) => ({ id: m.id, nome: m.nome, brand: brandSchema.parse(m.brand ?? {}) }));
 }
 
+export interface Conhecimento { texto: string; em: string | null; fontes: string[]; job: { status: string; progress: number | null; error: string | null; log: string | null } | null }
+
+/** Base de conhecimento da marca + a geração mais recente (para acompanhar na tela). */
+export async function conhecimentoDaMarca(workspaceId: string, brandId: string): Promise<Conhecimento> {
+  const sql = db();
+  const [m] = await sql<{ conhecimento: string; conhecimento_em: Date | null; conhecimento_fontes: string[] }[]>`
+    select conhecimento, conhecimento_em, conhecimento_fontes from ads.brands where id = ${brandId} and workspace_id = ${workspaceId}`;
+  const [j] = await sql<{ status: string; progress: number | null; error: string | null; log: string | null }[]>`
+    select j.status, j.progress, j.error, (select l.message from ads.job_logs l where l.job_id = j.id order by l.created_at desc limit 1) as log
+    from ads.jobs j where j.type = 'MARCA_CONHECIMENTO' and j.workspace_id = ${workspaceId} and j.payload->>'brandId' = ${brandId}
+    order by j.created_at desc limit 1`;
+  return { texto: m?.conhecimento ?? "", em: m?.conhecimento_em?.toISOString() ?? null, fontes: m?.conhecimento_fontes ?? [], job: j ?? null };
+}
+
 export const resumo = (m: Marca): MarcaResumo => ({ id: m.id, nome: m.nome, cores: m.brand.cores, temLogo: !!m.brand.logoId, logoId: m.brand.logoId });
 
 /** Id de marca vindo do cliente: aceito só se for deste workspace. Vazio = sem marca. */
