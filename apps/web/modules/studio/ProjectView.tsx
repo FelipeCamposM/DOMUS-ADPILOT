@@ -53,14 +53,19 @@ export function ProjectView({ p, podeEditar, vozes }: { p: ProjetoView; podeEdit
   const chaveFalas = `falas:${p.id}`;
   const [falas, setFalas] = useState<Record<number, VozGravada>>({});
   useEffect(() => {
-    let ids: (string | null)[] = p.brief.voz === "falas" ? p.brief.falas ?? [] : [];
-    try { const r = localStorage.getItem(chaveFalas); if (r) ids = JSON.parse(r) as (string | null)[]; } catch { /* sem armazenamento */ }
-    setFalas(Object.fromEntries(ids.flatMap((id, i) => (id ? [[i, { id, url: `/api/creatives/${id}/file`, dur: 0, pct: 100 }]] : []))));
+    type Salva = string | { id: string; dur: number; picos?: number[] } | null;
+    let lista: Salva[] = p.brief.voz === "falas" ? p.brief.falas ?? [] : [];
+    try { const r = localStorage.getItem(chaveFalas); if (r) lista = JSON.parse(r) as Salva[]; } catch { /* sem armazenamento */ }
+    setFalas(Object.fromEntries(lista.flatMap((x, i) => {
+      const f = typeof x === "string" ? { id: x, dur: 0 } : x;
+      return f ? [[i, { ...f, url: `/api/creatives/${f.id}/file`, pct: 100 }]] : [];
+    })));
   }, [chaveFalas, p.brief.voz, p.brief.falas]);
   const mudarFala = (i: number, v: VozGravada | null) => setFalas((f) => {
     const n = { ...f };
     if (v) n[i] = v; else delete n[i];
-    try { localStorage.setItem(chaveFalas, JSON.stringify((p.storyboard?.scenes ?? []).map((_, k) => n[k]?.id ?? null))); } catch { /* sem armazenamento */ }
+    const salvar = (p.storyboard?.scenes ?? []).map((_, k) => { const f = n[k]; return f?.id ? { id: f.id, dur: f.dur, picos: f.picos } : null; });
+    try { localStorage.setItem(chaveFalas, JSON.stringify(salvar)); } catch { /* sem armazenamento */ }
     return n;
   });
   const falasProntas = roteiro.every((c) => falas[c.i]?.id);

@@ -2188,3 +2188,14 @@ button.mdl-var:hover { background: rgb(var(--c-brand) / 0.22); border-color: rgb
 .fala .grv-mic { width: 46px; height: 46px; }
 @media (max-width: 560px) { .grv { flex-wrap: wrap; } .grv-enviar { margin-left: 72px; } }
 @media (prefers-reduced-motion: reduce) { .grv-mic, .grv-mic::after { animation: none !important; } }
+
+/* onda do player: barras espelhadas pela intensidade; neutra (sem dados) fica apagada */
+.ply-onda { height: 32px; gap: 2px; }
+.ply-onda span { min-width: 2px; max-width: 5px; border-radius: 99px; }
+.ply[data-onda="neutra"] .ply-onda span:not([data-on="true"]) { background: rgb(var(--c-text-tertiary) / 0.25); }
+.ply[data-onda="real"] .ply-onda span { background: linear-gradient(180deg, rgb(var(--c-text-tertiary) / 0.35), rgb(var(--c-text-tertiary) / 0.6), rgb(var(--c-text-tertiary) / 0.35)); }
+.ply[data-onda="real"] .ply-onda span[data-on="true"] { background: linear-gradient(180deg, rgb(var(--c-brand)), rgb(var(--c-glow)), rgb(var(--c-brand))); }
+.mic-sel { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; font-size: 12px; color: rgb(var(--c-text-secondary)); }
+.mic-sel svg { flex: none; width: 13px; height: 13px; }
+.mic-sel select { min-width: 0; max-width: 280px; height: 28px; padding: 0 8px; border-radius: 8px; font: inherit; font-size: 12px; color: inherit;
+  border: 1px solid rgb(var(--c-border)); background: rgb(var(--c-bg-inset)); text-overflow: ellipsis; }

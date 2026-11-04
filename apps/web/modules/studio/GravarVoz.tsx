@@ -7,10 +7,32 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { enviarArquivo } from "../creatives/upload";
 import { toast } from "../shell/toast";
 
-export interface VozGravada { id: string | null; url: string; dur: number; pct: number }
+export interface VozGravada { id: string | null; url: string; dur: number; pct: number; picos?: number[] }
 
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 const BARRAS = 28;
+const N_ONDA = 56;
+const MUDO = 2; // pico (0–128) abaixo disso = silêncio digital: microfone mudo ou errado
+
+/** Intensidade do áudio em N_ONDA faixas (RMS normalizado) e o pico geral (0–1). null se o navegador não decodificar. */
+async function analisarAudio(dados: Blob): Promise<{ picos: number[]; pico: number } | null> {
+  try {
+    const ctx = new AudioContext();
+    const au = await ctx.decodeAudioData(await dados.arrayBuffer());
+    void ctx.close();
+    const d = au.getChannelData(0), passo = Math.max(1, Math.floor(d.length / N_ONDA));
+    let pico = 0;
+    const rms = Array.from({ length: N_ONDA }, (_, i) => {
+      let soma = 0, n = 0;
+      for (let j = i * passo; j < Math.min(d.length, (i + 1) * passo); j += 8) { const v = d[j]!; soma += v * v; n++; pico = Math.max(pico, Math.abs(v)); }
+      return n ? Math.sqrt(soma / n) : 0;
+    });
+    const max = Math.max(...rms, 1e-6);
+    return { picos: rms.map((x) => +Math.max(0.06, (x / max) ** 0.7).toFixed(3)), pico };
+  } catch {
+    return null;
+  }
+}
 
 /** Microfone com medidor de nível: gravar(limite, pronto) chama pronto(arquivo, duração) quando parar. */
 function useGravador() {
@@ -18,6 +40,19 @@ function useGravador() {
   const [gravando, setGravando] = useState(false);
   const [seg, setSeg] = useState(0);
   const [niveis, setNiveis] = useState<number[]>([]);
+  const [mics, setMics] = useState<{ id: string; nome: string }[]>([]);
+  const [mic, setMicSt] = useState("");
+  const listarMics = useCallback(async () => {
+    try {
+      const ds = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "audioinput" && d.deviceId);
+      setMics(ds.map((d, i) => ({ id: d.deviceId, nome: d.label || `Microfone ${i + 1}` })));
+    } catch { /* sem lista */ }
+  }, []);
+  useEffect(() => {
+    try { setMicSt(localStorage.getItem("mic") ?? ""); } catch { /* sem armazenamento */ }
+    void listarMics();
+  }, [listarMics]);
+  const setMic = (id: string) => { setMicSt(id); try { localStorage.setItem("mic", id); } catch { /* sem armazenamento */ } };
 
   const parar = useCallback(() => {
     const r = rec.current;
@@ -34,11 +69,15 @@ function useGravador() {
 
   const gravar = async (limite: number, pronto: (f: File, dur: number) => void) => {
     let stream: MediaStream;
+    const base = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+      stream = await navigator.mediaDevices.getUserMedia({ audio: mic ? { ...base, deviceId: { exact: mic } } : base })
+        .catch(() => navigator.mediaDevices.getUserMedia({ audio: base })); // microfone salvo sumiu: usa o padrão
     } catch {
       return toast.err("Sem acesso ao microfone. Libere o microfone para este site no navegador.");
     }
+    void listarMics(); // com a permissão dada, os nomes dos microfones aparecem
+    let maxPico = 0, avisou = false;
     const tipo = ["audio/webm;codecs=opus", "audio/mp4", "audio/ogg;codecs=opus"].find((t) => MediaRecorder.isTypeSupported(t));
     const mr = new MediaRecorder(stream, tipo ? { mimeType: tipo } : undefined);
     const partes: Blob[] = [];
@@ -58,6 +97,8 @@ function useGravador() {
         an.getByteTimeDomainData(buf);
         let pico = 0;
         for (const v of buf) pico = Math.max(pico, Math.abs(v - 128));
+        maxPico = Math.max(maxPico, pico);
+        if (!avisou && s > 2.5 && maxPico < MUDO) { avisou = true; toast.err("O microfone não está captando nada. Confira se ele está mudo ou escolha outro microfone abaixo."); }
         setNiveis((h) => [...h.slice(1 - BARRAS), Math.min(1, pico / 56)]);
         setSeg(s);
       }
@@ -67,6 +108,7 @@ function useGravador() {
       const mime = (mr.mimeType || "audio/webm").split(";")[0]!;
       const dur = (performance.now() - t0) / 1000;
       if (dur < 1) return toast.err("Gravação curta demais");
+      if (maxPico < MUDO) return toast.err("A gravação ficou muda (o microfone não captou som). Escolha outro microfone e grave de novo.");
       pronto(new File(partes, `minha-voz.${mime.includes("mp4") ? "m4a" : mime.split("/")[1]}`, { type: mime }), dur);
     };
     mr.start(1000);
@@ -74,17 +116,20 @@ function useGravador() {
     setSeg(0);
     setGravando(true);
   };
-  return { gravando, seg, niveis, gravar, parar };
+  return { gravando, seg, niveis, gravar, parar, mics, mic, setMic };
 }
 type Gravador = ReturnType<typeof useGravador>;
 
 /** Sobe o áudio na hora (criativo VOICE), mostrando o progresso. */
 async function subirVoz(arq: File, dur: number, set: (v: VozGravada | null) => void) {
+  const an = await analisarAudio(arq);
+  if (an && an.pico < 0.002) { toast.err("Esse áudio está sem som. Confira o microfone e grave de novo."); return; }
+  const picos = an?.picos;
   const url = URL.createObjectURL(arq);
-  set({ id: null, url, dur, pct: 0 });
+  set({ id: null, url, dur, pct: 0, picos });
   try {
-    const e = await enviarArquivo(arq, { type: "VOICE", onProgresso: (pct) => set({ id: null, url, dur, pct }) });
-    set({ id: e.id, url, dur, pct: 100 });
+    const e = await enviarArquivo(arq, { type: "VOICE", onProgresso: (pct) => set({ id: null, url, dur, pct, picos }) });
+    set({ id: e.id, url, dur, pct: 100, picos });
   } catch (err) {
     toast.err((err as Error).message);
     URL.revokeObjectURL(url);
@@ -110,35 +155,21 @@ async function lerArquivo(arq: File | undefined, limite: number): Promise<number
 }
 
 /** Player próprio: play/pause, onda do áudio (clique para pular) e tempo. */
-export function PlayerAudio({ src, durDica = 0 }: { src: string; durDica?: number }) {
+export function PlayerAudio({ src, durDica = 0, picos: dados }: { src: string; durDica?: number; picos?: number[] }) {
   const a = useRef<HTMLAudioElement>(null);
   const [tocando, setTocando] = useState(false);
   const [t, setT] = useState(0);
   const [dur, setDur] = useState(durDica);
-  const [picos, setPicos] = useState<number[] | null>(null);
+  const [lidos, setLidos] = useState<number[] | null>(null);
+  const picos = dados?.length ? dados : lidos;
 
   useEffect(() => {
+    if (dados?.length) return;
     let vivo = true;
-    (async () => {
-      try {
-        const buf = await (await fetch(src)).arrayBuffer();
-        const ctx = new AudioContext();
-        const au = await ctx.decodeAudioData(buf);
-        void ctx.close();
-        const d = au.getChannelData(0), n = 48, passo = Math.max(1, Math.floor(d.length / n));
-        const p = Array.from({ length: n }, (_, i) => {
-          let m = 0;
-          for (let j = i * passo; j < (i + 1) * passo; j += 32) m = Math.max(m, Math.abs(d[j] ?? 0));
-          return m;
-        });
-        const max = Math.max(...p, 0.01);
-        if (vivo) { setPicos(p.map((x) => Math.max(0.1, x / max))); setDur((v) => v || au.duration); }
-      } catch {
-        if (vivo) setPicos(null); // arquivo de outro domínio (R2) sem CORS: fica a barra simples
-      }
-    })();
+    // sem a onda guardada: tenta ler o arquivo (o R2 sem CORS falha; aí fica a onda neutra)
+    void fetch(src).then((r) => r.blob()).then(analisarAudio).then((an) => { if (vivo && an) setLidos(an.picos); }).catch(() => {});
     return () => { vivo = false; };
-  }, [src]);
+  }, [src, dados]);
 
   const pular = (frac: number) => {
     const el = a.current;
@@ -146,11 +177,11 @@ export function PlayerAudio({ src, durDica = 0 }: { src: string; durDica?: numbe
     el.currentTime = Math.min(dur, Math.max(0, frac * dur));
     setT(el.currentTime);
   };
-  const barras = picos ?? Array.from({ length: 48 }, (_, i) => 0.25 + 0.15 * Math.sin(i * 0.9));
+  const barras = picos ?? Array.from({ length: N_ONDA }, (_, i) => 0.18 + 0.5 * Math.abs(Math.sin(i * 0.37) * Math.cos(i * 0.11)));
   const feito = dur ? t / dur : 0;
 
   return (
-    <div className="ply">
+    <div className="ply" data-onda={picos ? "real" : "neutra"}>
       <audio ref={a} src={src} preload="metadata" onPlay={() => setTocando(true)} onPause={() => setTocando(false)}
         onEnded={() => { setTocando(false); setT(0); }} onTimeUpdate={(e) => setT(e.currentTarget.currentTime)}
         onLoadedMetadata={(e) => { if (Number.isFinite(e.currentTarget.duration)) setDur(e.currentTarget.duration); }} />
@@ -164,6 +195,20 @@ export function PlayerAudio({ src, durDica = 0 }: { src: string; durDica?: numbe
       </div>
       <span className="ply-tempo tabular">{mmss(t)}<small> / {mmss(dur)}</small></span>
     </div>
+  );
+}
+
+/** Escolha do microfone (fica salva neste navegador). Só aparece com mais de um. */
+function SeletorMic({ g }: { g: Gravador }) {
+  if (g.mics.length < 2) return null;
+  return (
+    <label className="mic-sel">
+      <Mic aria-hidden />
+      <select value={g.mics.some((m) => m.id === g.mic) ? g.mic : ""} onChange={(e) => g.setMic(e.target.value)} aria-label="Microfone">
+        <option value="">Microfone padrão do sistema</option>
+        {g.mics.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
+      </select>
+    </label>
   );
 }
 
@@ -195,7 +240,7 @@ export function GravarVoz({ valor, onChange, dica = "o roteiro sai da sua fala" 
 
   if (valor) return (
     <div className="stack" style={{ gap: 8 }}>
-      <PlayerAudio src={valor.url} durDica={valor.dur} />
+      <PlayerAudio src={valor.url} durDica={valor.dur} picos={valor.picos} />
       <div className="cluster" style={{ gap: 8, justifyContent: "space-between" }}>
         <span className="subtle caption">
           {valor.pct < 100 ? <><Loader2 size={12} className="animate-spin" aria-hidden /> Enviando… {valor.pct}%</> : <><Check size={12} aria-hidden /> Pronto · {dica}</>}
@@ -219,6 +264,7 @@ export function GravarVoz({ valor, onChange, dica = "o roteiro sai da sua fala" 
       <div className="grv-info">
         <b>Toque no microfone para gravar</b>
         <span className="subtle caption">Até {MAX_VOZ_S / 60} min de fala. Fale naturalmente; as pausas são cortadas.</span>
+        <SeletorMic g={g} />
       </div>
       <button type="button" className="btn btn-ghost btn-xs grv-enviar" onClick={() => input.current?.click()}><UploadCloud aria-hidden /> Enviar arquivo</button>
     </div>
@@ -252,6 +298,7 @@ export function FalaPorFala({ cenas, falas, onChange }: { cenas: { i: number; te
         <b className="tabular">{prontas} de {cenas.length} falas gravadas</b>
         <span className="falas-barra" aria-hidden><span style={{ width: `${(prontas / Math.max(1, cenas.length)) * 100}%` }} /></span>
       </div>
+      <SeletorMic g={g} />
       <ol className="falas-lista">
         {cenas.map((c, n) => {
           const f = falas[c.i];
@@ -270,7 +317,7 @@ export function FalaPorFala({ cenas, falas, onChange }: { cenas: { i: number; te
               {aqui ? <Gravando g={g} limite={MAX_FALA_S} dica="Leia o texto acima. Toque no quadrado quando terminar." />
                 : f ? (f.pct < 100
                   ? <span className="subtle caption"><Loader2 size={12} className="animate-spin" aria-hidden /> Enviando… {f.pct}%</span>
-                  : <div className="fala-ok"><PlayerAudio src={f.url} durDica={f.dur} />
+                  : <div className="fala-ok"><PlayerAudio src={f.url} durDica={f.dur} picos={f.picos} />
                       <button type="button" className="btn btn-ghost btn-xs" disabled={g.gravando} onClick={() => gravar(c.i)}><RotateCcw aria-hidden /> Regravar</button></div>)
                 : (
                   <div className="fala-acoes">
