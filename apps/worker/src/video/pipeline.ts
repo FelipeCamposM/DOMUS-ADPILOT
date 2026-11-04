@@ -18,7 +18,7 @@ import { corrigir, encaixarNaFala, encaixarRoteiro, legendaRevisada, prepararFal
 
 type Etapa = "SCRIPTING" | "VOICE" | "COMPOSING" | "RENDERING" | "MIXING" | "UPLOADING" | "READY";
 export interface Ctx { signal: AbortSignal; log: (m: string) => Promise<void>; progress: (p: number) => Promise<void> }
-export interface VideoPayload { projectId: string; mode?: "full" | "rerender" | "render" | "adjust" | "voz"; instruction?: string }
+export interface VideoPayload { projectId: string; mode?: "full" | "rerender" | "render" | "adjust" | "voz"; instruction?: string; reencaixar?: boolean }
 
 const PROGRESSO: Record<Etapa, number> = { SCRIPTING: 5, VOICE: 20, COMPOSING: 32, RENDERING: 50, MIXING: 85, UPLOADING: 93, READY: 100 };
 
@@ -101,9 +101,11 @@ export async function runVideo(payload: VideoPayload, c: Ctx) {
     const arquivoVoz = (i: number) => [join(pasta, `voz-${i}.mp3`), join(pasta, `voz-${i}.wav`)].find(existsSync);
     if (propria) {
       // regravou lendo o roteiro (modo voz): cenas reencaixadas na fala nova. Senão o áudio não muda e o texto editado só mexe na legenda
-      if (modo === "voz") await etapa("VOICE", "Transcrevendo a sua gravação…");
+      // reencaixar: gravou lendo o roteiro na aprovação
+      const reencaixa = modo === "voz" || !!payload.reencaixar;
+      if (reencaixa) await etapa("VOICE", "Transcrevendo a sua gravação e cortando as pausas…");
       const v = await vozPropria();
-      sb = modo === "voz" ? encaixarRoteiro(sb, v) : legendaRevisada(sb);
+      sb = reencaixa ? encaixarRoteiro(sb, v) : legendaRevisada(sb);
       vozes.push({ file: v.arquivo, start: 0 });
     } else if (modo !== "adjust" && brief.voz !== "none") {
       // falas gravadas pelo cliente cena a cena entram no lugar do TTS (som tratado e nivelado)
@@ -121,7 +123,7 @@ export async function runVideo(payload: VideoPayload, c: Ctx) {
           const fala = brief.falas[i];
           if (deFalas && !fala) throw new Error(`Falta gravar a fala da cena ${i + 1}`);
           const v = tts ? await tts.generateVoice({ text: s.narration, voice: brief.voz, out: join(pasta, `voz-${i}.wav`) })
-            : { seconds: await prepararFala(p.workspace_id, fala!, join(pasta, `voz-${i}.wav`), pasta, c.signal), words: undefined, credits: 0 };
+            : { seconds: await prepararFala(p.workspace_id, fala!, join(pasta, `voz-${i}.wav`), pasta, brief.cortarPausas, c.signal), words: undefined, credits: 0 };
           minimos.push(Math.max(v.seconds + 0.6, tempoLeitura(s))); // a fala com respiro, ou o tempo de ler, o que for maior
           falas.push(+v.seconds.toFixed(2));
           palavras.push(v.words);

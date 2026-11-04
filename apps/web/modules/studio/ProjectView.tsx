@@ -17,7 +17,7 @@ const TIPO: Record<string, string> = { abertura: "Abertura", titulo: "Título", 
 const editavel = (s: Cena) => ({ headline: s.headline, subtext: s.subtext ?? "", narration: s.narration ?? "", ...(s.itens ? { itens: [...s.itens] } : {}) });
 export interface ProjetoView {
   id: string; title: string; status: string; step_detail: string | null; error: string | null; progress: number | null;
-  brief: { formato: string; duracao: number; voz: string; vozNome?: string; falas?: (string | null)[]; musica: string; produto: string; estiloVisual?: string };
+  brief: { formato: string; duracao: number; voz: string; vozNome?: string; falas?: (string | null)[]; lerRoteiro?: boolean; musica: string; produto: string; estiloVisual?: string };
   storyboard: { scenes: Cena[]; duration: number; music: { tag: string } | null } | null;
   creative: { id: string; duration_ms: number | null; size_bytes: string | null; width: number | null; height: number | null; arquivado: boolean; avisos: string[]; music: string | null } | null;
   thumb: boolean;
@@ -49,7 +49,7 @@ export function ProjectView({ p, podeEditar, vozes }: { p: ProjetoView; podeEdit
   const [abaVoz, setAbaVoz] = useState<"ia" | "minha">(p.brief.voz === "propria" || p.brief.voz === "falas" ? "minha" : "ia");
   const [jeito, setJeito] = useState<"falas" | "tudo">(p.brief.voz === "propria" ? "tudo" : "falas");
   const [minhaVoz, setMinhaVoz] = useState<VozGravada | null>(null);
-  const roteiro = (p.storyboard?.scenes ?? []).map((s, i) => ({ i, texto: s.narration?.trim() ?? "" })).filter((c) => c.texto);
+  const roteiro = cenas.map((s, i) => ({ i, texto: s.narration.trim() })).filter((c) => c.texto);
   // falas já enviadas: as do vídeo (se já usa) ou o rascunho guardado neste navegador; tocam do arquivo salvo
   const chaveFalas = `falas:${p.id}`;
   const [falas, setFalas] = useState<Record<number, VozGravada>>({});
@@ -70,6 +70,36 @@ export function ProjectView({ p, podeEditar, vozes }: { p: ProjetoView; podeEdit
     return n;
   });
   const falasProntas = roteiro.every((c) => falas[c.i]?.id);
+  const limparGravacao = () => { setMinhaVoz(null); try { localStorage.removeItem(chaveFalas); } catch { /* sem armazenamento */ } };
+  // "gravar depois, lendo o roteiro": a gravação vai junto com a aprovação
+  const gravarNaRevisao = !!p.brief.lerRoteiro && st.status === "REVIEW";
+  const narracaoPronta = jeito === "falas" ? roteiro.length > 0 && falasProntas : !!minhaVoz?.id;
+  const narracao = () => (jeito === "falas" ? { falas: cenas.map((_, i) => falas[i]?.id ?? null) } : { audio: minhaVoz!.id! });
+  /** Gravação com a minha voz (fala por fala ou tudo de uma vez). comBotao: vídeo pronto (troca a voz); sem: vai na aprovação. */
+  const gravacao = (comBotao: boolean) => <>
+    <div className="seg-mini" role="radiogroup" aria-label="Como gravar">
+      <button type="button" role="radio" aria-checked={jeito === "falas"} onClick={() => setJeito("falas")}>Fala por fala</button>
+      <button type="button" role="radio" aria-checked={jeito === "tudo"} onClick={() => setJeito("tudo")}>Tudo de uma vez</button>
+    </div>
+    {jeito === "falas" ? <>
+      <span className="subtle caption">Grave cada cena lendo o texto dela. Errou uma? Apague só aquela e grave de novo. O AdPilot corta os silêncios, tira o chiado, iguala o volume e junta tudo no vídeo.</span>
+      <FalaPorFala cenas={roteiro} falas={falas} onChange={mudarFala} />
+      {comBotao && <button className="btn btn-primary btn-sm" style={{ alignSelf: "flex-end" }} disabled={pend || rodando || !falasProntas}
+        onClick={() => acao(() => narrarComMinhasFalas(p.id, cenas.map((_, i) => falas[i]?.id ?? null)), "Na fila: juntando as suas falas e ajustando o som", limparGravacao)}>
+        {pend ? <Loader2 className="animate-spin" aria-hidden /> : <><Mic aria-hidden /> {falasProntas ? "Usar minhas falas" : `Faltam ${roteiro.filter((c) => !falas[c.i]?.id).length} falas`}</>}
+      </button>}
+    </> : <>
+      <span className="subtle caption">Leia o roteiro abaixo em voz alta, na ordem. As pausas são cortadas e cada cena se encaixa na sua fala.</span>
+      <ol className="roteiro-ler" aria-label="Roteiro para ler">
+        {roteiro.map((c) => <li key={c.i}><small>Cena {c.i + 1}</small>{c.texto}</li>)}
+      </ol>
+      <GravarVoz valor={minhaVoz} onChange={setMinhaVoz} dica="as cenas se encaixam na sua fala" />
+      {comBotao && <button className="btn btn-primary btn-sm" style={{ alignSelf: "flex-end" }} disabled={pend || rodando || !minhaVoz?.id}
+        onClick={() => acao(() => narrarComMinhaVoz(p.id, minhaVoz!.id!), "Na fila: transcrevendo e encaixando a sua voz", limparGravacao)}>
+        {pend ? <Loader2 className="animate-spin" aria-hidden /> : <><Mic aria-hidden /> Usar minha gravação</>}
+      </button>}
+    </>}
+  </>;
   const [novaVoz, setNovaVoz] = useState(() => vozes.find((v) => v.fav && v.id !== p.brief.voz)?.id ?? "");
   const musicaOriginal = p.storyboard?.music?.tag ?? "none";
   const [musica, setMusica] = useState(musicaOriginal);
@@ -205,31 +235,7 @@ export function ProjectView({ p, podeEditar, vozes }: { p: ProjetoView; podeEdit
               {vozes.length > 0 && <button type="button" role="tab" className="chip" style={{ height: 30 }} aria-selected={abaVoz === "ia"} data-active={abaVoz === "ia"} onClick={() => setAbaVoz("ia")}><Bot aria-hidden /> Voz da IA</button>}
               {roteiro.length > 0 && <button type="button" role="tab" className="chip" style={{ height: 30 }} aria-selected={abaVoz === "minha"} data-active={abaVoz === "minha"} onClick={() => setAbaVoz("minha")}><Mic aria-hidden /> Minha voz</button>}
             </div>
-            {abaVoz === "minha" && roteiro.length > 0 ? <>
-              <div className="seg-mini" role="radiogroup" aria-label="Como gravar">
-                <button type="button" role="radio" aria-checked={jeito === "falas"} onClick={() => setJeito("falas")}>Fala por fala</button>
-                <button type="button" role="radio" aria-checked={jeito === "tudo"} onClick={() => setJeito("tudo")}>Tudo de uma vez</button>
-              </div>
-              {jeito === "falas" ? <>
-                <span className="subtle caption">Grave cada cena lendo o texto dela. Errou uma? Apague só aquela e grave de novo. No final o AdPilot tira o silêncio e o chiado, iguala o volume e junta tudo no vídeo.</span>
-                <FalaPorFala cenas={roteiro} falas={falas} onChange={mudarFala} />
-                <button className="btn btn-primary btn-sm" style={{ alignSelf: "flex-end" }} disabled={pend || rodando || !falasProntas}
-                  onClick={() => acao(() => narrarComMinhasFalas(p.id, (p.storyboard?.scenes ?? []).map((_, i) => falas[i]?.id ?? null)), "Na fila: juntando as suas falas e ajustando o som",
-                    () => { try { localStorage.removeItem(chaveFalas); } catch { /* sem armazenamento */ } })}>
-                  {pend ? <Loader2 className="animate-spin" aria-hidden /> : <><Mic aria-hidden /> {falasProntas ? "Usar minhas falas" : `Faltam ${roteiro.filter((c) => !falas[c.i]?.id).length} falas`}</>}
-                </button>
-              </> : <>
-                <span className="subtle caption">Leia o roteiro abaixo em voz alta, na ordem. As pausas são cortadas e cada cena se encaixa na sua fala.</span>
-                <ol className="roteiro-ler" aria-label="Roteiro para ler">
-                  {roteiro.map((c) => <li key={c.i}><small>Cena {c.i + 1}</small>{c.texto}</li>)}
-                </ol>
-                <GravarVoz valor={minhaVoz} onChange={setMinhaVoz} dica="as cenas se encaixam na sua fala" />
-                <button className="btn btn-primary btn-sm" style={{ alignSelf: "flex-end" }} disabled={pend || rodando || !minhaVoz?.id}
-                  onClick={() => acao(() => narrarComMinhaVoz(p.id, minhaVoz!.id!), "Na fila: transcrevendo e encaixando a sua voz", () => setMinhaVoz(null))}>
-                  {pend ? <Loader2 className="animate-spin" aria-hidden /> : <><Mic aria-hidden /> Usar minha gravação</>}
-                </button>
-              </>}
-            </> : vozes.length > 0 && <div className="cluster" style={{ gap: 6 }}>
+            {abaVoz === "minha" && roteiro.length > 0 ? gravacao(true) : vozes.length > 0 && <div className="cluster" style={{ gap: 6 }}>
               <select className="select" style={{ flex: 1, minWidth: 180 }} aria-label="Nova voz" value={novaVoz} onChange={(e) => setNovaVoz(e.target.value)} disabled={rodando}>
                 <option value="" disabled>Escolha a voz</option>
                 {vozes.map((v) => <option key={v.id} value={v.id} disabled={v.id === p.brief.voz}>{v.fav ? `⭐ ${v.nome}` : v.nome}</option>)}
@@ -242,19 +248,29 @@ export function ProjectView({ p, podeEditar, vozes }: { p: ProjetoView; podeEdit
           </div>
         )}
 
+        {podeEditar && revisao && p.brief.lerRoteiro && (
+          <div className="panel surge" data-enter style={{ padding: 18, display: "flex", flexDirection: "column", gap: 10, borderColor: "rgb(var(--c-error) / 0.35)" }}>
+            <div className="panel-title" style={{ display: "flex", gap: 8, alignItems: "center" }}><Mic size={15} aria-hidden /> Grave a sua narração</div>
+            {roteiro.length ? gravacao(false) : <span className="subtle caption">Escreva a narração das cenas no roteiro abaixo para ter o que gravar.</span>}
+          </div>
+        )}
+
         <div key={revisao ? "rev" : "sb"} className={revisao ? "panel surge" : "panel"} data-enter style={revisao ? { borderColor: "rgb(var(--c-brand) / 0.6)", boxShadow: "0 0 0 3px rgb(var(--c-brand) / 0.12), 0 0 32px -8px rgb(var(--c-brand) / 0.6)" } : undefined}>
           <div className="panel-head">
             <div>
               <div className="panel-title" style={{ display: "flex", gap: 8, alignItems: "center" }}>{revisao && <ClipboardCheck size={15} aria-hidden />}{revisao ? "Aprove o roteiro" : "Storyboard"}</div>
               <div className="subtle caption">{!p.storyboard ? "Aparece quando o roteiro ficar pronto."
+                : revisao && p.brief.lerRoteiro ? `${p.storyboard.scenes.length} cenas. Ajuste a narração se quiser, grave lendo no painel acima e aprove: o vídeo sai com a sua voz tratada e os tempos dela.`
                 : revisao && p.brief.voz === "propria" ? `${p.storyboard.scenes.length} cenas em cima da sua fala · ${seg(p.storyboard.duration)} (sem as pausas). Os tempos seguem a sua voz; edite os textos na tela e corrija a legenda se precisar.`
                 : revisao ? `${p.storyboard.scenes.length} cenas · cerca de ${seg(p.storyboard.duration)}. Edite textos, narração e música se quiser; a geração (voz, animação e render) só começa quando você aprovar.`
                 : `${p.storyboard.scenes.length} cenas · ${seg(p.storyboard.duration)}. Edite o texto e gere de novo: voz e tempos se ajustam sozinhos.`}</div>
             </div>
             {podeEditar && p.storyboard && (
-              <button className={revisao ? "btn btn-primary btn-sm" : "btn btn-primary btn-xs"} disabled={pend || rodando || !paletaOk || (!revisao && !alterado && !paletaMudou && musica === musicaOriginal)}
-                onClick={() => acao(() => regerarComStoryboard(p.id, cenas, musica, paleta && (paletaMudou ? { ...paleta, origem: "usuario" } : paleta)), revisao ? "Aprovado: gerando o vídeo" : "Gerando com o texto novo")}>
-                {revisao ? <><Check aria-hidden /> Aprovar e gerar vídeo</> : <><Rocket aria-hidden /> Salvar e gerar</>}
+              <button className={revisao ? "btn btn-primary btn-sm" : "btn btn-primary btn-xs"} disabled={pend || rodando || !paletaOk || (!revisao && !alterado && !paletaMudou && musica === musicaOriginal) || (gravarNaRevisao && !narracaoPronta)}
+                title={gravarNaRevisao && !narracaoPronta ? "Grave a sua narração primeiro" : undefined}
+                onClick={() => acao(() => regerarComStoryboard(p.id, cenas, musica, paleta && (paletaMudou ? { ...paleta, origem: "usuario" } : paleta), gravarNaRevisao ? narracao() : undefined),
+                  revisao ? "Aprovado: gerando o vídeo" : "Gerando com o texto novo", gravarNaRevisao ? limparGravacao : undefined)}>
+                {revisao ? <><Check aria-hidden /> {gravarNaRevisao ? "Aprovar e gerar com a minha voz" : "Aprovar e gerar vídeo"}</> : <><Rocket aria-hidden /> Salvar e gerar</>}
               </button>
             )}
           </div>

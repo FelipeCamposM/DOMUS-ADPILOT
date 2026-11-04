@@ -63,7 +63,7 @@ export async function prepararVozPropria(workspaceId: string, brief: Brief, past
  * Fala gravada cena a cena: baixa, corta o silêncio das pontas, tira graves e chiado e nivela o volume (-16 LUFS),
  * para as falas gravadas em momentos diferentes soarem como uma só. Devolve a duração em segundos.
  */
-export async function prepararFala(workspaceId: string, audioId: string, out: string, pasta: string, signal?: AbortSignal): Promise<number> {
+export async function prepararFala(workspaceId: string, audioId: string, out: string, pasta: string, cortarPausas: boolean, signal?: AbortSignal): Promise<number> {
   const [a] = await db()<{ storage: string; r2_key: string; arquivado: boolean; mime: string | null }[]>`
     select storage, r2_key, arquivado, mime from ads.creatives where id = ${audioId} and workspace_id = ${workspaceId} and type = 'VOICE' and status = 'READY' and r2_key is not null`;
   if (!a) throw new Error("Uma das suas falas não existe mais. Grave de novo.");
@@ -73,7 +73,9 @@ export async function prepararFala(workspaceId: string, audioId: string, out: st
     renameSync(`${fonte}.parcial`, fonte);
   }
   const ponta = "silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.12";
-  const filtro = `highpass=f=80,afftdn=nf=-25,${ponta},areverse,${ponta},areverse,loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000`;
+  // pausas longas no meio da fala (> 0,5 s) viram um respiro curto
+  const meio = cortarPausas ? ",silenceremove=stop_periods=-1:stop_duration=0.5:stop_threshold=-45dB:stop_silence=0.25" : "";
+  const filtro = `highpass=f=80,afftdn=nf=-25,${ponta},areverse,${ponta},areverse${meio},loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000`;
   const r = await ffmpeg(["-i", fonte, "-vn", "-af", filtro, "-ac", "1", out], { timeoutMs: 300_000, signal });
   if (r.code !== 0) throw new Error(`Não consegui tratar uma das falas: ${r.err.trim().split("\n").at(-1)?.slice(0, 200)}`);
   const pr = await rodar(FFPROBE, ["-v", "error", "-show_format", "-of", "json", out]);

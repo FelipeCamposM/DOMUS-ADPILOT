@@ -71,6 +71,8 @@ export const briefSchema = z.object({
   vozNome: z.string().trim().max(80).default(""),
   audioProprio: z.string().uuid("Áudio inválido").nullable().default(null),
   falas: z.array(z.string().uuid("Áudio inválido").nullable()).max(40).default([]),
+  // "gravar depois, lendo o roteiro": a IA escreve a narração e o cliente grava na aprovação (falas ou tudo de uma vez)
+  lerRoteiro: z.coerce.boolean().default(false),
   cortarPausas: z.coerce.boolean().default(true),
   // auto = a IA escolhe o clima; sem música licenciada na biblioteca, a trilha é composta (original) no worker
   musica: z.enum(["none", "auto", ...MUSICA_TAGS]).default("auto"),
@@ -81,8 +83,7 @@ export const briefSchema = z.object({
   // estilo salvo (modo Livre): a IA repete a linguagem visual de um vídeo aprovado
   estiloSalvo: z.string().uuid("Estilo inválido").nullable().default(null),
 }).refine((b) => b.voz === VOZ_PROPRIA || temObjetivo(b), MSG_OBJETIVO) // a própria fala já diz do que se trata
-  .refine((b) => (b.voz === VOZ_PROPRIA) === !!b.audioProprio, { message: "Grave ou envie o áudio com a sua voz", path: ["audioProprio"] })
-  .refine((b) => (b.voz === VOZ_FALAS) === b.falas.some(Boolean), { message: "Grave as falas das cenas", path: ["falas"] });
+  .refine((b) => (b.voz === VOZ_PROPRIA) === !!b.audioProprio, { message: "Grave ou envie o áudio com a sua voz", path: ["audioProprio"] });
 export type Brief = z.infer<typeof briefSchema>;
 
 /** Efeitos sonoros e climas de música: o que pedir ao ElevenLabs quando a biblioteca não tem (o gerado fica salvo). */
