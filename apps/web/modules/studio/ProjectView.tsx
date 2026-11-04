@@ -10,6 +10,7 @@ import { BotaoPublicar } from "../instagram/BotaoPublicar";
 import { toast } from "../shell/toast";
 import { ajustarComIA, apagarVideo, cancelarVideo, gerarDeNovo, narrarComMinhaVoz, narrarComMinhasFalas, regerarComStoryboard, salvarEstilo, trocarVoz } from "./actions";
 import { FalaPorFala, GravarVoz, type VozGravada } from "./GravarVoz";
+import { PlayerVideo } from "./PlayerVideo";
 
 interface Cena { start: number; end: number; headline: string; subtext?: string; narration?: string; animation?: string; tipo?: string; itens?: string[] }
 const TIPO: Record<string, string> = { abertura: "Abertura", titulo: "Título", lista: "Lista", numero: "Número", comparacao: "Antes/depois", produto: "Produto", citacao: "Depoimento", cta: "CTA" };
@@ -124,8 +125,7 @@ export function ProjectView({ p, podeEditar, vozes }: { p: ProjetoView; podeEdit
                 <span className="subtle small">O roteiro está ao lado. Nada de voz, animação ou render foi gerado ainda: só depois que você aprovar.</span>
               </div>
             ) : p.creative && !rodando ? (
-              <video key={p.creative.id + (p.creative.size_bytes ?? "")} className="surge" src={`/api/creatives/${p.creative.id}/file`} poster={p.thumb ? `/api/creatives/${p.creative.id}/file?kind=thumb` : undefined}
-                controls playsInline style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
+              <PlayerVideo key={p.creative.id + (p.creative.size_bytes ?? "")} src={`/api/creatives/${p.creative.id}/file`} poster={p.thumb ? `/api/creatives/${p.creative.id}/file?kind=thumb` : undefined} />
             ) : (
               <Progresso status={st.status} step={st.step} progress={st.progress} error={st.error} />
             )}

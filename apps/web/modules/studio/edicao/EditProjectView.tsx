@@ -1,6 +1,7 @@
 "use client";
 
 import { blocosLegenda, ESTILOS_LEGENDA, REDES, type BriefEdicao, type EstiloLegenda, type PlanoEdicao, type Rede } from "@domus-ads/core/edicao";
+import { PlayerVideo } from "../PlayerVideo";
 import { Captions, Check, ClipboardCheck, Download, Eye, EyeOff, Film, Loader2, Mic, Rocket, Scissors, Sparkles, Square, Trash2, Upload, Wand2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
@@ -91,8 +92,8 @@ export function EditProjectView({ p, podeEditar }: { p: EdicaoView; podeEditar: 
           <div className="edicao-video" style={{ aspectRatio: String(prop), maxHeight: "68vh", maxWidth: `calc(68vh * ${prop})`, width: "100%" }}>
             {rodando ? <Etapas status={st.status} step={st.step} progress={st.progress} />
               : st.status === "FAILED" && !p.creative ? <Etapas status="FAILED" step={null} progress={null} error={st.error} />
-              : <video key={fonte ? "fonte" : p.creative!.id + (p.creative!.size_bytes ?? "")} src={`/api/creatives/${fonte ? p.brief.videoId : p.creative!.id}/file`}
-                  poster={fonte ? undefined : `/api/creatives/${p.creative!.id}/file?kind=thumb`} controls playsInline style={{ objectFit: "contain" }} />}
+              : <PlayerVideo key={fonte ? "fonte" : p.creative!.id + (p.creative!.size_bytes ?? "")} src={`/api/creatives/${fonte ? p.brief.videoId : p.creative!.id}/file`}
+                  poster={fonte ? undefined : `/api/creatives/${p.creative!.id}/file?kind=thumb`} />}
             {verZonas && !rodando && <ZonasRede rede={rede} formato={p.brief.formato} />}
           </div>
           <div className="cluster" style={{ marginTop: 10, justifyContent: "space-between", gap: 6 }}>
