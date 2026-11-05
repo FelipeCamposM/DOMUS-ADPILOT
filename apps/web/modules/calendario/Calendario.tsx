@@ -1,5 +1,6 @@
 "use client";
 
+import { usePulso } from "../shell/usePulso";
 import { confirmar } from "../shell/confirmar";
 import { faltasItem, FORMATOS_CAL, type FormatoCal, type Roteiro } from "@domus-ads/core/calendario";
 import { LIMITES_IG } from "@domus-ads/core/instagram-regras";
@@ -52,11 +53,7 @@ export function Calendario({ conta, contas, marcas, mes, itens, avulsos, planos,
   const gerando = itens.some((i) => ["GERANDO", "REVISAO", "AGENDADO"].includes(i.status));
 
   // acompanha a IA (3 s) e a geração das artes (15 s) sem recarregar a página
-  useEffect(() => {
-    if (!trabalhando && !gerando) return;
-    const t = setInterval(() => router.refresh(), trabalhando ? 3000 : 15000);
-    return () => clearInterval(t);
-  }, [trabalhando, gerando, router]);
+  usePulso("calendario", trabalhando ? 3000 : 20_000, trabalhando || gerando);
 
   const navegar = (delta: number) => {
     const [y, m] = mes.split("-").map(Number) as [number, number];

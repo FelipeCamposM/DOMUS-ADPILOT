@@ -1,5 +1,6 @@
 "use client";
 
+import { usePulso } from "./usePulso";
 import { Check, ChevronsUpDown, LogOut, Menu, MessageCircle, Search } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -53,11 +54,8 @@ export function Shell(p: ShellProps) {
     return () => window.removeEventListener("keydown", k);
   }, []);
 
-  // Contadores e status do worker se atualizam sozinhos a cada 30 s (sem recarregar a página).
-  useEffect(() => {
-    const t = setInterval(() => { if (document.visibilityState === "visible") router.refresh(); }, 30_000);
-    return () => clearInterval(t);
-  }, [router]);
+  // notificações e status do worker: confere a cada 30 s e só recarrega se mudou
+  usePulso("shell", 30_000);
 
   const trocar = (id: string) => start(async () => {
     try {

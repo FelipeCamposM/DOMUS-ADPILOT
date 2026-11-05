@@ -1,14 +1,9 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { usePulso } from "../shell/usePulso";
 
-/** Enquanto há vídeo sendo gerado, a lista se atualiza sozinha a cada 4 s. */
+/** Enquanto há vídeo sendo gerado, a lista confere a cada 4 s e só recarrega quando algo mudou. */
 export function StudioRefresh() {
-  const router = useRouter();
-  useEffect(() => {
-    const t = setInterval(() => { if (document.visibilityState === "visible") router.refresh(); }, 4000);
-    return () => clearInterval(t);
-  }, [router]);
+  usePulso("studio", 4000);
   return null;
 }

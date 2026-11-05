@@ -1,5 +1,6 @@
 "use client";
 
+import { usePulso } from "../shell/usePulso";
 import {
   CONSENTIMENTO, contatoSchema, ETAPA_ENTRADA, FRIO, formatarNumero, MAX_TEXTO_WA, preencherModelo, temLink, type EtapaCrm,
 } from "@domus-ads/core/mensagens";
@@ -111,10 +112,7 @@ export function Mensagens({ mensagens, contatos, modelos, biblioteca, avisos, on
   const nome = (c: { numero: string; contato: Contato | null }) => (c.numero === avisos ? "Avisos da plataforma" : c.contato?.nome ?? formatarNumero(c.numero));
 
   // atualiza sozinha (mensagens novas, status do envio) enquanto a aba está aberta
-  useEffect(() => {
-    const t = setInterval(() => { if (document.visibilityState === "visible") router.refresh(); }, 5000);
-    return () => clearInterval(t);
-  }, [router]);
+  usePulso("mensagens", 8000);
   // abriu a conversa com mensagens novas: marca como lida
   useEffect(() => {
     if (atual?.naoLidas && atual.contato) void marcarLida(atual.numero);
