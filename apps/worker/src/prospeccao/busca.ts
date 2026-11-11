@@ -1,5 +1,5 @@
 import { db } from "@domus-ads/core";
-import { campanhas, configProsp, salvarLeadsProsp } from "@domus-ads/core/prospeccao-db";
+import { campanhas, configProsp, leadsProsp, salvarLeadsProsp } from "@domus-ads/core/prospeccao-db";
 import { completeLead, type Lead } from "@domus-ads/core/prospeccao";
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
@@ -44,7 +44,8 @@ function matarArvore(pid: number | undefined) {
 }
 
 interface Resultado { success: boolean; found?: number; audited?: number; blocked?: boolean; leads?: Parameters<typeof completeLead>[0][]; message?: string }
-export interface ProspeccaoPayload { campanhaId: string }
+/** reauditar: a busca já achou as empresas mas caiu na auditoria; audita só o que está guardado, sem voltar ao Maps. */
+export interface ProspeccaoPayload { campanhaId: string; reauditar?: boolean }
 
 export async function runProspeccao(p: ProspeccaoPayload, o: { signal: AbortSignal; log: (m: string) => Promise<void>; progress: (n: number) => Promise<void> }) {
   const sql = db();
@@ -58,18 +59,19 @@ export async function runProspeccao(p: ProspeccaoPayload, o: { signal: AbortSign
     throw e;
   }
   const { pesos } = await configProsp(sql);
+  const guardados = p.reauditar ? await leadsProsp(sql, { campanhaId: c.id }) : null;
   mkdirSync(PASTA, { recursive: true });
   const entrada = join(PASTA, `${c.id}.json`);
   // tudo por arquivo: nada digitado vira argumento de linha de comando
   writeFileSync(entrada, JSON.stringify({
     campaignId: c.id, source: "google_maps", niches: c.niches, location: c.locationLabel, centerLat: c.centerLat, centerLng: c.centerLng,
     radiusKm: c.radiusKm, maxLeads: c.maxLeads, language: "pt-BR", country: "BR", pace: c.pace, auditWebsites: c.auditWebsites,
-    opportunityFocus: c.opportunityFocus, scoreWeights: pesos,
+    opportunityFocus: c.opportunityFocus, scoreWeights: pesos, ...(guardados && { auditLeads: guardados.filter((l) => !l.deletedAt) }),
   }), "utf8");
 
   // andamento: o que o Python conta no stderr, gravado no máximo 1x por segundo
   const achados = new Map<string, Lead>();
-  const st = { progresso: 0, etapa: "Abrindo o navegador", encontrados: 0, aAuditar: 0, sujo: true };
+  const st = { progresso: 0, etapa: "Abrindo o navegador", encontrados: guardados?.length ?? 0, aAuditar: 0, sujo: true };
   const gravar = async () => {
     if (!st.sujo) return;
     st.sujo = false;
@@ -116,7 +118,7 @@ export async function runProspeccao(p: ProspeccaoPayload, o: { signal: AbortSign
   /** parou ou falhou no meio: guarda o que já tinha (sem auditoria nem score) */
   const guardarParcial = async (status: "cancelled" | "failed", erro: string | null) => {
     await salvarLeadsProsp(sql, c.id, [...achados.values()]);
-    await sql`update ads.prosp_campanhas set status = ${status}, erro = ${erro}, encontrados = ${achados.size}, updated_at = now() where id = ${c.id}`;
+    await sql`update ads.prosp_campanhas set status = ${status}, erro = ${erro}, encontrados = ${Math.max(achados.size, guardados?.length ?? 0)}, updated_at = now() where id = ${c.id}`;
   };
   if (o.signal.aborted) {
     await guardarParcial("cancelled", null);
