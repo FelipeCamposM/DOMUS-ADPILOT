@@ -248,22 +248,42 @@ export function receitas(txs: TxBase[], vendas: VendaSite[]): Receita[] {
   return out.sort((a, b) => b.data.localeCompare(a.data) || b.valor - a.valor);
 }
 
-export interface ResumoReceitas {
-  mes: string; total: number; pf: number; pj: number; site: number; aLiberar: number; vendas: number; maior: Receita | null;
-  porFonte: { nome: string; valor: number }[]; serie: { mes: string; valor: number }[]; entradas: Receita[];
+/** Receitas por dia, semana (segunda a domingo) ou mês. */
+export type PeriodoRec = "dia" | "semana" | "mes";
+const somaDias = (d: string, n: number) => new Date(Date.parse(`${d}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+/** Primeiro dia do período que contém a data (AAAA-MM-DD). */
+export function inicioPeriodo(p: PeriodoRec, data: string): string {
+  if (p === "dia") return data.slice(0, 10);
+  if (p === "mes") return mesDe(data);
+  return somaDias(data, -((new Date(`${data.slice(0, 10)}T00:00:00Z`).getUTCDay() + 6) % 7));
 }
-export function resumoReceitas(rs: Receita[], mes: string, n = 12): ResumoReceitas {
-  const doMes = rs.filter((r) => r.mes === mes);
+/** Início do período n passos depois (n negativo = antes). */
+export const andarPeriodo = (p: PeriodoRec, inicio: string, n: number) => (p === "dia" ? somaDias(inicio, n) : p === "semana" ? somaDias(inicio, 7 * n) : somarMeses(inicio, n));
+export const fimPeriodo = (p: PeriodoRec, inicio: string) => somaDias(andarPeriodo(p, inicio, 1), -1);
+export const PONTOS_SERIE: Record<PeriodoRec, number> = { dia: 14, semana: 12, mes: 12 };
+// no mês vale a competência (igual às telas PF/PJ); no dia e na semana, a data
+const chavePeriodo = (p: PeriodoRec, r: Receita) => (p === "mes" ? r.mes : inicioPeriodo(p, r.data));
+
+export interface ResumoReceitas {
+  periodo: PeriodoRec; inicio: string; fim: string; total: number; pf: number; pj: number; site: number; aLiberar: number; vendas: number; maior: Receita | null;
+  porFonte: { nome: string; valor: number }[]; serie: { inicio: string; valor: number }[]; entradas: Receita[];
+}
+export function resumoReceitas(rs: Receita[], p: PeriodoRec, data: string, n = PONTOS_SERIE[p]): ResumoReceitas {
+  const inicio = inicioPeriodo(p, data);
+  const doPeriodo = rs.filter((r) => chavePeriodo(p, r) === inicio);
   const soma = (xs: Receita[]) => xs.reduce((a, r) => a + r.valor, 0);
+  const porChave = new Map<string, number>();
+  for (const r of rs) { const k = chavePeriodo(p, r); porChave.set(k, (porChave.get(k) ?? 0) + r.valor); }
   const fontes = new Map<string, number>();
-  for (const r of doMes) fontes.set(r.fonte, (fontes.get(r.fonte) ?? 0) + r.valor);
+  for (const r of doPeriodo) fontes.set(r.fonte, (fontes.get(r.fonte) ?? 0) + r.valor);
   return {
-    mes, total: soma(doMes), pf: soma(doMes.filter((r) => r.pessoa === "PF")), pj: soma(doMes.filter((r) => r.pessoa !== "PF")),
-    site: soma(doMes.filter((r) => r.origem !== "banco")), aLiberar: soma(doMes.filter((r) => r.origem === "site")), vendas: doMes.filter((r) => r.origem !== "banco").length,
-    maior: doMes.reduce<Receita | null>((m, r) => (!m || r.valor > m.valor ? r : m), null),
+    periodo: p, inicio, fim: fimPeriodo(p, inicio),
+    total: soma(doPeriodo), pf: soma(doPeriodo.filter((r) => r.pessoa === "PF")), pj: soma(doPeriodo.filter((r) => r.pessoa !== "PF")),
+    site: soma(doPeriodo.filter((r) => r.origem !== "banco")), aLiberar: soma(doPeriodo.filter((r) => r.origem === "site")), vendas: doPeriodo.filter((r) => r.origem !== "banco").length,
+    maior: doPeriodo.reduce<Receita | null>((m, r) => (!m || r.valor > m.valor ? r : m), null),
     porFonte: [...fontes].map(([nome, valor]) => ({ nome, valor })).filter((f) => f.valor > 0).sort((a, b) => b.valor - a.valor),
-    serie: Array.from({ length: n }, (_, i) => { const m = somarMeses(mes, i - n + 1); return { mes: m, valor: soma(rs.filter((r) => r.mes === m)) }; }),
-    entradas: doMes,
+    serie: Array.from({ length: n }, (_, i) => { const k = andarPeriodo(p, inicio, i - n + 1); return { inicio: k, valor: porChave.get(k) ?? 0 }; }),
+    entradas: doPeriodo,
   };
 }
 

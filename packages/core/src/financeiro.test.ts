@@ -103,9 +103,14 @@ describe("financeiro", () => {
     expect(rs.map((r) => r.id).sort()).toEqual(["sal", "venda:1", "venda:2"]);
     expect(rs.find((r) => r.id === "venda:1")).toMatchObject({ origem: "conciliada", valor: 1980, taxa: 20, pessoa: "PJ" });
     expect(rs.find((r) => r.id === "venda:2")).toMatchObject({ origem: "site", valor: 1980 });
-    const m = resumoReceitas(rs, "2026-11-01");
+    const m = resumoReceitas(rs, "mes", "2026-11-20");
     expect(m.total).toBe(350000 + 1980 * 2);
     expect(m.aLiberar).toBe(1980);
     expect(m.porFonte[0]).toEqual({ nome: "Salário PJ", valor: 350000 });
+    expect(m.serie.at(-1)).toEqual({ inicio: "2026-11-01", valor: m.total });
+    // semana de seg 09/11 a dom 15/11: só a venda de 11/11
+    const sem = resumoReceitas(rs, "semana", "2026-11-15");
+    expect([sem.inicio, sem.fim, sem.total]).toEqual(["2026-11-09", "2026-11-15", 1980]);
+    expect(resumoReceitas(rs, "dia", "2026-11-06").total).toBe(350000);
   });
 });
