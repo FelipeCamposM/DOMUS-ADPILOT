@@ -32,6 +32,8 @@ export default async function ReceitasPage({ searchParams }: { searchParams: Pro
   // só o que a tela usa (sem telefone/e-mail de cliente no navegador)
   const rs = receitas(todas, vendas.map(({ pagoEm: _p, telefone: _t, email: _e, ...v }) => v));
   const r = resumoReceitas(rs, p, data);
+  // período anterior, dia a dia, para a linha de comparação da tendência
+  const anteriores = resumoReceitas(rs, p, andarPeriodo(p, inicio, -1)).entradas.map((e) => ({ data: e.data, valor: e.valor }));
   // entradas que você marcou como "desconsiderar" (natureza ignorado), para poder voltar atrás
   const fimP = r.fim;
   const desconsideradas: ReceitaNota[] = todas
@@ -41,7 +43,7 @@ export default async function ReceitasPage({ searchParams }: { searchParams: Pro
   return (
     <Receitas key={`${p}-${inicio}`} d={{
       hoje, r, anterior: r.serie.at(-2)?.valor ?? 0, media: antes.length ? Math.round(antes.reduce((a, s) => a + s.valor, 0) / antes.length) : 0,
-      desconsideradas,
+      desconsideradas, anteriores,
       notas: Object.fromEntries(todas.filter((t) => t.nota && r.entradas.some((e) => e.id === t.id)).map((t) => [t.id, t.nota!])),
       cores: Object.fromEntries(cats.map((c) => [c.nome, c.cor])),
       contas: Object.fromEntries(cts.map((c) => [c.id, c.apelido || c.banco || c.nome])),
