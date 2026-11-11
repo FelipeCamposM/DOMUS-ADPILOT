@@ -3,8 +3,8 @@
 import "leaflet/dist/leaflet.css";
 import type { Lead } from "@domus-ads/core/prospeccao";
 import L from "leaflet";
-import { Crosshair, Loader2, MapPin, Search, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowRight, Crosshair, Loader2, LocateFixed, MapPin, Minus, Plus, Search, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Circle, MapContainer, Marker, TileLayer, Tooltip, useMap, useMapEvents } from "react-leaflet";
 import { STATUS } from "./comum";
 import { MapGuard, MapPlaceholder } from "./MapGuard";
@@ -81,7 +81,7 @@ function ClickToMove({ onPick, disabled }: { onPick: (lat: number, lng: number) 
   return null;
 }
 
-export function LocationPicker({ value, radiusKm, disabled, onChange }: { value: PickedLocation; radiusKm: number; disabled?: boolean; onChange: (v: PickedLocation) => void }) {
+export function LocationPicker({ value, radiusKm, disabled, onChange, extra }: { value: PickedLocation; radiusKm: number; disabled?: boolean; onChange: (v: PickedLocation) => void; /** cartão a mais no topo, à direita */ extra?: ReactNode }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Place[]>([]);
   const [searching, setSearching] = useState(false);
@@ -120,52 +120,81 @@ export function LocationPicker({ value, radiusKm, disabled, onChange }: { value:
     setQuery(""); setResults([]); setOpen(false);
   }
 
+  // mapa ocupa tudo; busca, território, zoom e dica flutuam por cima (fora do MapContainer: clique neles não move o pino)
+  const [map, setMap] = useState<L.Map | null>(null);
+  const [zoom, setZoom] = useState(14);
+  useEffect(() => {
+    if (!map) return;
+    const f = () => setZoom(Math.round(map.getZoom()));
+    f();
+    map.on("zoomend", f);
+    return () => { map.off("zoomend", f); };
+  }, [map]);
+  const recentrar = () => map?.flyToBounds(L.latLng(value.lat, value.lng).toBounds(radiusKm * 2000), { padding: [28, 28], duration: 0.6 });
+  const irAoLocal = () => { if (open && results[0] && !searching) choose(results[0]); else void buscar(); };
+
   return (
     <div className="pp-picker">
-      <div className="pp-lugar">
-        <Search className="pp-lugar-ic" aria-hidden />
-        <input type="search" className="input-sm" aria-label="Buscar endereço, bairro ou cidade" placeholder="Buscar endereço, bairro ou cidade… (Enter)" value={query} disabled={disabled}
-          onChange={(e) => { setQuery(e.target.value); if (!e.target.value) { setResults([]); setOpen(false); } }}
-          onFocus={() => results.length && setOpen(true)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") { e.preventDefault(); if (open && results[0] && !searching) choose(results[0]); else void buscar(); }
-            if (e.key === "Escape") setOpen(false);
-          }} />
-        {searching ? <Loader2 className="pp-lugar-fim animate-spin" aria-hidden />
-          : query && <button type="button" className="pp-lugar-fim pp-lugar-x" aria-label="Limpar busca" onClick={() => { setQuery(""); setResults([]); setOpen(false); }}><X aria-hidden /></button>}
-        {open && (results.length > 0 || failed || (!searching && query.trim().length >= 3)) && (
-          <ul role="listbox" aria-label="Lugares encontrados" className="pp-lugares">
-            {failed && <li className="pp-lugares-erro">Não foi possível buscar agora. Clique no mapa para escolher o ponto.</li>}
-            {!failed && !results.length && <li className="pp-lugares-erro" style={{ color: "rgb(var(--c-text-tertiary))" }}>Nada encontrado. Tente o bairro com a cidade.</li>}
-            {results.map((place) => (
-              <li key={`${place.lat},${place.lng}`}>
-                <button type="button" role="option" aria-selected={false} onClick={() => choose(place)}>
-                  <MapPin aria-hidden />
-                  <span><b>{place.label}</b><small>{place.detail}</small></span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
       <div className="pp-mapa pp-mapa-picker">
-        <MapContainer center={[value.lat, value.lng]} zoom={14} className="pp-mapa-in" style={{ height: 380 }} scrollWheelZoom zoomControl={false}>
+        <MapContainer ref={setMap} center={[value.lat, value.lng]} zoom={14} className="pp-mapa-in" style={{ height: "100%" }} scrollWheelZoom zoomControl={false}>
           <MapTiles />
           <FitRadius lat={value.lat} lng={value.lng} radiusKm={radiusKm} />
           <ClickToMove onPick={pick} disabled={disabled} />
-          <Circle center={[value.lat, value.lng]} radius={radiusKm * 1000} pathOptions={{ className: "pp-raio", weight: 2, fillOpacity: 0.08, dashArray: "6 6" }} />
+          <Circle center={[value.lat, value.lng]} radius={radiusKm * 1000} pathOptions={{ className: "pp-raio", weight: 2, fillOpacity: 0.1, dashArray: "6 6" }} />
           <Marker position={[value.lat, value.lng]} icon={PIN} draggable={!disabled}
             eventHandlers={{ dragend: (e) => { const p = (e.target as L.Marker).getLatLng(); pick(p.lat, p.lng); } }} />
         </MapContainer>
-        <div className="pp-mapa-topo">
-          <span className="pp-flutua">
-            {naming ? <Loader2 className="animate-spin" aria-hidden /> : <MapPin aria-hidden />}
-            <span className="pp-trunc" aria-live="polite">{value.label || "Escolha um ponto"}</span>
-            <span className="pp-flutua-km">· {String(radiusKm).replace(".", ",")} km</span>
-          </span>
+      </div>
+
+      <div className="pp-hud-topo">
+        <div className="pp-hud pp-hud-terr">
+          <span className="pp-hud-rot"><i data-on={!naming || undefined} />Território definido</span>
+          <b className="pp-trunc" aria-live="polite">{naming ? "Identificando o lugar…" : value.label || "Escolha um ponto"}</b>
+          <small className="tabular">{String(radiusKm).replace(".", ",")} km de raio · {Math.round(Math.PI * radiusKm * radiusKm).toLocaleString("pt-BR")} km² de área</small>
         </div>
-        <p className="pp-flutua pp-mapa-dica"><Crosshair aria-hidden /> Clique no mapa ou arraste o pino</p>
+
+        <div className="pp-hud pp-hud-busca">
+          <span className="pp-hud-ico">{searching ? <Loader2 className="animate-spin" aria-hidden /> : <Search aria-hidden />}</span>
+          <label className="pp-hud-campo">
+            <span className="pp-hud-rot">Explorar o mapa</span>
+            <input type="search" aria-label="Buscar endereço, bairro ou cidade" placeholder="Busque cidade, bairro ou endereço" value={query} disabled={disabled}
+              onChange={(e) => { setQuery(e.target.value); if (!e.target.value) { setResults([]); setOpen(false); } }}
+              onFocus={() => results.length && setOpen(true)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") { e.preventDefault(); irAoLocal(); }
+                if (e.key === "Escape") setOpen(false);
+              }} />
+          </label>
+          {query && !searching && <button type="button" className="pp-hud-x" aria-label="Limpar busca" onClick={() => { setQuery(""); setResults([]); setOpen(false); }}><X aria-hidden /></button>}
+          <button type="button" className="btn btn-primary btn-sm pp-hud-ir" disabled={disabled || query.trim().length < 3 || searching} onClick={irAoLocal}>Ir ao local <ArrowRight aria-hidden /></button>
+          {open && (results.length > 0 || failed || (!searching && query.trim().length >= 3)) && (
+            <ul role="listbox" aria-label="Lugares encontrados" className="pp-lugares">
+              {failed && <li className="pp-lugares-erro">Não foi possível buscar agora. Clique no mapa para escolher o ponto.</li>}
+              {!failed && !results.length && <li className="pp-lugares-erro" style={{ color: "rgb(var(--c-text-tertiary))" }}>Nada encontrado. Tente o bairro com a cidade.</li>}
+              {results.map((place) => (
+                <li key={`${place.lat},${place.lng}`}>
+                  <button type="button" role="option" aria-selected={false} onClick={() => choose(place)}>
+                    <MapPin aria-hidden />
+                    <span><b>{place.label}</b><small>{place.detail}</small></span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        {extra}
+      </div>
+
+      <div className="pp-hud pp-hud-zoom" role="group" aria-label="Zoom do mapa">
+        <button type="button" aria-label="Aproximar" onClick={() => map?.zoomIn()}><Plus aria-hidden /></button>
+        <span><small>zoom</small><b className="tabular">{zoom}</b></span>
+        <button type="button" aria-label="Afastar" onClick={() => map?.zoomOut()}><Minus aria-hidden /></button>
+        <button type="button" aria-label="Voltar ao território" onClick={recentrar}><LocateFixed aria-hidden /></button>
+      </div>
+
+      <div className="pp-hud pp-hud-dica">
+        <span className="pp-hud-ico pp-hud-ico-sm"><Crosshair aria-hidden /></span>
+        <span><b>Marque o território</b><small>Clique no mapa ou arraste o pino · a roda do mouse aproxima</small></span>
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { BibliotecaModal } from "../arquivos/Biblioteca";
 import { enviarArquivo } from "../creatives/upload";
+import { Seletor } from "../shell/Seletor";
 import { toast } from "../shell/toast";
 import { salvarMarca } from "./actions";
 
@@ -13,6 +14,8 @@ export interface BrandValor {
   tom: string; sobre: string; regras: string; referencias: string[]; site: string;
 }
 const FONTES = ["Plus Jakarta Sans", "Inter", "Poppins", "Montserrat", "Manrope", "DM Sans", "Space Grotesk", "Sora", "Outfit", "Urbanist", "Bricolage Grotesque", "Anton", "Bebas Neue", "Playfair Display", "Fraunces", "Instrument Serif", "Archivo Black", "Syne"];
+// fonte salva antes fora da lista continua aparecendo como opção
+const opcoesFonte = (atual: string) => [...new Set([...(atual && !FONTES.includes(atual) ? [atual] : []), ...FONTES])].map((f) => ({ valor: f, rotulo: f }));
 
 /**
  * Identidade visual de uma marca. O que a IA cria com ela (vídeos, imagens, campanhas, legendas) segue isto: cores,
@@ -84,10 +87,11 @@ export function BrandEditor({ marcaId, nome: nomeInicial, inicial, podeEditar }:
           </div>
         </div>
 
-        <datalist id="fontes-google">{FONTES.map((f) => <option key={f} value={f} />)}</datalist>
         <div className="kpis" style={{ gridTemplateColumns: "1fr 1fr" }}>
-          <div className="field"><label className="label" htmlFor="ft">Fonte dos títulos (Google Fonts)</label><input id="ft" className="input-sm" list="fontes-google" value={b.fonteTitulo} maxLength={60} onChange={(e) => set({ fonteTitulo: e.target.value })} placeholder="Ex.: Plus Jakarta Sans" /></div>
-          <div className="field"><label className="label" htmlFor="fx">Fonte dos textos</label><input id="fx" className="input-sm" list="fontes-google" value={b.fonteTexto} maxLength={60} onChange={(e) => set({ fonteTexto: e.target.value })} placeholder="Ex.: Inter" /></div>
+          <div className="field"><span className="label">Fonte dos títulos (Google Fonts)</span>
+            <Seletor className="seletor-campo" ariaLabel="Fonte dos títulos" valor={b.fonteTitulo} opcoes={opcoesFonte(b.fonteTitulo)} onChange={(v) => set({ fonteTitulo: v })} /></div>
+          <div className="field"><span className="label">Fonte dos textos</span>
+            <Seletor className="seletor-campo" ariaLabel="Fonte dos textos" valor={b.fonteTexto} opcoes={opcoesFonte(b.fonteTexto)} onChange={(v) => set({ fonteTexto: v })} /></div>
         </div>
 
         <div className="field">

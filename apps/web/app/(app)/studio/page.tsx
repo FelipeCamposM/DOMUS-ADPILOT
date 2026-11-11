@@ -6,6 +6,7 @@ import { projetos } from "@/lib/video";
 import { Busca } from "@/modules/shell/Busca";
 import { StudioRefresh } from "@/modules/studio/StudioRefresh";
 import { VideoCard } from "@/modules/studio/VideoCard";
+import { Selecao } from "@/modules/shell/Selecao";
 import { HeroFx } from "@/modules/shell/HeroFx";
 
 export const metadata = { title: "Studio" };
@@ -64,13 +65,15 @@ export default async function StudioPage({ searchParams }: { searchParams: Promi
       {lista.length === 0 ? (
         <div className="panel"><div className="empty">{q ? `Nada encontrado para “${q}”.` : f !== "todos" ? "Nenhum projeto neste filtro." : "Nenhum projeto ainda. Escolha acima o que criar."}</div></div>
       ) : (
+        <Selecao tipo="projetos" chaves={editor ? lista.map((p) => p.id) : []}>
         <div className="studio-grid">
           {lista.map((p) => (
-            <VideoCard key={p.id} href={`/studio/${p.id}`} creativeId={p.creative_id} thumb={p.thumb} titulo={p.title} status={p.status} progress={p.progress}
+            <VideoCard key={p.id} chave={editor ? p.id : undefined} href={`/studio/${p.id}`} creativeId={p.creative_id} thumb={p.thumb} titulo={p.title} status={p.status} progress={p.progress}
               formato={p.brief.formato} kind={p.kind === "image" ? "image" : "video"}
               sub={p.kind === "image" ? `Imagem · ${p.brief.formato.replace(".", ",")} · ${ago(p.updated_at)}` : p.kind === "edit" ? `Edição · ${p.brief.formato} · ${ago(p.updated_at)}` : `Vídeo · ${p.brief.formato} · ${p.brief.duracao} s · ${ago(p.updated_at)}`} />
           ))}
         </div>
+        </Selecao>
       )}
     </div>
   );

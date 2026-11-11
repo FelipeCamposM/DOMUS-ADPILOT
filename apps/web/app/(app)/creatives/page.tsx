@@ -8,6 +8,7 @@ import { db } from "@domus-ads/core";
 import { AudioLibrary, type AudioItem } from "@/modules/creatives/AudioLibrary";
 import { Busca } from "@/modules/shell/Busca";
 import { VideoCard } from "@/modules/studio/VideoCard";
+import { Selecao } from "@/modules/shell/Selecao";
 import { HeroFx } from "@/modules/shell/HeroFx";
 
 export const metadata = { title: "Criativos" };
@@ -42,10 +43,16 @@ export default async function CreativesPage({ searchParams }: { searchParams: Pr
 
   const vazio = <div className="panel"><div className="empty">{q ? `Nada encontrado para “${q}”.` : "Nada ainda."}</div></div>;
   const cartao = ({ capa: c, n, ids }: { capa: CriativoLinha; n: number; ids: string[] }) => (
-    <VideoCard key={c.id} href={c.project_id ? `/studio/${c.project_id}` : `/api/creatives/${c.id}/file`} creativeId={c.id} thumb={c.thumb} status={c.status}
+    <VideoCard key={c.id} chave={editor ? ids.join(",") : undefined} href={c.project_id ? `/studio/${c.project_id}` : `/api/creatives/${c.id}/file`} creativeId={c.id} thumb={c.thumb} status={c.status}
       titulo={n > 1 ? c.name.split(" · slide ")[0]! : c.name} slides={n > 1 ? ids : undefined}
       progress={null} kind={c.type === "IMAGE" ? "image" : "video"} formato={formatoDe(c.width, c.height)}
       sub={`${n > 1 ? `Carrossel · ${n} slides` : c.type === "IMAGE" ? "Imagem" : "Vídeo"}${gerado(c.tags) ? "" : " enviado"} · ${c.width}×${c.height}${c.duration_ms ? ` · ${(c.duration_ms / 1000).toFixed(1).replace(".", ",")} s` : ""} · ${ago(c.created_at)}`} />
+  );
+
+  const grade = (gs: ReturnType<typeof agrupar>) => (
+    <Selecao tipo="criativos" chaves={editor ? gs.map((g) => g.ids.join(",")) : []}>
+      <div className="studio-grid">{gs.map(cartao)}</div>
+    </Selecao>
   );
 
   let corpo: React.ReactNode;
@@ -56,7 +63,7 @@ export default async function CreativesPage({ searchParams }: { searchParams: Pr
     const audios = itens.filter((c) => c.type === "MUSIC" || c.type === "SFX");
     corpo = !itens.length ? vazio : (
       <>
-        {visuais.length > 0 && <div className="studio-grid">{agrupar(visuais).map(cartao)}</div>}
+        {visuais.length > 0 && grade(agrupar(visuais))}
         {audios.length > 0 && (
           <div className="panel">
             <div className="panel-head"><div className="panel-title">Áudios ({audios.length})</div></div>
@@ -91,7 +98,7 @@ export default async function CreativesPage({ searchParams }: { searchParams: Pr
     corpo = itens.length === 0 && q ? vazio : itens.length === 0 ? (
       <div className="panel"><div className="empty">Nada ainda. Crie no <Link href={`/studio/novo${tipo === "IMAGE" ? "?tipo=imagem" : ""}`} style={{ textDecoration: "underline" }}>Studio</Link>.</div></div>
     ) : (
-      <div className="studio-grid">{agrupar(itens).map(cartao)}</div>
+      grade(agrupar(itens))
     );
   }
 

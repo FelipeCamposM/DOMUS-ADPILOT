@@ -298,24 +298,84 @@ export async function cancelarVideo(projectId: string) {
   });
 }
 
-/** Apaga o projeto e o vídeo final (banco + arquivo no PC ou no R2). */
+/** Apaga o projeto e tudo que ele gerou (banco + arquivos no PC ou no R2). */
+async function apagarProjeto(ctx: Ctx, projectId: string) {
+  const p = await doWorkspace(ctx, projectId);
+  if (p.ocupado) throw new Error("Cancele a geração antes de apagar");
+  // o vídeo final, todas as variações de imagem e as fotos baixadas dos links do projeto (banco + arquivos)
+  const gerados = await db()<{ id: string; storage: string; r2_key: string | null; thumbnail_key: string | null }[]>`
+    select id, storage, r2_key, thumbnail_key from ads.creatives
+    where workspace_id = ${ctx.workspace.id} and (id = ${p.creative_id ?? null} or metadata->>'projectId' = ${p.id} or metadata->>'refDe' = ${p.id}) and type in ('VIDEO','IMAGE')`;
+  for (const c of gerados) {
+    for (const k of [c.r2_key, c.thumbnail_key]) if (k) await apagarArquivo(c.storage, k).catch(() => {});
+    await db()`delete from ads.creatives where id = ${c.id}`;
+  }
+  await db()`delete from ads.video_projects where id = ${p.id}`;
+  await audit(db(), { workspaceId: ctx.workspace.id, actor: ctx.actor, action: "Apagar vídeo", entityType: "video_project", entityId: p.id, entityName: p.title });
+}
+
 export async function apagarVideo(projectId: string) {
   return run(async () => {
     const ctx = await requireCtx();
     requireRole(ctx, "editor");
-    const p = await doWorkspace(ctx, projectId);
-    if (p.ocupado) throw new Error("Cancele a geração antes de apagar");
-    // o vídeo final, todas as variações de imagem e as fotos baixadas dos links do projeto (banco + arquivos)
-    const gerados = await db()<{ id: string; storage: string; r2_key: string | null; thumbnail_key: string | null }[]>`
-      select id, storage, r2_key, thumbnail_key from ads.creatives
-      where workspace_id = ${ctx.workspace.id} and (id = ${p.creative_id ?? null} or metadata->>'projectId' = ${p.id} or metadata->>'refDe' = ${p.id}) and type in ('VIDEO','IMAGE')`;
-    for (const c of gerados) {
-      for (const k of [c.r2_key, c.thumbnail_key]) if (k) await apagarArquivo(c.storage, k).catch(() => {});
-      await db()`delete from ads.creatives where id = ${c.id}`;
-    }
-    await db()`delete from ads.video_projects where id = ${p.id}`;
-    await audit(db(), { workspaceId: ctx.workspace.id, actor: ctx.actor, action: "Apagar vídeo", entityType: "video_project", entityId: p.id, entityName: p.title });
+    await apagarProjeto(ctx, projectId);
     revalidatePath("/studio");
+  });
+}
+
+/** Apaga vários projetos de uma vez (lista do Studio). Os que estão gerando ficam e são contados à parte. */
+export async function apagarProjetos(ids: unknown) {
+  return run(async () => {
+    const ctx = await requireCtx();
+    requireRole(ctx, "editor");
+    const lista = z.array(uuid).min(1, "Selecione ao menos um projeto").max(200, "Máximo de 200 por vez").parse(ids);
+    let apagados = 0, pulados = 0;
+    for (const id of lista) {
+      try { await apagarProjeto(ctx, id); apagados++; } catch { pulados++; }
+    }
+    revalidatePath("/studio");
+    revalidatePath("/creatives");
+    return { apagados, pulados };
+  });
+}
+
+/**
+ * Apaga vários itens da página Criativos. Grupos = cartões (um carrossel são vários ids).
+ * Item gerado num projeto: some só ele; se o projeto ficar sem nada, o projeto vai junto. Projeto gerando fica.
+ */
+export async function apagarCriativos(grupos: unknown) {
+  return run(async () => {
+    const ctx = await requireCtx();
+    requireRole(ctx, "editor");
+    const ids = [...new Set(z.array(z.array(z.string().uuid("Item inválido")).min(1)).min(1, "Selecione ao menos um item").max(200, "Máximo de 200 por vez").parse(grupos).flat())];
+    const sql = db();
+    const itens = await sql<{ id: string; name: string; storage: string; r2_key: string | null; thumbnail_key: string | null; preview_key: string | null; project_id: string | null }[]>`
+      select c.id, c.name, c.storage, c.r2_key, c.thumbnail_key, c.preview_key,
+        coalesce(c.metadata->>'projectId', (select vp.id::text from ads.video_projects vp where vp.creative_id = c.id and vp.workspace_id = c.workspace_id limit 1)) as project_id
+      from ads.creatives c
+      where c.workspace_id = ${ctx.workspace.id} and c.id = any(${ids}::uuid[]) and c.type in ('VIDEO','IMAGE','MUSIC','SFX')`;
+    let apagados = 0, pulados = 0;
+    const projetos = new Set<string>();
+    for (const c of itens) {
+      if (c.project_id && (await doWorkspace(ctx, c.project_id).catch(() => null))?.ocupado) { pulados++; continue; }
+      // banco primeiro: item em uso (anúncio, post) não apaga e o arquivo fica
+      try { await sql`delete from ads.creatives where id = ${c.id}`; } catch { pulados++; continue; }
+      for (const k of [c.r2_key, c.thumbnail_key, c.preview_key]) if (k) await apagarArquivo(c.storage, k).catch(() => {});
+      if (c.project_id) projetos.add(c.project_id);
+      apagados++;
+    }
+    // projeto que ficou sem nada some; o que sobrou aponta para o primeiro item restante
+    for (const pid of projetos) {
+      const [resto] = await sql<{ id: string }[]>`select id from ads.creatives where workspace_id = ${ctx.workspace.id} and metadata->>'projectId' = ${pid} and type in ('VIDEO','IMAGE') order by created_at limit 1`;
+      if (resto) await sql`update ads.video_projects set creative_id = ${resto.id} where id = ${pid} and workspace_id = ${ctx.workspace.id}
+        and (creative_id is null or not exists (select 1 from ads.creatives x where x.id = video_projects.creative_id))`;
+      else await apagarProjeto(ctx, pid).catch(() => {});
+    }
+    await audit(sql, { workspaceId: ctx.workspace.id, actor: ctx.actor, action: "Apagar criativos", entityType: "creative", entityName: `${apagados} item(ns)`, after: { ids: itens.map((c) => c.id) } });
+    revalidatePath("/creatives");
+    revalidatePath("/studio");
+    revalidatePath("/arquivos");
+    return { apagados, pulados };
   });
 }
 

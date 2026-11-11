@@ -19,6 +19,8 @@ const filtroSchema = z.object({
   pasta: z.union([z.literal("todas"), z.literal("sem"), uuid]).default("todas"),
   tipo: z.enum(["IMAGE", "VIDEO", "todos"]).default("todos"),
   origem: z.enum(["enviados", "gerados", "todos"]).default("todos"),
+  /** onde está o original: r2 (abre na hora) ou drive (arquivado no PC) */
+  onde: z.enum(["r2", "drive", "todos"]).default("todos"),
 });
 
 /** Imagens e vídeos do workspace (enviados e gerados) com as pastas. Alimenta a página Arquivos e o modal da biblioteca. */
@@ -39,6 +41,7 @@ export async function listarArquivos(filtro: z.input<typeof filtroSchema>) {
           and (${f.origem} = 'todos' or ('asset' = any(tags)) = (${f.origem} = 'enviados'))
           and (${f.pasta} = 'todas' or (${f.pasta} = 'sem' and pasta_id is null) or pasta_id::text = ${f.pasta})
           and (${t}::text is null or name ilike ${t})
+          and (${f.onde} = 'todos' or arquivado = (${f.onde} = 'drive'))
         order by created_at desc limit 400`,
       sql<Pasta[]>`
         select p.id, p.nome, count(c.id)::int as n from ads.pastas p left join ads.creatives c on c.pasta_id = p.id and c.status = 'READY'
@@ -100,5 +103,17 @@ export async function moverArquivos(ids: string[], pastaId: string | null) {
     const r = await sql`update ads.creatives set pasta_id = ${destino} where id = any(${lista}::uuid[]) and workspace_id = ${ctx.workspace.id}`;
     revalidatePath("/arquivos");
     return r.count;
+  });
+}
+
+/** Renomeia um arquivo da biblioteca. */
+export async function renomearArquivo(id: string, nome: string) {
+  return run(async () => {
+    const ctx = await requireCtx();
+    requireRole(ctx, "editor");
+    const n = z.string().trim().min(1, "Dê um nome ao arquivo").max(120, "Nome com no máximo 120 caracteres").parse(nome);
+    const r = await db()`update ads.creatives set name = ${n} where id = ${uuid.parse(id)} and workspace_id = ${ctx.workspace.id}`;
+    if (!r.count) throw new Error("Arquivo não encontrado");
+    revalidatePath("/arquivos");
   });
 }

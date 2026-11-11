@@ -3,23 +3,29 @@
 import { ClipboardCheck, Film, GalleryHorizontalEnd, Loader2, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { useRef } from "react";
+import { useMarcavel } from "../shell/Selecao";
 
 const RODANDO: Record<string, string> = { REVIEW: "Esperando aprovação", NEW: "Novo", QUEUED: "Na fila", SCRIPTING: "Roteiro", VOICE: "Narração", COMPOSING: "Animação", RENDERING: "Render", MIXING: "Mixagem", UPLOADING: "Enviando" };
 
 /** Cartão de vídeo: miniatura que vira prévia em movimento (sem som) ao passar o mouse. */
-export function VideoCard({ href, creativeId, thumb, titulo, sub, status, progress, formato, kind = "video", slides }: {
+export function VideoCard({ href, creativeId, thumb, titulo, sub, status, progress, formato, kind = "video", slides, chave }: {
   href: string; creativeId: string | null; thumb: boolean; titulo: string; sub: string; status: string; progress: number | null; formato: string; kind?: "video" | "image";
   /** carrossel: ids dos slides em ordem (o cartão vira uma pilha com selo e faixa de miniaturas) */
   slides?: string[];
+  /** dentro de <Selecao>: chave do cartão para marcar e apagar em lote */
+  chave?: string;
 }) {
+  const m = useMarcavel(chave);
   const vid = useRef<HTMLVideoElement>(null);
   const pronto = status === "READY" && creativeId;
   const carrossel = !!slides && slides.length > 1;
   const ratio = formato === "16:9" ? "16/9" : formato === "1:1" ? "1/1" : formato === "4:5" ? "4/5" : formato === "1.91:1" ? "1200/628" : "9/16";
   return (
     <Link href={href} className={`panel spotlight${carrossel ? " card-carrossel" : ""}`} data-enter="scale" style={{ padding: 8, display: "flex", flexDirection: "column", gap: 8 }}
+      data-selecionado={m?.marcado || undefined} onClick={m?.onClickCartao}
       onMouseEnter={() => { if (vid.current) { vid.current.currentTime = 0; void vid.current.play().catch(() => {}); } }}
       onMouseLeave={() => vid.current?.pause()}>
+      {m?.caixa}
       <div className={carrossel ? "pilha" : undefined} style={{ position: "relative" }}>
       <div className="thumb-card" style={{ aspectRatio: ratio, maxHeight: 340, width: "100%" }}>
         {pronto && kind === "image" ? (
