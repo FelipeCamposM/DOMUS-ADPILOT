@@ -384,6 +384,37 @@ Como ligar um sistema novo (API, cabeçalho `Authorization: Bearer domus_…`, r
 - Sem sessão: mande o histórico inteiro em cada prompt. A IA roda sem ferramentas (só texto). Instruções e prompt são
   apagados ao fim da resposta e o pedido some em 7 dias (o consumo fica). Exemplo pronto: `lib/adpilot.ts` do SIAPLUS-site.
 
+### CRM · Prospecção (admin da plataforma)
+Acha empresas no Google Maps, audita o site de cada uma, dá uma nota de oportunidade (score) e prepara a abordagem.
+A busca roda no **worker** (o PC, com o IP de casa): o Google bloqueia IP de datacenter, então nada disso roda na
+Vercel. O worker precisa estar ligado.
+
+- **Buscar**: nichos em chips (Enter ou vírgula, com sugestões), raio (slider e atalhos de 1 a 20 km), máximo de
+  leads, nome da campanha (opcional), prioridade comercial (Sem site primeiro / Equilibrado / Todos), ritmo
+  (Cauteloso / Normal / Rápido) e "Auditar sites". O local sai do mapa: busque o endereço, bairro ou cidade (Enter) ou
+  clique/arraste o pino; o círculo mostra a área.
+- **Durante a busca**: um aviso fixo (em todas as telas do CRM) mostra o nome, a % e as 4 etapas (abrindo o navegador,
+  buscando no Maps com o contador de encontradas, auditando os sites, ordenando e salvando). **Parar** guarda o que já
+  foi achado, sem auditoria. Se o Google limitar as buscas, o que já foi encontrado é salvo e o aviso diz. Uma busca
+  por vez.
+- **Resultados**: suas buscas (status, data, excluir); em cada busca, os números do topo (sem site, site com
+  problema, já anunciam, com e-mail, nota média), filtros (texto, situação do site, score mínimo, com e-mail, com
+  WhatsApp, já anuncia, analisados), mapa com os pinos pela situação do site, lista por score, lixeira (restaurar ou
+  excluir de vez) e o detalhe: etapa, redes, selos de anúncio, plataforma do site, diagnóstico, links, mensagem de
+  WhatsApp editável, e-mail, notas, tags e próxima ação. **Exportar/Importar .md** no mesmo formato do CAMPS-UTILS.
+- **Análise com IA**: "Analisar lead" (ou "Analisar N com IA", 10 por vez, 2 juntos, com Parar) escreve resumo, dores,
+  o que oferecer e as mensagens de WhatsApp e e-mail. Usa as contas de IA conectadas e a oferta das Configurações.
+- **Transformar em lead**: cria o contato no CRM (card no funil, origem "Prospecção") e a conversa em Mensagens com a
+  mensagem do detalhe já no campo. Nada é enviado sozinho: revise, use **Ajustar com IA** (o ✨ ao lado do campo, que
+  também serve para qualquer conversa) e envie. Valem as travas do primeiro contato (sem link, poucas mensagens).
+  Nunca há disparo em massa.
+- **Pipeline**: colunas Novo → Qualificado → Contatado → Respondeu → Reunião → Proposta → Ganho/Perdido.
+- **Configurações**: "O que você vende" (usado pela IA) e os pesos do score (0 a 50), que valem para as próximas
+  buscas.
+
+Na primeira busca o worker cria um Python só dele (`.worker-data/prospeccao-py`) e instala o Playwright (1 a 2 min).
+Não baixa navegador: usa o Edge do Windows, invisível. Precisa do Python 3.10+ no PC (ou `PYTHON_BIN` no `.env`).
+
 ### Auditoria
 Toda alteração com data, usuário, ação, item, antes → depois e origem (Usuário, Recomendação da IA, Sistema). Entram:
 pausar/ativar, orçamento, conexões, membros, workspace e contas de IA.
@@ -580,13 +611,19 @@ apps/web        Next.js 16 (App Router). modules/<feature>/ = componentes + Serv
 apps/worker     Node + tsx. src/index.ts (fila), src/ai/ (CLI, contexto, failover), src/accounts-cli.ts
 packages/core   banco, cripto, dinheiro, providers Meta/Google (interface AdsProvider), sync, jobs, ações da IA
 packages/core/migrations   SQL aplicado pelo worker ao iniciar (nunca editar uma já aplicada: criar 003_…)
+apps/worker/python  busca de leads (leads.py e maps_batch.py copiados SEM MUDANÇA do CAMPS-UTILS; prospectar.py é a entrada)
 ```
 
 ```bash
 pnpm typecheck   # TypeScript nas 3 partes
 pnpm test        # dinheiro sem float, parser de propostas da IA, detecção de limite/uso
 pnpm build       # build de produção da web
+# testes do Python da prospecção (12), no venv do worker:
+cd apps/worker/python && ../../../.worker-data/prospeccao-py/Scripts/python -m pytest -q test_leads.py
 ```
+
+Job `PROSPECTAR_LEADS` (lento, um por vez, nunca repete sozinho), `AI_LEADS` (análise em lote) e
+`AI_AJUSTAR_MENSAGEM` (vaga rápida, como o chat).
 
 Design: estrutura do SIAPLUS Design System v2 (`apps/web/app/ds-*.css`) com a identidade DOMUS: roxo `#9B49F5` →
 `#8030E7` → `#621CCB` (mesmo gradiente da landing DOMUS), lilás `#DDA9F6` para texto em destaque e a logo/favicon

@@ -50,7 +50,8 @@ export async function enviarMensagem(input: unknown) {
       returning id`;
     await enqueueJob(sql, { workspaceId: null, type: "WHATSAPP_ENVIAR", payload: { id: r!.id }, createdBy: ctx.user.id, maxAttempts: 1 });
     // lead novo que recebeu a primeira mensagem passa para "em contato"
-    await sql`update ads.whatsapp_contatos set lido_em = now(), etapa = case when etapa = 'NOVO' then 'CONTATO' else etapa end where numero = ${m.para}`;
+    // (e a mensagem sugerida pela prospecção, se havia, já foi usada)
+    await sql`update ads.whatsapp_contatos set lido_em = now(), etapa = case when etapa = 'NOVO' then 'CONTATO' else etapa end, lead_dados = lead_dados - 'rascunho' where numero = ${m.para}`;
     revalidatePath("/crm", "layout");
     return r!.id;
   });
@@ -396,5 +397,28 @@ export async function apagarTemplate(id: string) {
     await admin();
     await db()`delete from ads.whatsapp_templates where id = ${z.string().uuid().parse(id)}`;
     revalidatePath("/crm", "layout");
+  });
+}
+
+/** "Ajustar com IA" no campo da conversa: o worker reescreve o rascunho (vaga rápida). Devolve o job para acompanhar. */
+export async function ajustarComIA(input: unknown) {
+  return run(async () => {
+    const ctx = await admin();
+    const p = z.object({ numero: numeroSchema, texto: z.string().max(MAX_TEXTO_WA, "Mensagem muito longa"), pedido: z.string().trim().max(400, "Pedido muito longo") }).parse(input);
+    const sql = db();
+    await workerOnline();
+    const [ia] = await sql`select 1 from ads.ai_accounts where status = 'ACTIVE' limit 1`;
+    if (!ia) throw new Error("Nenhuma conta de IA ativa. Conecte uma em Configurações → Contas de IA.");
+    return enqueueJob(sql, { workspaceId: null, type: "AI_AJUSTAR_MENSAGEM", payload: p, createdBy: ctx.user.id, maxAttempts: 1 });
+  });
+}
+
+export async function resultadoAjuste(jobId: string) {
+  return run(async () => {
+    await admin();
+    const [j] = await db()<{ status: string; result: { texto?: string } | null; error: string | null }[]>`
+      select status, result, error from ads.jobs where id = ${z.string().uuid().parse(jobId)} and type = 'AI_AJUSTAR_MENSAGEM'`;
+    if (!j) throw new Error("Pedido não encontrado");
+    return { status: j.status, texto: j.result?.texto ?? null, erro: j.error };
   });
 }

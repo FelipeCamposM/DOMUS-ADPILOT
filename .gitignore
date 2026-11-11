@@ -10,3 +10,7 @@ node_modules
 package-lock.json
 
 .vercel
+
+# Python do worker (prospecção)
+__pycache__/
+*.pyc

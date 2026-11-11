@@ -29,6 +29,12 @@ export async function GET(req: NextRequest) {
     r = await sql`select (select max(updated_at) from ads.calendario_itens where workspace_id = ${ws}) as i, (select max(updated_at) from ads.calendarios where workspace_id = ${ws}) as c`;
   } else if (e === "studio") {
     r = await sql`select max(updated_at) as m, count(*) as n from ads.video_projects where workspace_id = ${ws}`;
+  } else if (e === "prospeccao") {
+    if (!isPlatformAdmin(ctx)) return NextResponse.json({ error: "Sem acesso" }, { status: 403 });
+    // não usa updated_at da campanha: o worker mexe nele a cada segundo durante a busca (o aviso tem consulta própria)
+    r = await sql`select (select string_agg(id::text || status, ',' order by created_at) from ads.prosp_campanhas) as c,
+      (select count(*)::text || max(updated_at)::text from ads.prosp_leads) as l,
+      (select string_agg(id::text || status || coalesce(progress, 0), ',') from ads.jobs where type = 'AI_LEADS' and (status in ('PENDING', 'RUNNING') or finished_at > now() - interval '1 minute')) as j`;
   } else {
     return NextResponse.json({ error: "Escopo inválido" }, { status: 400 });
   }

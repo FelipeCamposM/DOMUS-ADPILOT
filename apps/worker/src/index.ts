@@ -11,6 +11,8 @@ import { runVideo, type VideoPayload } from "./video/pipeline";
 import { gerarAudio, type PedidoAudio } from "./video/audio-ia";
 import { runCampanhaIA, type CampanhaPayload } from "./ai/campanha";
 import { runConhecimento, type ConhecimentoPayload } from "./ai/marca-conhecimento";
+import { runProspeccao, type ProspeccaoPayload } from "./prospeccao/busca";
+import { runAjustarMensagem, runAnaliseLeads, type AjustePayload, type AnaliseLeadsPayload } from "./prospeccao/ia";
 import { inicializacaoAtiva, configurarInicializacao } from "./startup";
 import { arquivarExcesso, restaurar } from "./video/arquivo";
 import { gerarLegenda, type LegendaPayload } from "./instagram/legenda";
@@ -23,9 +25,11 @@ import { acaoWhatsapp, avisar, enviarDaFila, estadoWhatsapp, gravarQr, ouvirWhat
  * FOR UPDATE SKIP LOCKED e grava progresso/resultado no banco; a web só lê. A web nunca manda comando de shell:
  * cada tipo de job tem um handler fixo aqui (allowlist).
  */
-const TIPOS: readonly JobType[] = ["SYNC_META", "SYNC_GOOGLE", "AI_CHAT", "AI_LOGIN", "AI_DETECT", "WORKER_STARTUP", "GENERATE_VIDEO", "GENERATE_IMAGE", "AI_CAMPAIGN", "RESTORE_MEDIA", "SYNC_INSTAGRAM", "PUBLISH_INSTAGRAM", "AI_INSTAGRAM_CAPTION", "AI_USAGE", "WHATSAPP", "AI_CALENDARIO", "GENERATE_AUDIO", "AI_SISTEMA", "WHATSAPP_ENVIAR", "MARCA_CONHECIMENTO"];
+const TIPOS: readonly JobType[] = ["SYNC_META", "SYNC_GOOGLE", "AI_CHAT", "AI_LOGIN", "AI_DETECT", "WORKER_STARTUP", "GENERATE_VIDEO", "GENERATE_IMAGE", "AI_CAMPAIGN", "RESTORE_MEDIA", "SYNC_INSTAGRAM", "PUBLISH_INSTAGRAM", "AI_INSTAGRAM_CAPTION", "AI_USAGE", "WHATSAPP", "AI_CALENDARIO", "GENERATE_AUDIO", "AI_SISTEMA", "WHATSAPP_ENVIAR", "MARCA_CONHECIMENTO", "PROSPECTAR_LEADS", "AI_LEADS", "AI_AJUSTAR_MENSAGEM"];
 const sql = db();
 const ativos = new Map<string, AbortController>();
+/** uma busca no Google Maps por vez: duas juntas no mesmo IP chamam o bloqueio */
+let buscando = false;
 let parando = false;
 const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const agora = () => new Date().toLocaleTimeString("pt-BR");
@@ -69,6 +73,15 @@ async function executar(job: Job) {
     } else if (job.type === "MARCA_CONHECIMENTO") {
       // Marcas → Base de conhecimento: vasculha o site e a IA organiza os fatos da marca
       result = await runConhecimento(job.payload as unknown as ConhecimentoPayload, { signal: ctl.signal, log, progress: async (p) => { await sql`update ads.jobs set progress = ${p} where id = ${job.id}`; } });
+    } else if (job.type === "PROSPECTAR_LEADS") {
+      // CRM → Prospecção: Google Maps + auditoria dos sites (Python do CAMPS-UTILS)
+      buscando = true;
+      result = await runProspeccao(job.payload as unknown as ProspeccaoPayload, { signal: ctl.signal, log, progress: async (p) => { await sql`update ads.jobs set progress = ${p} where id = ${job.id}`; } });
+    } else if (job.type === "AI_LEADS") {
+      result = await runAnaliseLeads(job.payload as unknown as AnaliseLeadsPayload, { signal: ctl.signal, log, progress: async (p) => { await sql`update ads.jobs set progress = ${p} where id = ${job.id}`; } });
+    } else if (job.type === "AI_AJUSTAR_MENSAGEM") {
+      // "Ajustar com IA" no campo de mensagem do CRM
+      result = await runAjustarMensagem(job.payload as unknown as AjustePayload, { signal: ctl.signal, log });
     } else if (job.type === "AI_CALENDARIO") {
       result = await gerarCalendario(job.payload as unknown as CalendarioPayload, { signal: ctl.signal, log });
     } else if (job.type === "GENERATE_AUDIO") {
@@ -102,6 +115,7 @@ async function executar(job: Job) {
   } finally {
     clearInterval(vigia);
     ativos.delete(job.id);
+    if (job.type === "PROSPECTAR_LEADS") buscando = false;
   }
 }
 
@@ -109,7 +123,8 @@ async function loop() {
   while (!parando) {
     try {
       // CONCURRENCY vagas para tudo + 1 só para respostas de chat (nunca esperam atrás de vídeo ou sincronização)
-      const tipos = tiposLivres(ativos.size, CONCURRENCY, TIPOS);
+      const livres = tiposLivres(ativos.size, CONCURRENCY, TIPOS);
+      const tipos = livres && buscando ? livres.filter((t) => t !== "PROSPECTAR_LEADS") : livres;
       if (tipos) {
         const job = await claimJob(sql, WORKER_ID, tipos);
         if (job) { void executar(job); continue; }

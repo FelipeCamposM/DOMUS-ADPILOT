@@ -22,6 +22,7 @@ import {
 } from "./actions";
 import { corEtapa, EtapaSeletor, EtapasCtx, useEtapas } from "./etapas";
 import { AgendarDialog, EscolherModelo } from "./ModelosDialog";
+import { AjustarIA } from "./AjustarIA";
 
 export interface Mensagem {
   id: string; created_at: string; para: string; texto: string; status: string; erro: string | null;
@@ -31,7 +32,7 @@ export interface Mensagem {
 export interface Contato {
   numero: string; nome: string; salvo: boolean; lido_em: string;
   etapa: string | null; site: string | null; lead_em: string | null; consentimento_em: string | null;
-  lead_dados: { mensagem?: string; pagina?: string | null; utm?: Record<string, string>; email?: string; origem?: string } | null;
+  lead_dados: { mensagem?: string; pagina?: string | null; utm?: Record<string, string>; email?: string; origem?: string; rascunho?: string; prospeccao?: string } | null;
 }
 export interface SiteLead { id: string; nome: string; chave: string; dominios: string[]; mensagem_inicial: string; ativo: boolean; ultimo_lead: string | null; leads: number }
 export interface Modelo { id: string; nome: string; texto: string; categoria: string; usos: number }
@@ -237,7 +238,8 @@ function Conversa({ c, titulo, aviso, modelos, biblioteca, voltar, abrir, editar
   const fim = useRef<HTMLDivElement>(null);
   const campo = useRef<HTMLTextAreaElement>(null);
   const arquivo = useRef<HTMLInputElement>(null);
-  const [texto, setTexto] = useState("");
+  // lead vindo da prospecção: a mensagem sugerida já fica no campo até a primeira mensagem sair
+  const [texto, setTexto] = useState(() => (!c.msgs.some((m) => m.direcao === "OUT") && c.contato?.lead_dados?.rascunho) || "");
   const [nota, setNota] = useState(false);
   const [anexo, setAnexo] = useState<Anexo | null>(null);
   const [menu, setMenu] = useState<"modelos" | "anexo" | null>(null);
@@ -426,6 +428,7 @@ function Conversa({ c, titulo, aviso, modelos, biblioteca, voltar, abrir, editar
           <textarea ref={campo} rows={1} value={texto} maxLength={MAX_TEXTO_WA} onChange={(e) => setTexto(e.target.value)}
             placeholder={nota ? "Nota interna (só a equipe vê, não vai para o WhatsApp)" : salvo ? "Mensagem" : "Salve o contato para mandar mensagem"}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); enviar(); } }} />
+          {!nota && salvo && !aviso && <AjustarIA numero={c.numero} texto={texto} usar={(t) => { setTexto(t); campo.current?.focus(); }} />}
           {!nota && salvo && !aviso && <button className="btn btn-ghost btn-sm" title="Agendar envio" aria-label="Agendar envio" disabled={!!anexo} onClick={() => setAgendar(texto)}><CalendarClock aria-hidden /></button>}
           <button className="btn btn-ghost btn-sm" aria-pressed={nota} title={nota ? "Voltar para mensagem" : "Escrever nota interna"} onClick={() => setNota((n) => !n)}><StickyNote aria-hidden /></button>
           <button className="btn btn-primary btn-sm" aria-label={nota ? "Salvar nota" : "Enviar"} disabled={pend || (nota ? !texto.trim() : !salvo || travado || (!texto.trim() && !anexo) || (!!anexo && !anexo.creativeId))} onClick={enviar}>
