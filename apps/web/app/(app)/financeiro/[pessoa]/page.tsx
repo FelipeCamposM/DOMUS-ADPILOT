@@ -3,7 +3,8 @@ import { conexoes, contextoAnalise, etiquetas } from "@domus-ads/core/financeiro
 import { analisar, comprometidoFuturo, resumo, serie, somarMeses, type Pessoa } from "@domus-ads/core/financeiro";
 import { notFound } from "next/navigation";
 import type { Analise } from "@/modules/financeiro/Abas";
-import { ABAS, Financeiro, type Aba } from "@/modules/financeiro/Financeiro";
+import { ABAS, type Aba } from "@/modules/financeiro/lista-abas";
+import { Financeiro } from "@/modules/financeiro/Financeiro";
 
 export const metadata = { title: "Financeiro" };
 

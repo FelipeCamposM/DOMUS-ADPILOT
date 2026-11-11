@@ -7,6 +7,20 @@ const reais = (c: number | null) => (c == null ? null : (c / 100).toFixed(2));
 const dia = (iso: string | null | undefined) => (iso ? Number(iso.slice(8, 10)) || null : null);
 const hojeISO = () => new Date().toISOString().slice(0, 10);
 
+const MEU_PLUGGY = /meu\s*pluggy/i;
+const CORES: [RegExp, string][] = [[/inter/i, "#ff7a00"], [/santander/i, "#ec0000"], [/mercado\s*pago/i, "#00b1ea"], [/nubank|nu pagamentos/i, "#820ad1"],
+  [/ita[uú]/i, "#ec7000"], [/bradesco/i, "#cc092f"], [/caixa/i, "#0070af"], [/brasil/i, "#f8d117"], [/picpay/i, "#21c25e"]];
+
+/** Conexão pelo MeuPluggy (Open Finance): o conector é sempre "MeuPluggy"; o banco de verdade está no nome da conta. */
+function bancoDe(conector: string, contas: { type: string; name: string }[]) {
+  if (!MEU_PLUGGY.test(conector)) return conector;
+  const c = contas.find((x) => x.type === "BANK") ?? contas[0];
+  const nome = (c?.name ?? "").replace(/\(.*?\)/g, "").replace(/^\s*banco\s+/i, "").trim().toLowerCase().replace(/(^|\s)\p{L}/gu, (l) => l.toUpperCase());
+  return nome || conector;
+}
+/** CNPJ (14 dígitos) no titular de alguma conta = pessoa jurídica. */
+const ehPJ = (contas: { taxNumber?: string | null }[]) => contas.some((c) => String(c.taxNumber ?? "").replace(/\D/g, "").length === 14);
+
 /**
  * Financeiro → Sincronizar (e a cada 6h): lê cada conexão da Pluggy, grava contas e transações, pareia transferências
  * entre contas suas, aplica as regras e detecta assinaturas. O que foi classificado à mão nunca é sobrescrito.
@@ -24,22 +38,35 @@ export async function runFinSync(p: { itemId?: string }, o: { signal: AbortSigna
     if (o.signal.aborted) break;
     try {
       const it = await pluggy.item(k.item_id);
-      const banco = it.connector.name;
-      // 1ª vez: "Empresas"/"PJ" no nome do banco = pessoa jurídica (dá para trocar nas configurações)
-      const pessoa: Pessoa = k.banco == null && /empresa|\bpj\b|business/i.test(banco) ? "PJ" : k.pessoa;
-      await sql`update ads.fin_conexoes set banco = ${banco}, banco_logo = ${it.connector.imageUrl ?? null}, banco_cor = ${it.connector.primaryColor ? `#${it.connector.primaryColor.replace("#", "")}` : null},
+      const lista = await pluggy.contas(k.item_id);
+      const meuPluggy = MEU_PLUGGY.test(it.connector.name);
+      const nome = bancoDe(it.connector.name, lista);
+      // 1ª vez (ou ainda com o nome genérico "MeuPluggy"): CNPJ no titular ou "Empresas" no nome = PJ. Depois vale o que você escolher.
+      const primeira = k.banco == null || MEU_PLUGGY.test(k.banco);
+      const pessoa: Pessoa = primeira ? (ehPJ(lista) || /empresa|\bpj\b|business/i.test(it.connector.name) ? "PJ" : "PF") : k.pessoa;
+      const banco = !primeira ? k.banco! : pessoa === "PJ" && meuPluggy ? `${nome} PJ` : nome;
+      const cor = meuPluggy ? CORES.find(([re]) => re.test(nome))?.[1] ?? null : it.connector.primaryColor ? `#${it.connector.primaryColor.replace("#", "")}` : null;
+      await sql`update ads.fin_conexoes set banco = ${banco}, banco_logo = ${meuPluggy ? null : it.connector.imageUrl ?? null}, banco_cor = ${cor},
         pessoa = ${pessoa}, status = ${it.status}, erro = ${it.error?.message ?? null}, atualizado_no_banco = ${it.lastUpdatedAt ?? it.updatedAt ?? null} where item_id = ${k.item_id}`;
-      await o.log(`${banco}: ${it.status}`);
+      // receita guessada: Inter PJ = Salário PJ, Mercado Pago PJ = SIAPLUS
+      const renda = pessoa === "PJ" ? (/inter/i.test(nome) ? "Salário PJ" : /mercado\s*pago/i.test(nome) ? "SIAPLUS" : null) : null;
+      if (primeira) {
+        // contas já gravadas com o palpite errado: acerta pessoa, categoria das entradas e o histórico
+        await sql`update ads.fin_contas set pessoa = ${pessoa}, categoria_renda_id = coalesce(categoria_renda_id, case when tipo = 'BANK' then ${catId(renda)}::int end) where item_id = ${k.item_id}`;
+        await sql`update ads.fin_transacoes t set pessoa = c.pessoa,
+            categoria_id = case when t.natureza = 'renda' and not t.categoria_manual and c.categoria_renda_id is not null then c.categoria_renda_id else t.categoria_id end
+          from ads.fin_contas c where c.id = t.conta_id and c.item_id = ${k.item_id}`;
+        await sql`update ads.fin_assinaturas a set pessoa = ${pessoa} from ads.fin_contas c where c.id = a.conta_id and c.item_id = ${k.item_id}`;
+      }
+      await o.log(`${banco} (${pessoa}): ${it.status}`);
 
-      for (const c of await pluggy.contas(k.item_id)) {
+      for (const c of lista) {
         const cd = c.creditData;
         const usado = cd?.creditLimit != null && cd.availableCreditLimit != null ? Math.round((cd.creditLimit - cd.availableCreditLimit) * 100) : null;
-        // receita guessada: Inter PJ = Salário PJ, Mercado Pago PJ = SIAPLUS
-        const renda = pessoa === "PJ" && c.type === "BANK" ? (/inter/i.test(banco) ? "Salário PJ" : /mercado\s*pago/i.test(banco) ? "SIAPLUS" : null) : null;
         const [conta] = await sql<{ pessoa: Pessoa; categoria_renda_id: number | null }[]>`
           insert into ads.fin_contas (id, item_id, tipo, subtipo, nome, numero, pessoa, saldo, moeda, limite, limite_usado, dia_fechamento, dia_vencimento, bandeira, categoria_renda_id)
           values (${c.id}, ${k.item_id}, ${c.type}, ${c.subtype}, ${c.marketingName || c.name}, ${c.number}, ${pessoa}, ${c.balance}, ${c.currencyCode || "BRL"},
-                  ${cd?.creditLimit ?? null}, ${reais(usado)}, ${dia(cd?.balanceCloseDate)}, ${dia(cd?.balanceDueDate)}, ${cd?.brand ?? null}, ${catId(renda)})
+                  ${cd?.creditLimit ?? null}, ${reais(usado)}, ${dia(cd?.balanceCloseDate)}, ${dia(cd?.balanceDueDate)}, ${cd?.brand ?? null}, ${c.type === "BANK" ? catId(renda) : null})
           on conflict (id) do update set tipo = excluded.tipo, subtipo = excluded.subtipo, nome = excluded.nome, numero = excluded.numero, saldo = excluded.saldo,
             limite = excluded.limite, limite_usado = excluded.limite_usado, dia_fechamento = coalesce(excluded.dia_fechamento, ads.fin_contas.dia_fechamento),
             dia_vencimento = coalesce(excluded.dia_vencimento, ads.fin_contas.dia_vencimento), bandeira = excluded.bandeira, updated_at = now()

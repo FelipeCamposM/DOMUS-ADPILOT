@@ -12,6 +12,7 @@ import { entrar, reduzido } from "../motion/entrar";
 import { HeroFx } from "../shell/HeroFx";
 import { usePulso } from "../shell/usePulso";
 import { sincronizar } from "./actions";
+import { ABAS, type Aba } from "./lista-abas";
 import { Analises, Assinaturas, Cartoes, Parcelados, type Analise } from "./Abas";
 import { Barras, Calor, Enche, Onda, Rosca } from "./graficos";
 import { Insights } from "./Insights";
@@ -26,8 +27,6 @@ export interface DadosFin {
   conexoes: Conexao[]; analises: Analise[]; sincronizando: boolean; iaPronta: boolean;
 }
 
-export const ABAS = [["geral", "Visão geral"], ["gastos", "Gastos"], ["rendas", "Rendas"], ["cartoes", "Cartões e contas"], ["assinaturas", "Assinaturas"], ["parcelados", "Parcelados"], ["analises", "Análises"]] as const;
-export type Aba = (typeof ABAS)[number][0];
 
 const variacao = (a: number, b: number) => (b > 0 ? (a - b) / b : null);
 

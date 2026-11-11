@@ -16,7 +16,7 @@ export const NATUREZA_ROTULO: Record<Natureza, string> = {
 
 export interface PluggyConta {
   id: string; type: "BANK" | "CREDIT"; subtype: string; name: string; marketingName: string | null; number: string | null;
-  balance: number; currencyCode: string;
+  balance: number; currencyCode: string; taxNumber?: string | null;
   creditData: { brand: string | null; creditLimit: number | null; availableCreditLimit: number | null; balanceDueDate: string | null; balanceCloseDate: string | null } | null;
 }
 export interface PluggyTransacao {
