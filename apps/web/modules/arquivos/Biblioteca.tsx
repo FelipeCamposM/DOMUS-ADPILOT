@@ -92,10 +92,11 @@ export function Biblioteca({ modo, tipos = ["IMAGE", "VIDEO"], max = 12, jaTem =
   const apagar = async (ids: string[]) => {
     if (!(await confirmar(`Apagar ${ids.length === 1 ? "este arquivo" : `${ids.length} arquivos`}? Some da biblioteca e do R2; não dá para desfazer.`))) return;
     setOcupado(true);
-    const r = await apagarCriativos(ids.map((id) => [id]));
+    const aviso = toast.carregando(`Apagando ${ids.length === 1 ? "1 arquivo" : `${ids.length} arquivos`}…`);
+    const r = await apagarCriativos(ids.map((id) => [id])).catch((e: Error) => ({ ok: false as const, error: e.message || "Não foi possível apagar" }));
     setOcupado(false);
-    if (!r.ok) { toast.err(r.error); return; }
-    toast.ok(`${r.data.apagados} apagado(s)${r.data.pulados ? ` · ${r.data.pulados} não (em uso ou gerando)` : ""}`);
+    if (!r.ok) { toast.fim(aviso, "err", r.error); return; }
+    toast.fim(aviso, r.data.apagados ? "ok" : "err", `${r.data.apagados} apagado(s)${r.data.pulados ? ` · ${r.data.pulados} não (em uso ou gerando)` : ""}`);
     setSel((s) => s.filter((x) => !ids.includes(x)));
     recarregar();
   };
