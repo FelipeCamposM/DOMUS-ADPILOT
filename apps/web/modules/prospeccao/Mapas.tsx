@@ -64,6 +64,27 @@ async function reversePlace(lat: number, lng: number, signal?: AbortSignal): Pro
   return placeLabel(item.address, item.display_name?.split(",").slice(0, 2).join(",") ?? "");
 }
 
+// ───────────── Zoom flutuante (fora do MapContainer) ─────────────
+
+function ZoomHud({ map, onRecentrar, rotulo }: { map: L.Map | null; onRecentrar: () => void; rotulo: string }) {
+  const [zoom, setZoom] = useState(14);
+  useEffect(() => {
+    if (!map) return;
+    const f = () => setZoom(Math.round(map.getZoom()));
+    f();
+    map.on("zoomend", f);
+    return () => { map.off("zoomend", f); };
+  }, [map]);
+  return (
+    <div className="pp-hud pp-hud-zoom" role="group" aria-label="Zoom do mapa">
+      <button type="button" aria-label="Aproximar" onClick={() => map?.zoomIn()}><Plus aria-hidden /></button>
+      <span><small>zoom</small><b className="tabular">{zoom}</b></span>
+      <button type="button" aria-label="Afastar" onClick={() => map?.zoomOut()}><Minus aria-hidden /></button>
+      <button type="button" aria-label={rotulo} title={rotulo} onClick={onRecentrar}><LocateFixed aria-hidden /></button>
+    </div>
+  );
+}
+
 // ───────────── Seletor de local ─────────────
 
 export interface PickedLocation { lat: number; lng: number; label: string }
@@ -122,14 +143,6 @@ export function LocationPicker({ value, radiusKm, disabled, onChange, extra }: {
 
   // mapa ocupa tudo; busca, território, zoom e dica flutuam por cima (fora do MapContainer: clique neles não move o pino)
   const [map, setMap] = useState<L.Map | null>(null);
-  const [zoom, setZoom] = useState(14);
-  useEffect(() => {
-    if (!map) return;
-    const f = () => setZoom(Math.round(map.getZoom()));
-    f();
-    map.on("zoomend", f);
-    return () => { map.off("zoomend", f); };
-  }, [map]);
   const recentrar = () => map?.flyToBounds(L.latLng(value.lat, value.lng).toBounds(radiusKm * 2000), { padding: [28, 28], duration: 0.6 });
   const irAoLocal = () => { if (open && results[0] && !searching) choose(results[0]); else void buscar(); };
 
@@ -185,12 +198,7 @@ export function LocationPicker({ value, radiusKm, disabled, onChange, extra }: {
         {extra}
       </div>
 
-      <div className="pp-hud pp-hud-zoom" role="group" aria-label="Zoom do mapa">
-        <button type="button" aria-label="Aproximar" onClick={() => map?.zoomIn()}><Plus aria-hidden /></button>
-        <span><small>zoom</small><b className="tabular">{zoom}</b></span>
-        <button type="button" aria-label="Afastar" onClick={() => map?.zoomOut()}><Minus aria-hidden /></button>
-        <button type="button" aria-label="Voltar ao território" onClick={recentrar}><LocateFixed aria-hidden /></button>
-      </div>
+      <ZoomHud map={map} onRecentrar={recentrar} rotulo="Voltar ao território" />
 
       <div className="pp-hud pp-hud-dica">
         <span className="pp-hud-ico pp-hud-ico-sm"><Crosshair aria-hidden /></span>
@@ -225,9 +233,11 @@ function InteractiveLeadMap({ leads, selectedId, onSelect, radiusKm, center }: L
   const mapped = useMemo(() => leads.filter((x) => Number.isFinite(x.latitude) && Number.isFinite(x.longitude)), [leads]);
   const points = useMemo(() => mapped.map((x) => [x.latitude!, x.longitude!] as [number, number]), [mapped]);
   const origin: [number, number] = center ?? points[0]!;
+  const [map, setMap] = useState<L.Map | null>(null);
+  const enquadrar = () => { if (points.length === 1) map?.setView(points[0]!, 15); else if (points.length > 1) map?.fitBounds(points, { padding: [28, 28], maxZoom: 16 }); };
   return (
-    <section className="pp-mapa" aria-label="Mapa dos leads">
-      <MapContainer center={origin} zoom={14} className="pp-mapa-in" style={{ height: 320 }} scrollWheelZoom zoomControl={false}>
+    <section className="pp-mapa pp-mapa-res" aria-label="Mapa dos leads">
+      <MapContainer ref={setMap} center={origin} zoom={14} className="pp-mapa-in" style={{ height: "100%" }} scrollWheelZoom zoomControl={false}>
         <MapTiles />
         <FitLeads points={points} />
         <FocusSelected lead={mapped.find((x) => x.id === selectedId)} />
@@ -243,7 +253,8 @@ function InteractiveLeadMap({ leads, selectedId, onSelect, radiusKm, center }: L
           );
         })}
       </MapContainer>
-      <ul className="pp-flutua pp-legenda" aria-label="Legenda">
+      <ZoomHud map={map} onRecentrar={enquadrar} rotulo="Enquadrar todos os leads" />
+      <ul className="pp-hud pp-legenda" aria-label="Legenda">
         {(["no_site", "social_only", "broken", "weak", "healthy"] as const).map((k) => (
           <li key={k}><span style={{ background: STATUS[k].color }} />{STATUS[k].label}</li>
         ))}

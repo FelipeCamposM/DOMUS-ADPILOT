@@ -2,7 +2,8 @@
 
 import { hasAds, OPPORTUNITY, whatsappNumber, type BuscaForm as Form, type Lead, type LeadCampaign, type LeadStage, type ScoreWeights, type WebsiteStatus } from "@domus-ads/core/prospeccao";
 import {
-  ArrowLeft, Bot, Briefcase, Building2, Download, FolderInput, Globe2, Loader2, Mail, Megaphone, Plus, Radar, Search, SlidersHorizontal, Square, Star, Trash2, TriangleAlert,
+  ArrowLeft, Bot, Briefcase, Building2, Download, FolderInput, Globe2, KanbanSquare, ListChecks, Loader2, Mail, Megaphone, MousePointerClick, Plus, Radar, Search, Settings2,
+  SlidersHorizontal, Square, Star, Trash2, TriangleAlert,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
@@ -18,8 +19,8 @@ import { ScoreRing, STATUS } from "./comum";
 import { LeadDetalhe } from "./LeadDetalhe";
 import { LeadLista } from "./LeadLista";
 import { MapGuard } from "./MapGuard";
-import { Kpi, Seg, Slider } from "./ui";
-import { HeroFx } from "@/modules/shell/HeroFx";
+import { Slider } from "./ui";
+import { Seletor } from "@/modules/shell/Seletor";
 
 const LeadMap = dynamic(() => import("./Mapas").then((m) => m.LeadMap), { ssr: false, loading: () => <div className="pp-mapa pp-mapa-carregando" style={{ height: 320 }} /> });
 
@@ -44,6 +45,11 @@ const WEIGHT_LABEL: Record<keyof ScoreWeights, string> = {
   noSite: "Sem site", brokenSite: "Site quebrado", weakSite: "Site fraco", socialOnly: "Só redes sociais",
   instagram: "Ativo nas redes", contact: "Contato disponível", reviews: "Avaliações no Google", distance: "Proximidade", ads: "Já investe em anúncios",
 };
+const ABAS_NAV = [["search", "Buscar", Radar], ["results", "Resultados", ListChecks], ["pipeline", "Pipeline", KanbanSquare], ["settings", "Ajustes", Settings2]] as const;
+const STATUS_OPCOES = [
+  { valor: "opportunities", rotulo: "Oportunidades" }, { valor: "no_site", rotulo: "Sem site" }, { valor: "broken", rotulo: "Quebrado" }, { valor: "weak", rotulo: "Fraco" },
+  { valor: "social_only", rotulo: "Só redes" }, { valor: "healthy", rotulo: "Saudável" }, { valor: "all", rotulo: "Todos" },
+];
 const dataCurta = (ms: number) => new Date(ms).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
 
 /** Um card por busca. `<article>`, não `<button>`: o botão de excluir mora dentro do card. */
@@ -255,119 +261,130 @@ export function Prospeccao({ campanhas, campanhaId, leads: leadsServidor, etapas
   const newSearch = <button className="btn btn-primary btn-sm" onClick={() => setTab("search")}><Plus aria-hidden />Nova busca</button>;
   const emLote = analise && analise.ids.length > 1;
 
-  return (
-    <div className="page pp" style={{ maxWidth: 1480 }}>
-      <header className="pp-topo">
-        <HeroFx />
-        <div>
-          <span className="eyebrow"><Radar aria-hidden /> CRM · Prospecção</span>
-          <h1 className="crm-titulo">Prospecção de leads</h1>
-        </div>
-        <div className="pp-abas" role="tablist" aria-label="Áreas da prospecção">
-          {([["search", "Buscar"], ["results", "Resultados"], ["pipeline", "Pipeline"], ["settings", "Configurações"]] as const).map(([v, l]) => (
-            <button key={v} role="tab" aria-selected={tab === v} onClick={() => setTab(v)}>
-              {l}{v === "results" && stats.total > 0 && <span className="pp-abas-n tabular">{stats.total}</span>}
-            </button>
-          ))}
-        </div>
-      </header>
+  // as abas moram no cabeçalho roxo de cada tela (sem o card de título em cima)
+  const nav = (
+    <nav className="pp-nav" role="tablist" aria-label="Áreas da prospecção">
+      {ABAS_NAV.map(([v, l, I]) => (
+        <button key={v} type="button" role="tab" aria-selected={tab === v} onClick={() => setTab(v)} aria-label={l} title={l} data-so-icone={v === "settings" || undefined}>
+          <I aria-hidden />{v !== "settings" && l}{v === "results" && stats.total > 0 && <span className="pp-nav-n tabular">{stats.total}</span>}
+        </button>
+      ))}
+    </nav>
+  );
+  const trilha = (onde: string) => <span className="pp-console-trilha"><img src="/domus-logo.png" alt="" width={22} height={22} /> / Prospecção / {onde}</span>;
+  const faixa = (titulo: string, onde: string, acoes?: ReactNode) => (
+    <header className="pp-faixa" data-enter>
+      <div>{trilha(onde)}<h1>{titulo}<i>.</i></h1></div>
+      <div className="pp-faixa-dir">{acoes}{nav}</div>
+    </header>
+  );
 
-      {tab === "search" && <BuscaForm value={form} onChange={setForm} onSubmit={startSearch} running={running} enviando={enviando} />}
+  return (
+    <div className="page pp pp-cheia">
+      {tab === "search" && <BuscaForm value={form} onChange={setForm} onSubmit={startSearch} running={running} enviando={enviando} nav={nav} />}
 
       {tab === "results" && (campanhaId && activeCampaign ? (
-        <div className="pp-resultados">
-          <section className="panel pp-caixa">
-            <div className="pp-res-cab">
-              <div className="pp-res-id">
-                <button className="btn btn-ghost btn-sm" aria-label="Voltar às buscas" onClick={() => ir(null)}><ArrowLeft aria-hidden /></button>
+        <section className="pp-console pp-console-res" data-enter>
+          <aside className="pp-console-lado">
+            <header className="pp-console-cab pp-res-cab">
+              {trilha("Resultados")}
+              <div className="pp-res-titulo">
+                <button type="button" className="pp-voltar" aria-label="Voltar às buscas" title="Voltar às buscas" onClick={() => ir(null)}><ArrowLeft aria-hidden /></button>
                 <div>
-                  <h2 className="pp-trunc">{activeCampaign.name}</h2>
-                  <p className="pp-trunc">{activeCampaign.locationLabel} · raio {String(activeCampaign.radiusKm).replace(".", ",")} km · {new Date(activeCampaign.createdAt).toLocaleDateString("pt-BR")}
+                  <h2 className="pp-trunc" title={activeCampaign.name}>{activeCampaign.name}</h2>
+                  <p className="pp-trunc">{activeCampaign.locationLabel} · {String(activeCampaign.radiusKm).replace(".", ",")} km · {new Date(activeCampaign.createdAt).toLocaleDateString("pt-BR")}
                     {activeCampaign.status !== "completed" && <> · <b>{CAMPAIGN_STATUS[activeCampaign.status]?.label}</b></>}</p>
                 </div>
+                <span className="pp-res-icones">
+                  <button type="button" onClick={exportMd} aria-label="Exportar .md" title="Exportar .md"><Download aria-hidden /></button>
+                  <button type="button" onClick={() => removeCampaign(campanhaId)} aria-label="Excluir busca" title="Excluir busca" data-perigo><Trash2 aria-hidden /></button>
+                </span>
               </div>
-              <div className="cluster" style={{ gap: 8 }}>
-                <button className="btn btn-secondary btn-sm" onClick={exportMd}><Download aria-hidden />Exportar .md</button>
-                <button className="btn btn-danger btn-sm" onClick={() => removeCampaign(campanhaId)}><Trash2 aria-hidden />Excluir busca</button>
-              </div>
-            </div>
-            {activeCampaign.status === "failed" && activeCampaign.error && <p className="pp-erro"><TriangleAlert aria-hidden />{activeCampaign.error}</p>}
-            {activeCampaign.blocked && <p className="pp-erro" data-tone="warning"><TriangleAlert aria-hidden />O Google limitou as buscas no meio do caminho: os leads achados até ali foram salvos.</p>}
-            <div className="pp-kpis">
-              <Kpi icon={<Building2 aria-hidden />} label="Leads" value={stats.total} />
-              <Kpi icon={<Globe2 aria-hidden />} label="Sem site" value={stats.noSite} tone="error" />
-              <Kpi icon={<TriangleAlert aria-hidden />} label="Site com problemas" value={stats.weak} tone="warning" />
-              <Kpi icon={<Megaphone aria-hidden />} label="Já anunciam" value={stats.ads} />
-              <Kpi icon={<Mail aria-hidden />} label="Com e-mail" value={stats.email} tone="success" />
-              <Kpi icon={<Star aria-hidden />} label="Nota média" value={stats.rating} tone="warning" />
-            </div>
-          </section>
+              {nav}
+            </header>
 
-          <section className="panel pp-caixa pp-filtros">
-            <div className="pp-filtros-linha">
+            <div className="pp-res-filtros">
               <label className="pp-filtro-busca">
                 <Search aria-hidden />
-                <input className="input-sm" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar empresa, categoria, endereço ou nota…" aria-label="Filtrar leads" />
+                <input className="input-sm" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Empresa, categoria, endereço ou nota…" aria-label="Filtrar leads" />
               </label>
-              {(Object.keys(TOGGLES) as Toggle[]).map((t) => <button key={t} className="chip" data-active={toggles.has(t)} aria-pressed={toggles.has(t)} onClick={() => flip(t)}>{TOGGLES[t].label}</button>)}
-              <button className="chip" data-active={showTrash} aria-pressed={showTrash} onClick={() => { setShowTrash((v) => !v); setSelectedId(undefined); }}><Trash2 aria-hidden />Lixeira</button>
-            </div>
-            <div className="pp-filtros-linha2">
-              <Seg label="Status do site" size="sm" value={status} onChange={setStatus}
-                options={[{ value: "opportunities", label: "Oportunidades" }, { value: "no_site", label: "Sem site" }, { value: "broken", label: "Quebrado" }, { value: "weak", label: "Fraco" }, { value: "social_only", label: "Só redes" }, { value: "healthy", label: "Saudável" }, { value: "all", label: "Todos" }]} />
-              <Slider label="Score mínimo" value={minScore} min={0} max={100} onChange={setMinScore} />
-            </div>
-          </section>
-
-          <div className="pp-res-grade">
-            <div className="pp-res-lista">
-              <div className="pp-res-lista-cab">
-                <p>{filtered.length} de {visiveis.length} leads · ordenados por score</p>
-                {emLote ? (
-                  <div className="pp-lote" role="status">
-                    <span className="pp-lote-barra"><span style={{ width: `${analise!.progress}%` }} /></span>
-                    Analisando {Math.round((analise!.progress / 100) * analise!.ids.length)}/{analise!.ids.length}…
-                    <button className="btn btn-ghost btn-xs" onClick={stopBatch}><Square aria-hidden />Parar</button>
-                  </div>
-                ) : pending.length > 0 && (
-                  iaPronta
-                    ? <button className="btn btn-primary btn-sm" onClick={() => analyze(pending.map((l) => l.id))} title="Os melhores da lista atual que ainda não têm análise"><Bot aria-hidden />Analisar {pending.length} com IA</button>
-                    : <a className="btn btn-secondary btn-sm" href="/settings"><Bot aria-hidden />Conectar IA para analisar</a>
-                )}
+              <div className="pp-res-chips">
+                {(Object.keys(TOGGLES) as Toggle[]).map((t) => <button key={t} className="chip" data-active={toggles.has(t)} aria-pressed={toggles.has(t)} onClick={() => flip(t)}>{TOGGLES[t].label}</button>)}
+                <button className="chip" data-active={showTrash} aria-pressed={showTrash} onClick={() => { setShowTrash((v) => !v); setSelectedId(undefined); }}><Trash2 aria-hidden />Lixeira</button>
               </div>
+              <div className="pp-res-duas">
+                <div className="pp-campo"><span className="pp-rot">Site</span>
+                  <Seletor ariaLabel="Status do site" valor={status} onChange={(v) => setStatus(v as StatusFilter)} className="seletor-alto seletor-campo" opcoes={STATUS_OPCOES} /></div>
+                <Slider label="Score mínimo" value={minScore} min={0} max={100} onChange={setMinScore} />
+              </div>
+            </div>
+
+            <div className="pp-res-lista-cab">
+              <p><b className="tabular">{filtered.length}</b> de {visiveis.length} · por score</p>
+              {emLote ? (
+                <div className="pp-lote" role="status">
+                  <span className="pp-lote-barra"><span style={{ width: `${analise!.progress}%` }} /></span>
+                  {Math.round((analise!.progress / 100) * analise!.ids.length)}/{analise!.ids.length}
+                  <button className="btn btn-ghost btn-xs" onClick={stopBatch}><Square aria-hidden />Parar</button>
+                </div>
+              ) : pending.length > 0 && (
+                iaPronta
+                  ? <button className="btn btn-primary btn-xs" onClick={() => analyze(pending.map((l) => l.id))} title="Os melhores da lista atual que ainda não têm análise"><Bot aria-hidden />Analisar {pending.length} com IA</button>
+                  : <a className="btn btn-secondary btn-xs" href="/settings"><Bot aria-hidden />Conectar IA</a>
+              )}
+            </div>
+            <div className="pp-res-rolagem">
               <LeadLista leads={filtered} selectedId={selected?.id} trashed={showTrash} onSelect={setSelectedId}
                 onTrash={(id) => trash(id, true)} onRestore={(id) => trash(id, false)} onPurge={purge} />
             </div>
-            <aside className="pp-res-lado">
-              <MapGuard><LeadMap leads={filtered} selectedId={selected?.id} onSelect={setSelectedId} radiusKm={activeCampaign.radiusKm} center={center} /></MapGuard>
-              {selected && !showTrash && (
-                <LeadDetalhe lead={selected} stages={etapas} iaPronta={iaPronta} analisando={!!analise?.ids.includes(selected.id)}
-                  onStage={changeStage} onEdit={editLead} onAnalyze={(id) => analyze([id])} onLead={virarLead} />
-              )}
-            </aside>
-          </div>
-        </div>
-      ) : (
-        <div className="pp-buscas">
-          <div className="pp-buscas-cab">
-            <h2>Suas buscas</h2>
-            <div className="cluster" style={{ gap: 8 }}>
-              <input ref={arquivo} type="file" accept=".md,text/markdown" hidden onChange={(e) => void importMd(e.target.files?.[0])} />
-              <button className="btn btn-secondary btn-sm" onClick={() => arquivo.current?.click()}><FolderInput aria-hidden />Importar .md</button>
-              {newSearch}
+          </aside>
+
+          <div className="pp-console-mapa">
+            <MapGuard><LeadMap leads={filtered} selectedId={selected?.id} onSelect={setSelectedId} radiusKm={activeCampaign.radiusKm} center={center} /></MapGuard>
+            <div className="pp-hud-topo">
+              <div className="pp-hud pp-hud-kpis">
+                {([[Building2, "Leads", stats.total, undefined], [Globe2, "Sem site", stats.noSite, "error"], [TriangleAlert, "Site ruim", stats.weak, "warning"],
+                  [Megaphone, "Anunciam", stats.ads, undefined], [Mail, "Com e-mail", stats.email, "success"], [Star, "Nota média", stats.rating, "warning"]] as const).map(([I, l, v, tom]) => (
+                  <span key={l} data-tone={tom}><small><I aria-hidden />{l}</small><b className="tabular">{v}</b></span>
+                ))}
+              </div>
             </div>
+            {(activeCampaign.status === "failed" && activeCampaign.error) || activeCampaign.blocked ? (
+              <p className="pp-hud pp-hud-aviso" role="status"><TriangleAlert aria-hidden />
+                {activeCampaign.status === "failed" && activeCampaign.error ? activeCampaign.error : "O Google limitou as buscas no meio do caminho: os leads achados até ali foram salvos."}</p>
+            ) : null}
           </div>
+
+          <aside className="pp-console-detalhe">
+            {selected && !showTrash ? (
+              <LeadDetalhe lead={selected} stages={etapas} iaPronta={iaPronta} analisando={!!analise?.ids.includes(selected.id)}
+                onStage={changeStage} onEdit={editLead} onAnalyze={(id) => analyze([id])} onLead={virarLead} />
+            ) : (
+              <div className="pp-det-vazio"><span className="pp-hud-ico"><MousePointerClick aria-hidden /></span><b>Escolha um lead</b><small>Clique na lista ou num pino do mapa para ver contato, diagnóstico e abordagem.</small></div>
+            )}
+          </aside>
+        </section>
+      ) : (
+        <>
+          {faixa("Suas buscas", "Resultados", <>
+            <input ref={arquivo} type="file" accept=".md,text/markdown" hidden onChange={(e) => void importMd(e.target.files?.[0])} />
+            <button className="btn btn-secondary btn-sm" onClick={() => arquivo.current?.click()}><FolderInput aria-hidden />Importar .md</button>
+          </>)}
           {campanhas.length > 0
             ? <div className="pp-buscas-grade">{campanhas.map((c) => <CampaignCard key={c.id} c={c} onOpen={() => ir(c.id)} onDelete={() => removeCampaign(c.id)} />)}</div>
             : <Vazio title="Nenhuma busca ainda" text="Escolha um nicho e um ponto no mapa para encontrar empresas." action={newSearch} />}
-        </div>
+        </>
       ))}
 
-      {tab === "pipeline" && (leads.some((l) => !l.deletedAt)
-        ? <Pipeline leads={leads.filter((l) => !l.deletedAt && (!campanhaId || l.campaignId === campanhaId))} stages={etapas} onStage={changeStage} onOpen={(l) => { ir(l.campaignId); setSelectedId(l.id); }} />
-        : <Vazio title="Nenhum lead no pipeline" text="Faça uma busca ou importe uma base Markdown." action={newSearch} />)}
+      {tab === "pipeline" && <>
+        {faixa("Pipeline", "Pipeline")}
+        {leads.some((l) => !l.deletedAt)
+          ? <Pipeline leads={leads.filter((l) => !l.deletedAt && (!campanhaId || l.campaignId === campanhaId))} stages={etapas} onStage={changeStage} onOpen={(l) => { ir(l.campaignId); setSelectedId(l.id); }} />
+          : <Vazio title="Nenhum lead no pipeline" text="Faça uma busca ou importe uma base Markdown." action={newSearch} />}
+      </>}
 
-      {tab === "settings" && (
+      {tab === "settings" && <>
+        {faixa("Configurações", "Configurações")}
         <div className="pp-config">
           <section className="panel pp-caixa">
             <header className="pp-cab"><span className="icon-tile"><Briefcase aria-hidden /></span><div><h2>O que você vende</h2><p>A IA usa isto para escolher o argumento e escrever a abordagem de cada lead.</p></div></header>
@@ -386,7 +403,7 @@ export function Prospeccao({ campanhas, campanhaId, leads: leadsServidor, etapas
             <button className="btn btn-primary" onClick={saveConfig} disabled={salvando}>{salvando && <Loader2 className="animate-spin" aria-hidden />}Salvar oferta e pesos</button>
           </div>
         </div>
-      )}
+      </>}
     </div>
   );
 }

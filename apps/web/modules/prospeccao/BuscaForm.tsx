@@ -19,7 +19,7 @@ const FOCO: Record<Form["opportunityFocus"], string> = { no_site_first: "Sem sit
 const RITMO: Record<Form["pace"], string> = { slow: "cauteloso", balanced: "ritmo normal", fast: "rápido" };
 const nicheList = (raw: string) => raw.split(",").map((x) => x.trim()).filter(Boolean);
 
-export function BuscaForm({ value, onChange, onSubmit, running, enviando }: { value: Form; onChange: (v: Form) => void; onSubmit: () => void; running: boolean; enviando: boolean }) {
+export function BuscaForm({ value, onChange, onSubmit, running, enviando, nav }: { value: Form; onChange: (v: Form) => void; onSubmit: () => void; running: boolean; enviando: boolean; nav?: React.ReactNode }) {
   const set = <K extends keyof Form>(key: K, next: Form[K]) => onChange({ ...value, [key]: next });
   const [draft, setDraft] = useState("");
   const [qualif, setQualif] = useState(false);
@@ -47,6 +47,7 @@ export function BuscaForm({ value, onChange, onSubmit, running, enviando }: { va
         <header className="pp-console-cab">
           <span className="pp-console-trilha"><img src="/domus-logo.png" alt="" width={22} height={22} /> / Domus / Prospecção</span>
           <h2>Radar de leads<i>.</i></h2>
+          {nav}
         </header>
 
         <div className="pp-console-corpo">
@@ -140,7 +141,7 @@ export function BuscaForm({ value, onChange, onSubmit, running, enviando }: { va
             onChange={(p) => onChange({ ...value, centerLat: p.lat, centerLng: p.lng, location: p.label })}
             extra={
               <div className="pp-hud pp-hud-anel">
-                <span className="pp-anel" style={{ "--p": prontos / 3 } as React.CSSProperties}><i /></span>
+                <span className="pp-pronto" style={{ "--p": prontos / 3 } as React.CSSProperties}><i /></span>
                 <span><b className="tabular">{Math.round((prontos / 3) * 100)}%</b><small>Busca pronta</small><em>{niches.length ? `até ${value.maxLeads} leads` : "Falta o segmento"}</em></span>
               </div>
             } />

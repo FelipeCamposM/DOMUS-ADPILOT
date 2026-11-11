@@ -22,7 +22,8 @@ export default async function ProspeccaoPage({ searchParams }: { searchParams: P
       select id, payload, progress from ads.jobs where type = 'AI_LEADS' and status in ('PENDING', 'RUNNING') order by created_at desc limit 1`,
   ]);
   const j = jobs[0];
-  const aba = ABAS.includes(sp.aba as Aba) ? (sp.aba as Aba) : atual ? "results" : lista.length ? "results" : "search";
+  // abre na Busca; com uma busca escolhida (?c=), nos resultados dela
+  const aba = ABAS.includes(sp.aba as Aba) ? (sp.aba as Aba) : atual ? "results" : "search";
   return (
     <Prospeccao key={atual?.id ?? "todas"} campanhas={lista} campanhaId={atual?.id ?? null} leads={leads} etapas={etapas} config={config}
       iaPronta={ia.length > 0} abaInicial={aba} analise={j ? { jobId: j.id, ids: j.payload.ids ?? [], progress: j.progress ?? 0 } : null} />
