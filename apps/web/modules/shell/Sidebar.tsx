@@ -80,7 +80,7 @@ export function Sidebar({ pendentes, open }: { pendentes: number; open: boolean 
         })}
       </nav>
       <div className="sidebar-dica">
-        <span className="kbd">Ctrl</span> <span className="kbd">K</span> <span className="nav-lbl">para buscar</span>
+        <span className="kbd">Ctrl K</span><span className="nav-lbl">para buscar</span>
       </div>
     </aside>
   );

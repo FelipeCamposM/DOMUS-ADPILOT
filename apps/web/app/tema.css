@@ -92,8 +92,8 @@ body { background: #030205; }
 .sidebar:hover .nav-group::before, .sidebar:has(:focus-visible) .nav-group::before, .sidebar[data-open="true"] .nav-group::before { opacity: 0; }
 .nav .count { position: absolute; top: 4px; left: 34px; min-width: 17px; height: 17px; padding: 0 5px; font-size: 10px; background: #fff; color: var(--p-700); box-shadow: 0 4px 10px -2px #0006; }
 .nav a[aria-current="page"] .count { background: var(--p-700); color: #fff; }
-.sidebar-dica { margin-top: auto; display: flex; align-items: center; gap: 4px; padding: 10px 8px 2px; font-size: 11px; color: #ffffffb3; white-space: nowrap; border-top: 1px solid #ffffff2b; }
-.sidebar .kbd { border-color: #ffffff4d; color: #fff; background: #ffffff14; }
+.sidebar-dica { margin-top: auto; display: flex; align-items: center; gap: 8px; padding: 12px 0 2px 6px; font-size: 11px; color: #ffffffb3; white-space: nowrap; border-top: 1px solid #ffffff2b; }
+.sidebar .kbd { flex: none; width: 48px; height: 24px; display: inline-grid; place-items: center; padding: 0; border-radius: 8px; font: 600 10.5px/1 var(--font-sans); border-color: #ffffff4d; color: #fff; background: #ffffff14; }
 
 /* ── Topo ──────────────────────────────────────────────────────────────── */
 .topbar { height: 66px; padding-inline: 18px; border-bottom: 1px solid #ffffff0d; background: linear-gradient(180deg, #0d0b13f2, #09080dd9); box-shadow: none; }
