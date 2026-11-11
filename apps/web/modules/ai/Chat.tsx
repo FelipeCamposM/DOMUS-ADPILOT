@@ -91,10 +91,10 @@ export function Chat({ inicial, podeEditar, sugestao, provedores }: {
   const semConta = provedores.claude + provedores.codex === 0;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", minHeight: "100%", maxWidth: 880, margin: "0 auto", width: "100%", padding: "28px 24px 0" }}>
+    <div style={{ display: "flex", flexDirection: "column", minHeight: "100%", width: "100%", padding: "24px clamp(16px, 1.6vw, 28px) 0" }}>
       {!st ? <Vazio onPick={setTxt} /> : (
         <div className="term" ref={lista} style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
-          <h1 style={{ fontFamily: "var(--font-sans)", fontSize: 18, fontWeight: 700, marginBottom: 12 }} data-enter>{st.conversation.title}</h1>
+          <h1 className="ia-titulo" data-enter>{st.conversation.title}</h1>
           {st.messages.map((m) => <Mensagem key={m.id} m={m} acoes={st.actions.filter((a) => a.message_id === m.id)} podeEditar={podeEditar} onDecidiu={() => router.refresh()} />)}
           {rodando && !st.messages.some((m) => m.status === "STREAMING") && (
             <div className="term-msg term-sys" style={{ gap: 10 }}><span className="spinner-dots"><i /><i /><i /></span> Na fila do worker…</div>
@@ -226,17 +226,19 @@ function Vazio({ onPick }: { onPick: (t: string) => void }) {
     return () => { tl.kill(); };
   }, []);
   return (
-    <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 22, paddingBlock: "8vh" }}>
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", paddingBlock: "4vh" }}>
+    <div className="ia-vazio">
       <div className="eyebrow" data-enter>AI Analyst</div>
-      <h1 className="mono" style={{ fontSize: "clamp(1.3rem, 1rem + 1.4vw, 2rem)", fontWeight: 500, letterSpacing: "-0.02em", minHeight: "2.6em" }} data-enter>
-        <span style={{ color: "rgb(var(--c-brand))" }}>❯ </span><span ref={ref} /><span className="caret" aria-hidden />
+      <h1 data-enter>
+        <span className="ia-prompt">❯ </span><span ref={ref} /><span className="caret" aria-hidden />
       </h1>
-      <p className="muted" style={{ maxWidth: 560 }} data-enter>
+      <p data-enter>
         A IA lê as métricas do workspace a cada mensagem. Quando sugerir pausar, ativar ou mudar orçamento, a proposta aparece como um cartão e só é aplicada depois que você aprovar.
       </p>
       <div className="cluster" style={{ gap: 8 }} data-enter>
         {SUGESTOES.map((s) => <button key={s} className="chip" onClick={() => onPick(s)}>{s}</button>)}
       </div>
+    </div>
     </div>
   );
 }

@@ -30,7 +30,7 @@ export function NovaCampanha({ contas, marcas }: { contas: ContaGoogle[]; marcas
   });
 
   return (
-    <div className="panel" data-enter style={{ padding: 22, display: "flex", flexDirection: "column", gap: 16, maxWidth: 760 }}>
+    <div className="panel" data-enter style={{ padding: 22, display: "flex", flexDirection: "column", gap: 16 }}>
       <Escolha valor={modo} raio={999} variante="pilula" className="cluster" style={{ gap: 4, padding: 3, borderRadius: 12, border: "1px solid rgb(var(--c-border))", background: "rgb(var(--c-bg-surface))", alignSelf: "flex-start" }}>
         <button data-opt="ia" type="button" className="chip" data-active={modo === "ia"} onClick={() => setModo("ia")} style={{ height: 34, border: 0 }}><Sparkles aria-hidden /> Com IA</button>
         <button data-opt="manual" type="button" className="chip" data-active={modo === "manual"} onClick={() => setModo("manual")} style={{ height: 34, border: 0 }}><PenLine aria-hidden /> Manual</button>
