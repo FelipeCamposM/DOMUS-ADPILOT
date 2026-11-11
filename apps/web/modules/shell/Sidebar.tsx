@@ -32,7 +32,7 @@ export const NAV = [
 // "/" e "/crm" (Mensagens) têm itens filhos no menu: só ativam na própria página
 const ativo = (path: string, href: string) => (href === "/" || href === "/crm" ? path === href : path.startsWith(href));
 
-/** Sidebar com indicador que desliza (GSAP) até o item ativo, com leve "squash" no meio do caminho. */
+/** Trilho roxo de ícones (abre com os nomes ao passar o mouse), com indicador branco que desliza (GSAP) até o item ativo, com leve "squash" no meio do caminho. */
 export function Sidebar({ pendentes, open }: { pendentes: number; open: boolean }) {
   const path = usePathname();
   const navRef = useRef<HTMLElement>(null);
@@ -60,7 +60,7 @@ export function Sidebar({ pendentes, open }: { pendentes: number; open: boolean 
     <aside className="sidebar" data-open={open}>
       <Link href="/" className="brand">
         <img src="/domus-logo.png" alt="" className="brand-logo" width={30} height={30} />
-        <span>DOMUS<small>AdPilot</small></span>
+        <span className="nav-lbl">DOMUS<small>AdPilot</small></span>
       </Link>
       <nav className="nav" ref={navRef} aria-label="Navegação principal">
         <div className="nav-indicator" ref={indRef} style={{ opacity: 0 }} aria-hidden />
@@ -69,18 +69,18 @@ export function Sidebar({ pendentes, open }: { pendentes: number; open: boolean 
           const Icon = item.icon;
           return (
             <div key={item.href} style={{ display: "contents" }}>
-              {cabecalho && <div className="nav-group">{cabecalho}</div>}
-              <Link href={item.href} aria-current={ativo(path, item.href) ? "page" : undefined}>
+              {cabecalho && <div className="nav-group"><span>{cabecalho}</span></div>}
+              <Link href={item.href} aria-current={ativo(path, item.href) ? "page" : undefined} aria-label={item.label}>
                 <Icon aria-hidden />
-                {item.label}
+                <span className="nav-lbl">{item.label}</span>
                 {item.href === "/ai" && pendentes > 0 && <span className="count" title="Ações aguardando aprovação">{pendentes}</span>}
               </Link>
             </div>
           );
         })}
       </nav>
-      <div style={{ marginTop: "auto", padding: "12px", fontSize: 11, color: "rgb(var(--c-text-tertiary))" }}>
-        Pressione <span className="kbd">Ctrl</span> <span className="kbd">K</span> para buscar
+      <div className="sidebar-dica">
+        <span className="kbd">Ctrl</span> <span className="kbd">K</span> <span className="nav-lbl">para buscar</span>
       </div>
     </aside>
   );
