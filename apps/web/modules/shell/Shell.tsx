@@ -1,17 +1,17 @@
 "use client";
 
 import { usePulso } from "./usePulso";
-import { Check, ChevronsUpDown, LogOut, Menu, MessageCircle, Search } from "lucide-react";
+import { LogOut, Menu, MessageCircle, Search } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState, useTransition, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { ago } from "@/lib/format";
 import { Consultor } from "../ai/Consultor";
 import { Motion } from "../motion/Motion";
 import { Notificacoes, type DadosNotificacoes } from "./Notificacoes";
 import { Whatsapp, type EstadoWhatsapp } from "../settings/Whatsapp";
 import { Dialog } from "./Dialog";
-import { sair, trocarWorkspace } from "./actions";
+import { sair } from "./actions";
 import { CommandPalette } from "./CommandPalette";
 import { Popover } from "./Popover";
 import { Sidebar } from "./Sidebar";
@@ -38,13 +38,11 @@ export interface ShellProps {
 export function Shell(p: ShellProps) {
   const router = useRouter();
   const [paleta, setPaleta] = useState(false);
-  const [menu, setMenu] = useState<"ws" | "bell" | "user" | "ia" | null>(null);
+  const [menu, setMenu] = useState<"bell" | "user" | "ia" | null>(null);
   const [mobile, setMobile] = useState(false);
   const [zap, setZap] = useState(false);
-  const [pend, start] = useTransition();
   const fechar = useCallback(() => setMenu(null), []);
   const fecharPaleta = useCallback(() => setPaleta(false), []);
-  const ws = p.workspaces.find((w) => w.id === p.workspaceId)!;
 
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
@@ -57,16 +55,6 @@ export function Shell(p: ShellProps) {
   // notificações e status do worker: confere a cada 30 s e só recarrega se mudou
   usePulso("shell", 30_000);
 
-  const trocar = (id: string) => start(async () => {
-    try {
-      await trocarWorkspace(id);
-      setMenu(null);
-      router.refresh();
-    } catch (e) {
-      toast.err((e as Error).message);
-    }
-  });
-
   return (
     <>
     <div className="shell">
@@ -75,26 +63,6 @@ export function Shell(p: ShellProps) {
       <div className="main">
         <header className="topbar">
           <button className="chip only-mobile" onClick={() => setMobile((v) => !v)} aria-label="Abrir menu"><Menu aria-hidden /></button>
-
-          <div style={{ position: "relative" }}>
-            <button className="chip" onClick={() => setMenu(menu === "ws" ? null : "ws")} aria-haspopup="menu" aria-expanded={menu === "ws"}
-              style={{ color: "rgb(var(--c-text-primary))", fontWeight: 650, opacity: pend ? 0.6 : 1 }}>
-              <span className="brand-mark" style={{ width: 20, height: 20, borderRadius: 6, fontSize: 11, fontWeight: 800 }}>{ws.name[0]}</span>
-              {ws.name}
-              <ChevronsUpDown aria-hidden />
-            </button>
-            <Popover open={menu === "ws"} onClose={fechar} className="ws-menu">
-              <div className="nav-group" style={{ margin: "6px 10px" }}>Workspaces</div>
-              {p.workspaces.map((w) => (
-                <button key={w.id} className="menu-item" onClick={() => trocar(w.id)} data-active={w.id === ws.id}>
-                  <span className="brand-mark" style={{ width: 22, height: 22, borderRadius: 6, fontSize: 11 }}>{w.name[0]}</span>
-                  <span style={{ flex: 1 }}>{w.name}</span>
-                  <span className="subtle" style={{ fontSize: 11 }}>{w.role}</span>
-                  {w.id === ws.id && <Check aria-hidden />}
-                </button>
-              ))}
-            </Popover>
-          </div>
 
           <button className="chip chip-busca" onClick={() => setPaleta(true)} style={{ justifyContent: "flex-start" }}>
             <Search aria-hidden /> <span style={{ flex: 1, textAlign: "left" }}>Buscar…</span> <span className="kbd">Ctrl K</span>
