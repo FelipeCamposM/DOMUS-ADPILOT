@@ -10,7 +10,7 @@ const PARADO_MS = 5 * 60_000;
  * então recarrega a página. Não pergunta com a aba escondida nem quando ninguém mexe há 5 min (aba esquecida aberta);
  * ao voltar, confere na hora.
  */
-export function usePulso(escopo: "mensagens" | "shell" | "calendario" | "studio" | "prospeccao", ms: number, ativo = true) {
+export function usePulso(escopo: "mensagens" | "shell" | "calendario" | "studio" | "prospeccao" | "financeiro", ms: number, ativo = true) {
   const router = useRouter();
   useEffect(() => {
     if (!ativo) return;

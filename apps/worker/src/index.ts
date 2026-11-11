@@ -14,6 +14,8 @@ import { runConhecimento, type ConhecimentoPayload } from "./ai/marca-conhecimen
 import { runProspeccao, type ProspeccaoPayload } from "./prospeccao/busca";
 import { runAjustarMensagem, runAnaliseLeads, type AjustePayload, type AnaliseLeadsPayload } from "./prospeccao/ia";
 import { inicializacaoAtiva, configurarInicializacao } from "./startup";
+import { runFinSync } from "./financeiro/sync";
+import { runAnaliseFinanceira } from "./financeiro/ia";
 import { arquivarExcesso, restaurar } from "./video/arquivo";
 import { gerarLegenda, type LegendaPayload } from "./instagram/legenda";
 import { publicarInstagram } from "./instagram/publicar";
@@ -25,7 +27,7 @@ import { acaoWhatsapp, avisar, enviarDaFila, estadoWhatsapp, gravarQr, ouvirWhat
  * FOR UPDATE SKIP LOCKED e grava progresso/resultado no banco; a web só lê. A web nunca manda comando de shell:
  * cada tipo de job tem um handler fixo aqui (allowlist).
  */
-const TIPOS: readonly JobType[] = ["SYNC_META", "SYNC_GOOGLE", "AI_CHAT", "AI_LOGIN", "AI_DETECT", "WORKER_STARTUP", "GENERATE_VIDEO", "GENERATE_IMAGE", "AI_CAMPAIGN", "RESTORE_MEDIA", "SYNC_INSTAGRAM", "PUBLISH_INSTAGRAM", "AI_INSTAGRAM_CAPTION", "AI_USAGE", "WHATSAPP", "AI_CALENDARIO", "GENERATE_AUDIO", "AI_SISTEMA", "WHATSAPP_ENVIAR", "MARCA_CONHECIMENTO", "PROSPECTAR_LEADS", "AI_LEADS", "AI_AJUSTAR_MENSAGEM"];
+const TIPOS: readonly JobType[] = ["SYNC_META", "SYNC_GOOGLE", "AI_CHAT", "AI_LOGIN", "AI_DETECT", "WORKER_STARTUP", "GENERATE_VIDEO", "GENERATE_IMAGE", "AI_CAMPAIGN", "RESTORE_MEDIA", "SYNC_INSTAGRAM", "PUBLISH_INSTAGRAM", "AI_INSTAGRAM_CAPTION", "AI_USAGE", "WHATSAPP", "AI_CALENDARIO", "GENERATE_AUDIO", "AI_SISTEMA", "WHATSAPP_ENVIAR", "MARCA_CONHECIMENTO", "PROSPECTAR_LEADS", "AI_LEADS", "AI_AJUSTAR_MENSAGEM", "FIN_SYNC", "AI_FINANCEIRO"];
 const sql = db();
 const ativos = new Map<string, AbortController>();
 /** uma busca no Google Maps por vez: duas juntas no mesmo IP chamam o bloqueio */
@@ -82,6 +84,11 @@ async function executar(job: Job) {
     } else if (job.type === "AI_AJUSTAR_MENSAGEM") {
       // "Ajustar com IA" no campo de mensagem do CRM
       result = await runAjustarMensagem(job.payload as unknown as AjustePayload, { signal: ctl.signal, log });
+    } else if (job.type === "FIN_SYNC") {
+      // Financeiro: contas e transações da Pluggy
+      result = await runFinSync(job.payload as { itemId?: string }, { signal: ctl.signal, log });
+    } else if (job.type === "AI_FINANCEIRO") {
+      result = await runAnaliseFinanceira({ analiseId: String(job.payload.analiseId) }, { signal: ctl.signal, log });
     } else if (job.type === "AI_CALENDARIO") {
       result = await gerarCalendario(job.payload as unknown as CalendarioPayload, { signal: ctl.signal, log });
     } else if (job.type === "GENERATE_AUDIO") {
@@ -174,6 +181,14 @@ const repetir = (fn: () => Promise<unknown>, ms: number) => {
   return setInterval(rodar, ms);
 };
 
+/** Financeiro: sincroniza a Pluggy a cada 6h (se houver conexão e nenhum sync na fila). */
+async function agendarFinSync() {
+  const [k] = await sql<{ n: number }[]>`select count(*)::int as n from ads.fin_conexoes where ultima_sync is null or ultima_sync < now() - interval '6 hours'`;
+  if (!k?.n) return;
+  const [j] = await sql`select 1 from ads.jobs where type = 'FIN_SYNC' and (status in ('PENDING','RUNNING') or (status = 'FAILED' and finished_at > now() - interval '1 hour'))`;
+  if (!j) await enqueueJob(sql, { workspaceId: null, type: "FIN_SYNC", payload: { auto: true }, maxAttempts: 1 });
+}
+
 async function parar() {
   if (parando) return;
   parando = true;
@@ -198,9 +213,10 @@ await migrate(process.env.DIRECT_URL, (m) => console.log(m)); // banco sempre em
 await sql`update ads.ai_logins set status = 'FAILED', error = 'Worker reiniciado durante o login', updated_at = now()
            where status in ('STARTING','AWAITING_USER','CODE_SUBMITTED')`;
 await sql`update ads.jobs set status = 'FAILED', error = 'Worker reiniciado', finished_at = now()
-           where status = 'RUNNING' and type in ('AI_LOGIN','WORKER_STARTUP','GENERATE_VIDEO','GENERATE_IMAGE','GENERATE_AUDIO','PUBLISH_INSTAGRAM','AI_INSTAGRAM_CAPTION','WHATSAPP','AI_CALENDARIO','AI_SISTEMA','MARCA_CONHECIMENTO')`;
+           where status = 'RUNNING' and type in ('AI_LOGIN','WORKER_STARTUP','GENERATE_VIDEO','GENERATE_IMAGE','GENERATE_AUDIO','PUBLISH_INSTAGRAM','AI_INSTAGRAM_CAPTION','WHATSAPP','AI_CALENDARIO','AI_SISTEMA','MARCA_CONHECIMENTO','AI_FINANCEIRO')`;
 await sql`update ads.sistema_pedidos set status = 'ERRO', erro = 'Worker reiniciado durante a resposta.', instrucoes = null, prompt = null, updated_at = now() where status = 'RODANDO'`;
 await sql`update ads.calendarios set status = 'ERRO', erro = 'Worker reiniciado durante o planejamento. Gere de novo.' where status = 'GERANDO'`;
+await sql`update ads.fin_analises set status = 'erro', erro = 'Worker reiniciado durante a análise. Peça de novo.' where status = 'gerando'`;
 await sql`update ads.calendario_itens set refazendo = null where refazendo is not null`;
 await gravarQr(null).catch(() => {});
 // queda no meio de uma publicação: não dá para saber se o Instagram chegou a publicar; avisa em vez de repetir
@@ -220,6 +236,7 @@ repetir(heartbeat, 30_000);
 repetir(limparPedidos, 6 * 3600_000);
 repetir(agendarSyncs, 5 * 60_000);
 repetir(publicarAgendados, 30_000);
+repetir(agendarFinSync, 30 * 60_000);
 repetir(automatizarCalendario, 60_000);
 ouvirWhatsapp(responderWhatsapp); // respostas "sim"/"não" das artes mandadas para aprovação
 repetir(async function usoDasContas() { await atualizarUsoContas((m) => console.log(`[${agora()}] ${m}`)); }, 5 * 60_000);

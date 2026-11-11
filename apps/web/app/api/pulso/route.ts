@@ -35,6 +35,11 @@ export async function GET(req: NextRequest) {
     r = await sql`select (select string_agg(id::text || status, ',' order by created_at) from ads.prosp_campanhas) as c,
       (select count(*)::text || max(updated_at)::text from ads.prosp_leads) as l,
       (select string_agg(id::text || status || coalesce(progress, 0), ',') from ads.jobs where type = 'AI_LEADS' and (status in ('PENDING', 'RUNNING') or finished_at > now() - interval '1 minute')) as j`;
+  } else if (e === "financeiro") {
+    if (!isPlatformAdmin(ctx)) return NextResponse.json({ error: "Sem acesso" }, { status: 403 });
+    r = await sql`select (select max(ultima_sync)::text || coalesce(string_agg(coalesce(erro, ''), ''), '') from ads.fin_conexoes) as s,
+      (select string_agg(id::text || status, ',') from ads.fin_analises where created_at > now() - interval '1 day') as a,
+      (select count(*) from ads.jobs where type = 'FIN_SYNC' and status in ('PENDING', 'RUNNING')) as j`;
   } else {
     return NextResponse.json({ error: "Escopo inválido" }, { status: 400 });
   }
