@@ -34,6 +34,7 @@ export function garantirPlaywright(log: (m: string) => Promise<void>): Promise<v
 }
 
 export const pythonProspeccao = () => PY;
+const TETO_MIN = 75;
 
 /** Mata o Python e o Edge que ele abriu (no Windows, kill() só derruba o processo de cima). */
 function matarArvore(pid: number | undefined) {
@@ -103,8 +104,9 @@ export async function runProspeccao(p: ProspeccaoPayload, o: { signal: AbortSign
       erros = (erros + linha + "\n").slice(-8000);
     }
   });
-  // sem teto de tempo do Python: 500 leads auditados levam ~15 min; 40 min é folga
-  const teto = setTimeout(parar, 40 * 60_000);
+  // cada site tem teto de 45 s no Python (prospectar.py); isto só pega Python travado
+  let estourou = false;
+  const teto = setTimeout(() => { estourou = true; parar(); }, TETO_MIN * 60_000);
   const code = await new Promise<number | null>((ok) => { proc.on("close", ok); proc.on("error", () => ok(null)); });
   clearTimeout(teto); clearInterval(relogio);
   o.signal.removeEventListener("abort", parar);
@@ -124,7 +126,9 @@ export async function runProspeccao(p: ProspeccaoPayload, o: { signal: AbortSign
   let r: Resultado | null = null;
   try { r = JSON.parse(saida.trim().split("\n").at(-1) ?? "") as Resultado; } catch { /* sem resposta */ }
   if (!r?.success) {
-    const msg = r?.message || (code === null ? "O Python não abriu" : `A busca parou (código ${code}): ${erros.trim().split("\n").at(-1) ?? "sem detalhe"}`);
+    const ultimo = erros.trim().split("\n").at(-1)?.trim();
+    const msg = r?.message || (estourou ? `A busca passou de ${TETO_MIN} min e foi interrompida. As empresas encontradas foram guardadas sem auditoria.`
+      : code === null ? "O Python não abriu" : `A busca parou (código ${code})${ultimo ? `: ${ultimo}` : ". Sem detalhe do Python (veja o log do worker)."}`);
     await guardarParcial("failed", msg.slice(0, 600));
     throw new Error(msg);
   }

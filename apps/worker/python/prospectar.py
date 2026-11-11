@@ -14,7 +14,28 @@ import asyncio
 import json
 import sys
 
+import leads
 from leads import _lead_id, search_leads
+
+# Site que trava (JS em loop, evaluate sem resposta) segurava a vaga da auditoria para sempre e a busca toda estourava o
+# tempo. Aqui cada site tem um teto total; passou, vira "Site excedeu o tempo limite" e a fila anda.
+TETO_SITE_S = 45
+leads.AUDIT_WORKERS = 8
+_auditar = leads.audit_website
+
+
+async def _auditar_com_teto(context, url, timeout_ms=15000):
+    tarefa = asyncio.ensure_future(_auditar(context, url, timeout_ms))
+    # asyncio.wait não espera o cancelamento terminar (wait_for esperaria um page.close() travado)
+    feito, _ = await asyncio.wait({tarefa}, timeout=TETO_SITE_S)
+    if feito:
+        return tarefa.result()
+    tarefa.cancel()
+    return {"status": "broken", "email": "", "socials": {}, "whatsapp": "", "tech": {},
+            "findings": [{"code": "timeout", "label": "Site excedeu o tempo limite", "severity": "critical"}]}
+
+
+leads.audit_website = _auditar_com_teto
 
 
 def log(texto: str) -> None:
