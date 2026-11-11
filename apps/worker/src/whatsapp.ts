@@ -211,21 +211,21 @@ async function guardarRecebida(corpo: string, tipo: string): Promise<string | nu
 
   const sql = db();
   if (waId && (await sql`select 1 from ads.whatsapp_envios where wa_id = ${waId}`).length) return null;
-  const numero = await numeroSalvo(sql, doJid); // lead salvo com o 9 e o WhatsApp mandando sem: mesma conversa
+  // número dos avisos (você): vai para a conversa "Avisos da plataforma", com o número como foi salvo (com ou sem o 9)
+  const d = await destino().catch(() => null);
+  const avisos = d ? [d.para, numeroDe(d.jid)].find((a) => a && mesmoNumero(doJid, a)) ?? null : null;
+  const numero = avisos ? d!.para ?? avisos : await numeroSalvo(sql, doJid); // lead salvo com o 9 e o WhatsApp mandando sem: mesma conversa
   const mime = (j.mimeType ?? conteudo?.mimetype ?? "").split(";")[0] || null;
   const tipoMsg = msg.stickerMessage || msg.imageMessage ? "imagem" : msg.videoMessage ? "video" : msg.audioMessage ? "audio" : doc ? "documento" : "texto";
   const m = j.base64 && mime ? await guardarMidia(decodificar(j.base64), mime, j.fileName ?? doc?.fileName).catch((e: Error) => { console.log(`WhatsApp: mídia não guardada: ${e.message}`); return null; }) : null;
   const nome = typeof info.PushName === "string" && info.PushName.trim().length >= 2 ? info.PushName.trim().slice(0, 80) : formatarNumero(numero);
   // quem mandou e não está salvo vira contato com o nome do WhatsApp (dá para renomear na tela)
-  if (!deMim) await sql`insert into ads.whatsapp_contatos (numero, nome, salvo, lido_em) values (${numero}, ${nome}, false, now() - interval '1 second') on conflict (numero) do nothing`;
+  if (!deMim && !avisos) await sql`insert into ads.whatsapp_contatos (numero, nome, salvo, lido_em) values (${numero}, ${nome}, false, now() - interval '1 second') on conflict (numero) do nothing`;
   await sql`insert into ads.whatsapp_envios (para, texto, status, direcao, tipo, midia_storage, midia_key, midia_mime, midia_nome, wa_id, autor)
     values (${numero}, ${texto}, ${deMim ? "ENVIADO" : "RECEBIDO"}, ${deMim ? "OUT" : "IN"}, ${tipoMsg}, ${m?.storage ?? null}, ${m?.key ?? null}, ${mime}, ${doc?.fileName ?? j.fileName ?? null}, ${waId}, ${deMim ? "pelo celular" : null})
     on conflict do nothing`;
 
-  if (deMim || !texto) return null;
-  const d = await destino().catch(() => null);
-  if (!d || ![d.para, numeroDe(d.jid)].some((a) => a && mesmoNumero(numero, a))) return null;
-  return texto;
+  return deMim || !texto || !avisos ? null : texto;
 }
 
 /** Aponta o webhook da Wuzapi para o worker (a cada subida e depois de conectar). Nunca lança. */
