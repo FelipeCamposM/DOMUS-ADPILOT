@@ -110,9 +110,9 @@ export async function runFinSync(p: { itemId?: string }, o: { signal: AbortSigna
   return { conexoes: itens.length, transacoes: novas.length, transferencias: pares, regras, assinaturas: assin, erros };
 }
 
-/** Transferências entre contas suas (60 dias): PJ → PF vira "Retirada da PJ" na PF; o resto vira transferência dos dois lados. */
+/** Transferências entre contas suas (13 meses): PJ → PF vira "Retirada da PJ" na PF; o resto vira transferência dos dois lados. */
 async function parear(sql: ReturnType<typeof db>, catId: (n: string | null) => number | null) {
-  const desde = new Date(Date.now() - 60 * 86400_000).toISOString().slice(0, 10);
+  const desde = new Date(Date.now() - 400 * 86400_000).toISOString().slice(0, 10);
   const rs = await sql<{ id: string; conta_id: string; pessoa: Pessoa; tipo: "debito" | "credito"; valor: string; data: string; natureza: TxPar["natureza"]; natureza_manual: boolean; cartao: boolean }[]>`
     select t.id, t.conta_id, t.pessoa, t.tipo, t.valor, t.data::text, t.natureza, t.natureza_manual, c.tipo = 'CREDIT' as cartao
     from ads.fin_transacoes t join ads.fin_contas c on c.id = t.conta_id where t.data >= ${desde}::date`;

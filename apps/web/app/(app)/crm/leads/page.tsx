@@ -1,4 +1,5 @@
 import { db } from "@domus-ads/core";
+import { importarVendasCrm } from "@domus-ads/core/vendas";
 import { filtroCrmSchema, type EtapaCrm, type FiltroSalvo } from "@domus-ads/core/mensagens";
 import { Leads, type Lead } from "@/modules/mensagens/Leads";
 
@@ -9,6 +10,8 @@ const iso = (d: Date | null) => d?.toISOString() ?? null;
 
 export default async function CrmLeadsPage() {
   const sql = db();
+  // vendas pagas do site (SIAPLUS) entram como "Fechou" antes de listar; o worker também importa a cada 2 min
+  await importarVendasCrm(sql).catch((e) => console.error("importar vendas:", (e as Error).message));
   const [leads, etapas, sites, filtros] = await Promise.all([
     sql<Linha[]>`
       select c.numero, c.nome, c.etapa, s.nome as site, c.lead_valor::text as valor,

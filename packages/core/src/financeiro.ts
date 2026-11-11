@@ -39,12 +39,21 @@ const PADRAO_ENCARGO = /\b(iof|juros|multa|mora|anuidade|encargo|tarifa|taxa\s+d
 const CAT_FATURA = new Set(["Credit card payment"]);
 const CAT_PROPRIA = new Set(["Same person transfer", "Transfer between own accounts"]);
 const ehInvestimento = (c: string | null) => !!c && /invest|fixed income|mutual fund|stocks|pension|savings/i.test(c);
+/** Mercado Pago: dinheiro de venda liberado na conta (a Pluggy marca como "Investments"). */
+const LIBERACAO_VENDA = /libera[cç][aã]o de dinheiro/i;
+/** Pix que você mandou e voltou: devolve o gasto (estorno), não é renda. */
+const PIX_VOLTOU = /\bdevolvid[oa]\b|devolu[cç][aã]o/i;
+/** Pix que você recebeu e devolveu: abate a renda (natureza renda num débito = renda negativa). */
+const PIX_DEVOLVIDO = /recebido\s+devolvido|devolu[cç][aã]o\s+(de\s+)?pix\s+recebido/i;
 
 /** Gasto, renda, fatura, transferência…: o que essa linha É, antes de qualquer ajuste manual. */
 export function decidirNatureza(t: Pick<PluggyTransacao, "category" | "description" | "type">, cartao: boolean): Natureza {
   if (t.category && CAT_FATURA.has(t.category)) return "fatura";
   if (PADRAO_FATURA.test(t.description)) return "fatura";
   if (t.category && CAT_PROPRIA.has(t.category)) return "transferencia";
+  if (!cartao && t.type === "CREDIT" && LIBERACAO_VENDA.test(t.description)) return "renda";
+  if (!cartao && t.type === "DEBIT" && PIX_DEVOLVIDO.test(t.description)) return "renda";
+  if (!cartao && t.type === "CREDIT" && PIX_VOLTOU.test(t.description) && !/recebid/i.test(t.description)) return "estorno";
   if (ehInvestimento(t.category)) return "investimento";
   if (t.type === "DEBIT") return "gasto";
   // entrada no cartão que não é pagamento de fatura = estorno de compra
@@ -178,7 +187,7 @@ export interface Pareamento { id: string; natureza: Natureza; categoria?: string
  * Exceção: PJ → PF é a sua retirada da empresa; na PF ela conta como renda ("Retirada da PJ"), na PJ como transferência.
  */
 export function parearTransferencias(txs: TxPar[]): Pareamento[] {
-  const livres = txs.filter((t) => !t.manual && !t.cartao && (t.natureza === "gasto" || t.natureza === "renda" || t.natureza === "transferencia"));
+  const livres = txs.filter((t) => !t.manual && !t.cartao && (t.natureza === "gasto" || t.natureza === "renda" || t.natureza === "transferencia") && !(t.natureza === "renda" && t.tipo === "debito"));
   const entradas = livres.filter((t) => t.tipo === "credito");
   const usadas = new Set<string>();
   const out: Pareamento[] = [];
@@ -192,6 +201,70 @@ export function parearTransferencias(txs: TxPar[]): Pareamento[] {
     out.push(s.pessoa === "PJ" && e.pessoa === "PF" ? { id: e.id, natureza: "renda", categoria: "Retirada da PJ" } : { id: e.id, natureza: "transferencia" });
   }
   return out;
+}
+
+/* ── Receitas: bancos PF + PJ + vendas dos sites, cada real uma vez ─────── */
+
+/** Venda paga num sistema seu (ex.: SIAPLUS). Centavos; data no fuso de São Paulo. */
+export interface VendaSite { id: string; sistema: string; cliente: string; plano: string; bruto: number; liquido: number | null; metodo: string; data: string; interno: boolean }
+export interface Receita {
+  id: string; data: string; mes: string; valor: number; fonte: string; descricao: string; pessoa: Pessoa | null;
+  /** banco = só no extrato · site = venda ainda sem o crédito no banco · conciliada = venda + crédito do banco (contada uma vez) */
+  origem: "banco" | "site" | "conciliada"; bruto?: number; taxa?: number; contaId?: string;
+}
+
+const RETIRADA = "Retirada da PJ";
+const JANELA_LIBERACAO = 40; // dias entre a venda e o dinheiro cair (Pix: na hora; cartão: até 30)
+
+/**
+ * Receitas sem contar duas vezes:
+ * - renda dos bancos PF e PJ; "Retirada da PJ" fica de fora (é o dinheiro que já entrou na PJ passando para a PF);
+ * - Pix recebido devolvido (renda num débito) abate;
+ * - venda do site + crédito no banco do valor líquido (ou bruto) em até 40 dias = uma receita só, com o valor que caiu;
+ * - venda sem crédito ainda = receita do site pelo líquido; venda interna/teste não conta, e o crédito dela também não.
+ * ponytail: casa 1 venda com 1 crédito; venda parcelada pelo Mercado Pago (vários créditos) não casa — somar créditos se aparecer.
+ */
+export function receitas(txs: TxBase[], vendas: VendaSite[]): Receita[] {
+  const banco = txs.filter((t) => t.natureza === "renda" && !t.cartao && t.categoria !== RETIRADA);
+  const dia = (s: string) => Date.parse(`${s}T00:00:00Z`) / 86_400_000;
+  const usadas = new Set<string>();
+  const out: Receita[] = [];
+  for (const v of [...vendas].sort((a, b) => a.data.localeCompare(b.data))) {
+    // líquido desconhecido (vendas antigas): aceita até 10% de taxa
+    const casa = (x: number) => x === v.bruto || x === v.liquido || (v.liquido == null && x <= v.bruto && x >= v.bruto * 0.9);
+    const t = banco
+      .filter((b) => b.tipo === "credito" && !usadas.has(b.id) && casa(b.valor) && dia(b.data) - dia(v.data) >= -1 && dia(b.data) - dia(v.data) <= JANELA_LIBERACAO)
+      .sort((a, b) => Number(b.categoria === v.sistema) - Number(a.categoria === v.sistema) || Math.abs(dia(a.data) - dia(v.data)) - Math.abs(dia(b.data) - dia(v.data)))[0];
+    if (t) usadas.add(t.id);
+    if (v.interno) continue;
+    const valor = t?.valor ?? v.liquido ?? v.bruto;
+    out.push({ id: `venda:${v.id}`, data: v.data, mes: mesDe(v.data), valor, fonte: v.sistema, descricao: `${v.cliente} · ${v.plano}`, pessoa: t?.pessoa ?? null,
+      origem: t ? "conciliada" : "site", bruto: v.bruto, taxa: v.bruto - valor, contaId: t?.contaId });
+  }
+  for (const t of banco) {
+    if (usadas.has(t.id)) continue;
+    out.push({ id: t.id, data: t.data, mes: t.competencia, valor: valorRenda(t), fonte: t.categoria ?? "Outras rendas", descricao: t.merchant || t.descricao, pessoa: t.pessoa, origem: "banco", contaId: t.contaId });
+  }
+  return out.sort((a, b) => b.data.localeCompare(a.data) || b.valor - a.valor);
+}
+
+export interface ResumoReceitas {
+  mes: string; total: number; pf: number; pj: number; site: number; aLiberar: number; vendas: number; maior: Receita | null;
+  porFonte: { nome: string; valor: number }[]; serie: { mes: string; valor: number }[]; entradas: Receita[];
+}
+export function resumoReceitas(rs: Receita[], mes: string, n = 12): ResumoReceitas {
+  const doMes = rs.filter((r) => r.mes === mes);
+  const soma = (xs: Receita[]) => xs.reduce((a, r) => a + r.valor, 0);
+  const fontes = new Map<string, number>();
+  for (const r of doMes) fontes.set(r.fonte, (fontes.get(r.fonte) ?? 0) + r.valor);
+  return {
+    mes, total: soma(doMes), pf: soma(doMes.filter((r) => r.pessoa === "PF")), pj: soma(doMes.filter((r) => r.pessoa !== "PF")),
+    site: soma(doMes.filter((r) => r.origem !== "banco")), aLiberar: soma(doMes.filter((r) => r.origem === "site")), vendas: doMes.filter((r) => r.origem !== "banco").length,
+    maior: doMes.reduce<Receita | null>((m, r) => (!m || r.valor > m.valor ? r : m), null),
+    porFonte: [...fontes].map(([nome, valor]) => ({ nome, valor })).filter((f) => f.valor > 0).sort((a, b) => b.valor - a.valor),
+    serie: Array.from({ length: n }, (_, i) => { const m = somarMeses(mes, i - n + 1); return { mes: m, valor: soma(rs.filter((r) => r.mes === m)) }; }),
+    entradas: doMes,
+  };
 }
 
 /* ── Assinaturas ─────────────────────────────────────────────────────────── */
@@ -288,11 +361,14 @@ export interface Resumo {
   maior: TxBase | null; transacoes: number;
 }
 
+/** Renda num débito (Pix recebido devolvido) entra negativa. */
+const valorRenda = (t: Pick<TxBase, "natureza" | "tipo" | "valor">) => (t.natureza === "renda" && t.tipo === "debito" ? -t.valor : t.valor);
+
 const somaPor = <K extends string>(txs: TxBase[], chave: (t: TxBase) => K | K[] | null) => {
   const m = new Map<K, number>();
   for (const t of txs) {
     const k = chave(t);
-    for (const x of Array.isArray(k) ? k : k == null ? [] : [k]) m.set(x, (m.get(x) ?? 0) + (t.natureza === "estorno" ? -t.valor : t.valor));
+    for (const x of Array.isArray(k) ? k : k == null ? [] : [k]) m.set(x, (m.get(x) ?? 0) + (t.natureza === "estorno" ? -t.valor : valorRenda(t)));
   }
   return [...m].map(([nome, valor]) => ({ nome, valor })).filter((x) => x.valor > 0).sort((a, b) => b.valor - a.valor);
 };
@@ -303,7 +379,7 @@ export function resumo(txs: TxBase[], mes: string): Resumo {
   const gastosTx = doMes.filter((t) => t.natureza === "gasto" || t.natureza === "estorno");
   const g = doMes.filter((t) => t.natureza === "gasto").reduce((a, t) => a + t.valor, 0);
   const estornos = doMes.filter((t) => t.natureza === "estorno").reduce((a, t) => a + t.valor, 0);
-  const renda = doMes.filter((t) => t.natureza === "renda").reduce((a, t) => a + t.valor, 0);
+  const renda = doMes.filter((t) => t.natureza === "renda").reduce((a, t) => a + valorRenda(t), 0);
   const gastos = g - estornos;
   const porDia = Array.from({ length: diasNoMes(mes) }, () => 0);
   for (const t of doMes) if (t.natureza === "gasto") { const d = Number(t.data.slice(8, 10)); if (t.data.startsWith(mes.slice(0, 7))) porDia[d - 1]! += t.valor; }

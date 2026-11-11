@@ -39,7 +39,8 @@ export async function GET(req: NextRequest) {
     if (!isPlatformAdmin(ctx)) return NextResponse.json({ error: "Sem acesso" }, { status: 403 });
     r = await sql`select (select max(ultima_sync)::text || coalesce(string_agg(coalesce(erro, ''), ''), '') from ads.fin_conexoes) as s,
       (select string_agg(id::text || status, ',') from ads.fin_analises where created_at > now() - interval '1 day') as a,
-      (select count(*) from ads.jobs where type = 'FIN_SYNC' and status in ('PENDING', 'RUNNING')) as j`;
+      (select count(*) from ads.jobs where type = 'FIN_SYNC' and status in ('PENDING', 'RUNNING')) as j,
+      (select count(*)::text || coalesce(max(pago_em)::text, '') from siaplus.pagamentos where status = 'pago') as v`; // vendas do site (Receitas ao vivo)
   } else {
     return NextResponse.json({ error: "Escopo inválido" }, { status: 400 });
   }

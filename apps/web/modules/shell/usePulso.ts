@@ -7,10 +7,10 @@ const PARADO_MS = 5 * 60_000;
 
 /**
  * Atualiza a tela sozinha sem gastar CPU à toa: a cada `ms` pergunta ao /api/pulso se algo mudou (consulta pequena) e só
- * então recarrega a página. Não pergunta com a aba escondida nem quando ninguém mexe há 5 min (aba esquecida aberta);
+ * então recarrega a página. `continuo` = tela de acompanhar (ao vivo): segue perguntando mesmo sem mexer. Não pergunta com a aba escondida nem quando ninguém mexe há 5 min (aba esquecida aberta);
  * ao voltar, confere na hora.
  */
-export function usePulso(escopo: "mensagens" | "shell" | "calendario" | "studio" | "prospeccao" | "financeiro", ms: number, ativo = true) {
+export function usePulso(escopo: "mensagens" | "shell" | "calendario" | "studio" | "prospeccao" | "financeiro", ms: number, ativo = true, continuo = false) {
   const router = useRouter();
   useEffect(() => {
     if (!ativo) return;
@@ -18,7 +18,7 @@ export function usePulso(escopo: "mensagens" | "shell" | "calendario" | "studio"
     let mexeu = Date.now();
     let indo = false;
     const tick = async () => {
-      if (indo || document.visibilityState !== "visible" || Date.now() - mexeu > PARADO_MS) return;
+      if (indo || document.visibilityState !== "visible" || (!continuo && Date.now() - mexeu > PARADO_MS)) return;
       indo = true;
       try {
         const r = await fetch(`/api/pulso?e=${escopo}`, { cache: "no-store" });
@@ -45,5 +45,5 @@ export function usePulso(escopo: "mensagens" | "shell" | "calendario" | "studio"
       evs.forEach((e) => window.removeEventListener(e, marca));
       document.removeEventListener("visibilitychange", visivel);
     };
-  }, [escopo, ms, ativo, router]);
+  }, [escopo, ms, ativo, continuo, router]);
 }

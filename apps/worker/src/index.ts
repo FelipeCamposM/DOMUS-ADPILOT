@@ -16,6 +16,7 @@ import { runAjustarMensagem, runAnaliseLeads, type AjustePayload, type AnaliseLe
 import { inicializacaoAtiva, configurarInicializacao } from "./startup";
 import { runFinSync } from "./financeiro/sync";
 import { runAnaliseFinanceira } from "./financeiro/ia";
+import { importarVendasCrm } from "@domus-ads/core/vendas";
 import { arquivarExcesso, restaurar } from "./video/arquivo";
 import { gerarLegenda, type LegendaPayload } from "./instagram/legenda";
 import { publicarInstagram } from "./instagram/publicar";
@@ -237,6 +238,7 @@ repetir(limparPedidos, 6 * 3600_000);
 repetir(agendarSyncs, 5 * 60_000);
 repetir(publicarAgendados, 30_000);
 repetir(agendarFinSync, 30 * 60_000);
+repetir(async function vendasNoCrm() { const n = await importarVendasCrm(sql); if (n) console.log(`[${agora()}] CRM: ${n} venda(s) do site`); }, 2 * 60_000);
 repetir(automatizarCalendario, 60_000);
 ouvirWhatsapp(responderWhatsapp); // respostas "sim"/"não" das artes mandadas para aprovação
 repetir(async function usoDasContas() { await atualizarUsoContas((m) => console.log(`[${agora()}] ${m}`)); }, 5 * 60_000);

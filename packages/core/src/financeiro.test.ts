@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analisar, corrigirParcelasSemFatura, decidirNatureza, detectarAssinaturas, normalizar, padrao, parcelados, parearTransferencias, resumo, type PluggyTransacao, type TxBase } from "./financeiro";
+import { analisar, corrigirParcelasSemFatura, decidirNatureza, detectarAssinaturas, normalizar, padrao, parcelados, parearTransferencias, receitas, resumo, resumoReceitas, type PluggyTransacao, type TxBase } from "./financeiro";
 
 const tx = (o: Partial<TxBase>): TxBase => ({
   id: Math.random().toString(36), contaId: "c1", pessoa: "PF", descricao: "X", valor: 1000, tipo: "debito", data: "2026-10-10", competencia: "2026-10-01",
@@ -76,5 +76,36 @@ describe("financeiro", () => {
     expect(r.renda).toBe(500000);
     const ids = analisar({ pessoa: "PF", mes: "2026-10-01", hoje: "2026-11-11", txs, assinaturas: [], cartoes: [], orcamentos: [], parcelados: [] }).map((i) => i.id);
     expect(ids).toContain("cat-Delivery");
+  });
+
+  it("natureza: liberação de venda no Mercado Pago é renda; Pix devolvido abate a renda", () => {
+    expect(decidirNatureza({ category: "Investments", description: "Liberação de dinheiro Venda com Pix", type: "CREDIT" }, false)).toBe("renda");
+    expect(decidirNatureza({ category: "Bookstore", description: "Pix recebido devolvido - Editora", type: "DEBIT" }, false)).toBe("renda");
+    expect(decidirNatureza({ category: null, description: "PIX DEVOLVIDO   Juliana", type: "CREDIT" }, false)).toBe("estorno");
+    const r = resumo([tx({ tipo: "credito", natureza: "renda", valor: 298333, cartao: false }), tx({ tipo: "debito", natureza: "renda", valor: 30000, cartao: false })], "2026-10-01");
+    expect(r.renda).toBe(268333);
+  });
+
+  it("receitas: venda do site + crédito no banco contam uma vez; retirada da PJ e teste interno não contam", () => {
+    const b = { cartao: false, tipo: "credito" as const, natureza: "renda" as const, competencia: "2026-11-01" };
+    const txs = [
+      tx({ ...b, id: "mp", pessoa: "PJ", valor: 1980, data: "2026-11-02", categoria: "SIAPLUS" }),
+      tx({ ...b, id: "teste", pessoa: "PJ", valor: 95, data: "2026-09-24", competencia: "2026-09-01", categoria: "SIAPLUS" }),
+      tx({ ...b, id: "sal", pessoa: "PJ", valor: 350000, data: "2026-11-06", categoria: "Salário PJ" }),
+      tx({ ...b, id: "ret", pessoa: "PF", valor: 350000, data: "2026-11-09", categoria: "Retirada da PJ" }),
+    ];
+    const vendas = [
+      { id: "1", sistema: "SIAPLUS", cliente: "Maria", plano: "Bimestral", bruto: 2000, liquido: 1980, metodo: "pix", data: "2026-11-02", interno: false },
+      { id: "2", sistema: "SIAPLUS", cliente: "Ester", plano: "Bimestral", bruto: 2000, liquido: 1980, metodo: "pix", data: "2026-11-11", interno: false },
+      { id: "0", sistema: "SIAPLUS", cliente: "Teste", plano: "Interno", bruto: 100, liquido: null, metodo: "pix", data: "2026-09-24", interno: true },
+    ];
+    const rs = receitas(txs, vendas);
+    expect(rs.map((r) => r.id).sort()).toEqual(["sal", "venda:1", "venda:2"]);
+    expect(rs.find((r) => r.id === "venda:1")).toMatchObject({ origem: "conciliada", valor: 1980, taxa: 20, pessoa: "PJ" });
+    expect(rs.find((r) => r.id === "venda:2")).toMatchObject({ origem: "site", valor: 1980 });
+    const m = resumoReceitas(rs, "2026-11-01");
+    expect(m.total).toBe(350000 + 1980 * 2);
+    expect(m.aLiberar).toBe(1980);
+    expect(m.porFonte[0]).toEqual({ nome: "Salário PJ", valor: 350000 });
   });
 });
