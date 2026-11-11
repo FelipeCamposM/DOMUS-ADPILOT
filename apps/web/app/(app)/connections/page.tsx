@@ -1,6 +1,7 @@
 import { db } from "@domus-ads/core";
 import { can, requireCtx } from "@/lib/ctx";
 import { Connections, type Conexao } from "@/modules/connections/Connections";
+import { HeroFx } from "@/modules/shell/HeroFx";
 
 export const metadata = { title: "Conexões" };
 
@@ -26,6 +27,7 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
   return (
     <div className="page">
       <div className="page-head">
+        <HeroFx />
         <div>
           <div className="eyebrow" data-enter>{ctx.workspace.name}</div>
           <h1 className="page-title" data-enter>Conexões</h1>

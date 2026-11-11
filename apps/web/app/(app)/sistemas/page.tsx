@@ -2,6 +2,7 @@ import { isPlatformAdmin, requireCtx } from "@/lib/ctx";
 import { workerOnline } from "@/lib/queries";
 import { consumoSistemas } from "@/lib/sistemas";
 import { Sistemas } from "@/modules/sistemas/Sistemas";
+import { HeroFx } from "@/modules/shell/HeroFx";
 
 export const metadata = { title: "Sistemas" };
 
@@ -13,6 +14,7 @@ export default async function SistemasPage() {
   return (
     <div className="page" style={{ maxWidth: 1240 }}>
       <div className="page-head">
+        <HeroFx />
         <div>
           <div className="eyebrow" data-enter>Central de IA da empresa</div>
           <h1 className="page-title" data-enter>Sistemas</h1>

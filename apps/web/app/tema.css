@@ -136,25 +136,26 @@ body { background: #030205; }
   background-size: 56px 56px, 56px 56px, 260% 100%;
   animation: hero-luz 11s var(--ease-in-out) infinite alternate;
 }
-/* lado direito: anéis + a marca DOMUS flutuando */
+/* a marca DOMUS flutuando à direita (só transform: suave, sem repintar) */
 :is(.page-head:has(.page-title), .vg-topo, .pp-topo, .crm-cab, .ia-vazio)::after {
-  content: ""; position: absolute; inset: 0 0 0 auto; width: 34%; z-index: -1; pointer-events: none;
-  border-left: 1px solid #ffffff29;
-  background:
-    url(/domus-logo.png) 50% 50% / auto 58% no-repeat,
-    radial-gradient(circle at 50% 50%, #c385ff66, transparent 30%),
-    radial-gradient(circle at 50% 50%, transparent 0 32%, #ffffff24 32.2% 32.6%, transparent 33% 46%, #ffffff14 46.2% 46.6%, transparent 47%),
-    linear-gradient(145deg, #2c086814, #1c043c70);
-  animation: hero-marca 7s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  content: ""; position: absolute; right: clamp(28px, 6%, 96px); top: 50%; width: clamp(110px, 11vw, 168px); aspect-ratio: 1; z-index: -1; pointer-events: none;
+  background: url(/domus-logo.png) center / contain no-repeat;
+  filter: drop-shadow(0 22px 30px #1c043c99) drop-shadow(0 0 34px #c385ff8c);
+  transform: translateY(-50%); animation: hero-marca 6.5s cubic-bezier(0.45, 0, 0.55, 1) infinite; will-change: transform;
 }
 :is(.page-head:has(.page-title), .vg-topo, .pp-topo, .crm-cab, .ia-vazio) { flex-direction: column; align-items: flex-start; justify-content: flex-end; gap: 18px; }
 /* texto e ações ficam no lado esquerdo; o direito é da marca */
-:is(.page-head:has(.page-title), .vg-topo, .pp-topo, .crm-cab, .ia-vazio) > * { max-width: 64%; }
+:is(.page-head:has(.page-title), .vg-topo, .pp-topo, .crm-cab, .ia-vazio) > :not(.hero-fx) { max-width: 64%; }
+/* chuva de terminal (HeroFx): mais forte à direita, some atrás do texto */
+.hero-fx {
+  position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; opacity: 0.75; mix-blend-mode: screen;
+  -webkit-mask-image: linear-gradient(90deg, #0000004d 0%, #000a 35%, #000 65%); mask-image: linear-gradient(90deg, #0000004d 0%, #000a 35%, #000 65%);
+}
 @keyframes hero-entra { from { opacity: 0; transform: translateY(14px) scale(0.985); filter: blur(6px); } }
 @keyframes hero-luz { from { background-position: 0 0, 0 0, 100% 0; } to { background-position: 0 0, 0 0, 0% 0; } }
 @keyframes hero-marca {
-  0%, 100% { background-position: 50% 54%, 50% 50%, 50% 50%, 0 0; }
-  50% { background-position: 50% 44%, 50% 50%, 50% 50%, 0 0; }
+  0%, 100% { transform: translateY(-50%) rotate(-4deg); }
+  50% { transform: translateY(calc(-50% - 12px)) rotate(3deg) scale(1.03); }
 }
 
 /* textos do hero */
@@ -264,15 +265,15 @@ body { background: #030205; }
 .cx-head .cx-sub { color: #ffffffc2; }
 .cx-head .cx-icon-btn { color: #fff; background: #ffffff1a; border: 1px solid #ffffff2e; border-radius: 999px; }
 .cx-head .cx-icon-btn:hover { background: #fff; color: var(--p-700); }
-.cx-head .cx-avatar { background: #fff; color: var(--p-700); border-radius: 13px; box-shadow: 0 8px 18px -8px #1c043c; }
-.cx-head .cx-avatar .cx-mascote { color: var(--p-700); }
+.cx-head .cx-avatar, .cx-hello-mark { color: #fff; background: linear-gradient(135deg, var(--p-500), var(--p-600) 45%, var(--p-800)); box-shadow: inset 0 1px #ffffff59, 0 0 0 1px #e4c4ff66, 0 10px 24px -10px rgb(var(--c-brand) / 0.85); }
+.cx-head .cx-avatar { border-radius: 999px; }
+.cx-head .cx-avatar .cx-mascote, .cx-hello-mark .cx-mascote { color: #fff; filter: drop-shadow(0 2px 4px rgb(0 0 0 / 0.25)); }
 .cx-head .cx-live:not([data-busy="true"]) { box-shadow: 0 0 0 3px #3ddc9733; }
 .cx-modos { margin: 10px 12px 2px; border-radius: 999px; background: #ffffff07; border-color: #ffffff14; }
 .cx-modos-pill { border-radius: 999px; background: #fff; box-shadow: 0 6px 16px -6px #000a; }
 .cx-modo { border-radius: 999px; }
 .cx-modo[aria-selected="true"] { color: var(--p-700); }
-.cx-hello-mark { background: #fff; color: var(--p-700); border-radius: 20px; box-shadow: 0 0 40px -6px rgb(var(--c-brand)), 0 18px 40px -14px #000; }
-.cx-hello-mark .cx-mascote { color: var(--p-700); }
+.cx-hello-mark { border-radius: 999px; }
 .cx-hello h2 { font: 400 25px/1.1 var(--font-display); letter-spacing: -0.05em; }
 .cx-sug { position: relative; border-radius: 16px; background: linear-gradient(180deg, #14101d, #0d0b13); border-color: #ffffff12; }
 .cx-sug::before { content: ""; position: absolute; left: -1px; top: 12px; bottom: 12px; width: 2px; border-radius: 2px; background: linear-gradient(var(--p-400), var(--p-700)); opacity: 0.5; transition: opacity 0.3s; }
@@ -325,8 +326,8 @@ body { background: #030205; }
   .main { margin: 0; height: 100dvh; border-radius: 0; border: 0; }
   .sidebar[data-open="true"] { width: 260px; }
   .page-head:has(.page-title), .vg-topo, .pp-topo, .crm-cab, .ia-vazio { min-height: 0; padding: 22px 20px; border-radius: 22px; }
-  :is(.page-head:has(.page-title), .vg-topo, .pp-topo, .crm-cab, .ia-vazio)::after { width: 30%; opacity: 0.55; }
-  :is(.page-head:has(.page-title), .vg-topo, .pp-topo, .crm-cab, .ia-vazio) > * { max-width: 100%; }
+  :is(.page-head:has(.page-title), .vg-topo, .pp-topo, .crm-cab, .ia-vazio)::after { width: 84px; opacity: 0.7; right: 16px; }
+  :is(.page-head:has(.page-title), .vg-topo, .pp-topo, .crm-cab, .ia-vazio) > :not(.hero-fx) { max-width: 100%; }
   .auth-card.auth-cm { padding: 34px 22px 24px; }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -339,3 +340,5 @@ body { background: #030205; }
 
 /* largura total: toda página ocupa a área inteira (o !important vence os maxWidth inline de cada página) */
 .page { max-width: none !important; width: 100%; padding-inline: clamp(16px, 1.6vw, 28px); }
+
+.page.page-ig { max-width: 975px !important; }

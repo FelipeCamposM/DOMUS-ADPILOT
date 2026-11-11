@@ -5,6 +5,7 @@ import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
 import { can, requireCtx } from "@/lib/ctx";
 import { ArtEditor, type AssetEmbutido } from "@/modules/studio/ArtEditor";
+import { HeroFx } from "@/modules/shell/HeroFx";
 
 export const metadata = { title: "Editar arte" };
 
@@ -54,6 +55,7 @@ export default async function EditarArtePage({ params }: { params: Promise<{ id:
   return (
     <div className="page" style={{ maxWidth: "none" }}>
       <div className="page-head">
+        <HeroFx />
         <div>
           <Link href={`/studio/${ids.data.id}`} className="eyebrow" data-enter style={{ textDecoration: "none" }}><ChevronLeft size={12} aria-hidden /> {p.title}</Link>
           <h1 className="page-title" data-enter>Editar arte</h1>

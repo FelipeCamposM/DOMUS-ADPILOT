@@ -8,6 +8,7 @@ import { db } from "@domus-ads/core";
 import { AudioLibrary, type AudioItem } from "@/modules/creatives/AudioLibrary";
 import { Busca } from "@/modules/shell/Busca";
 import { VideoCard } from "@/modules/studio/VideoCard";
+import { HeroFx } from "@/modules/shell/HeroFx";
 
 export const metadata = { title: "Criativos" };
 
@@ -97,6 +98,7 @@ export default async function CreativesPage({ searchParams }: { searchParams: Pr
   return (
     <div className="page">
       <div className="page-head">
+        <HeroFx />
         <div>
           <div className="eyebrow" data-enter>{ctx.workspace.name}</div>
           <h1 className="page-title" data-enter>Criativos</h1>

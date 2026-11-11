@@ -19,6 +19,7 @@ import { toast } from "../shell/toast";
 import { apagarFiltro, definirEtapa, definirValor, favoritarFiltro, salvarFiltro } from "./actions";
 import { EditarFunil } from "./EditarFunil";
 import { corEtapa, EtapaSeletor } from "./etapas";
+import { HeroFx } from "@/modules/shell/HeroFx";
 
 gsap.registerPlugin(Flip);
 
@@ -209,6 +210,7 @@ export function Leads({ leads, etapas, sites, salvos }: { leads: Lead[]; etapas:
   return (
     <div className="crm-leads" ref={raiz}>
       <header className="crm-cab">
+        <HeroFx />
         <div>
           <h1 className="crm-titulo">Funil de vendas</h1>
           <p className="subtle small" style={{ margin: 0 }}>Arraste os cartões entre as colunas. Clique num cartão para ver tudo sobre o lead.</p>

@@ -2,6 +2,7 @@ import { db } from "@domus-ads/core";
 import { Bot, Cog, User } from "lucide-react";
 import { requireCtx } from "@/lib/ctx";
 import { dateTime, money, STATUS_LABEL } from "@/lib/format";
+import { HeroFx } from "@/modules/shell/HeroFx";
 
 export const metadata = { title: "Auditoria" };
 
@@ -25,6 +26,7 @@ export default async function AuditPage() {
   return (
     <div className="page">
       <div className="page-head">
+        <HeroFx />
         <div>
           <div className="eyebrow" data-enter>Toda alteração fica registrada</div>
           <h1 className="page-title" data-enter>Auditoria</h1>

@@ -2,6 +2,7 @@ import { db } from "@domus-ads/core";
 import { can, requireCtx } from "@/lib/ctx";
 import { workerOnline } from "@/lib/queries";
 import { JobsTable, type JobLinha } from "@/modules/jobs/JobsTable";
+import { HeroFx } from "@/modules/shell/HeroFx";
 
 export const metadata = { title: "Jobs" };
 
@@ -15,6 +16,7 @@ export default async function JobsPage() {
   return (
     <div className="page">
       <div className="page-head">
+        <HeroFx />
         <div>
           <div className="eyebrow" data-enter>Fila do worker local</div>
           <h1 className="page-title" data-enter>Jobs</h1>

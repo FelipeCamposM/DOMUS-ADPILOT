@@ -3,6 +3,7 @@ import { can, requireCtx } from "@/lib/ctx";
 import { usoArmazenamento } from "@/lib/armazenamento";
 import { Biblioteca } from "@/modules/arquivos/Biblioteca";
 import { UsoR2 } from "@/modules/arquivos/UsoR2";
+import { HeroFx } from "@/modules/shell/HeroFx";
 
 export const metadata = { title: "Arquivos" };
 
@@ -12,6 +13,7 @@ export default async function ArquivosPage() {
   return (
     <div className="page">
       <div className="page-head">
+        <HeroFx />
         <div>
           <div className="eyebrow" data-enter>{ctx.workspace.name}</div>
           <h1 className="page-title" data-enter>Arquivos</h1>

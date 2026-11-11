@@ -14,6 +14,7 @@ import { Dialog } from "../shell/Dialog";
 import { toast } from "../shell/toast";
 import { gradeDoMes, somaDias } from "./grade";
 import { apagarPlanejamento, aprovarArte, aprovarItens, descartarItem, mudarHorario, novoItem, pedirMudanca, planejarPeriodo, refazerComIA, replanejar, salvarItem, voltarParaSugestao } from "./actions";
+import { HeroFx } from "@/modules/shell/HeroFx";
 
 const TZ = "America/Sao_Paulo";
 const ICONE: Record<FormatoCal, typeof ImageIcon> = { FEED: ImageIcon, CARROSSEL: GalleryHorizontal, REELS: Clapperboard };
@@ -72,6 +73,7 @@ export function Calendario({ conta, contas, marcas, mes, itens, avulsos, planos,
   return (
     <div className="cal-pagina">
       <div className="page-head">
+        <HeroFx />
         <div>
           <div className="eyebrow" data-enter>@{conta.username} · Instagram</div>
           <h1 className="page-title" data-enter>Conteúdos programados</h1>

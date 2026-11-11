@@ -6,6 +6,7 @@ import { z } from "zod";
 import { contasGoogle } from "@/lib/contas";
 import { can, requireCtx } from "@/lib/ctx";
 import { DraftEditor, type RascunhoView } from "@/modules/campaigns/DraftEditor";
+import { HeroFx } from "@/modules/shell/HeroFx";
 
 export const metadata = { title: "Rascunho de campanha" };
 
@@ -22,6 +23,7 @@ export default async function RascunhoPage({ params }: { params: Promise<{ id: s
   return (
     <div className="page" style={{ maxWidth: 1400 }}>
       <div className="page-head">
+        <HeroFx />
         <div>
           <Link href="/campaigns" className="eyebrow" data-enter style={{ textDecoration: "none" }}><ChevronLeft size={12} aria-hidden /> Campanhas</Link>
           <h1 className="page-title" data-enter>{d.name}</h1>

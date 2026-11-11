@@ -26,7 +26,7 @@ export default async function InstagramPage({ searchParams }: { searchParams: Pr
   const conta = contas.find((c) => c.id === sp.conta) ?? contas[0]!;
   const [vivo, posts] = await Promise.all([aoVivo(ctx.workspace.id, conta.id), postsInstagram(ctx.workspace.id, conta.id)]);
   return (
-    <div className="page" style={{ maxWidth: 975 }}>
+    <div className="page page-ig" style={{ maxWidth: 975 }}>
       <PerfilInstagram conta={conta} contas={contas} midias={vivo.midias} posts={posts} erroApi={vivo.erro} podeEditar={can(ctx, "editor")} />
     </div>
   );

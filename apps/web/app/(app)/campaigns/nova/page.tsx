@@ -5,6 +5,7 @@ import { contasGoogle } from "@/lib/contas";
 import { can, requireCtx } from "@/lib/ctx";
 import { marcasDoWorkspace, resumo } from "@/lib/marcas";
 import { NovaCampanha } from "@/modules/campaigns/NovaCampanha";
+import { HeroFx } from "@/modules/shell/HeroFx";
 
 export const metadata = { title: "Nova campanha" };
 
@@ -16,6 +17,7 @@ export default async function NovaCampanhaPage() {
   return (
     <div className="page">
       <div className="page-head">
+        <HeroFx />
         <div>
           <Link href="/campaigns" className="eyebrow" data-enter style={{ textDecoration: "none" }}><ChevronLeft size={12} aria-hidden /> Campanhas</Link>
           <h1 className="page-title" data-enter>Nova campanha · Google Pesquisa</h1>

@@ -8,6 +8,7 @@ import { NewImageForm } from "./NewImageForm";
 import { NewPostForm } from "./NewPostForm";
 import { NewVideoForm } from "./NewVideoForm";
 import { NewEditForm } from "./edicao/NewEditForm";
+import { HeroFx } from "@/modules/shell/HeroFx";
 
 type Aba = "post" | "video" | "imagem" | "edicao";
 const URL_ABA: Record<Aba, string> = { post: "/studio/novo?tipo=post", imagem: "/studio/novo?tipo=imagem", video: "/studio/novo", edicao: "/studio/novo?tipo=edicao" };
@@ -54,6 +55,7 @@ export function StudioNovo({ inicial, video, imagem, post, edicao }: { inicial: 
   return (
     <>
       <div className="page-head">
+        <HeroFx />
         <div>
           <div className="eyebrow" data-enter>Studio</div>
           <h1 ref={titulo} className="page-title" data-enter>{TITULO[visivel][0]}</h1>

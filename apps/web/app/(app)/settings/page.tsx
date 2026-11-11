@@ -4,6 +4,7 @@ import { workerOnline } from "@/lib/queries";
 import { usoArmazenamento } from "@/lib/armazenamento";
 import type { Detectada } from "@/modules/settings/AiAccounts";
 import { Settings, type ContaIA, type Membro } from "@/modules/settings/Settings";
+import { HeroFx } from "@/modules/shell/HeroFx";
 
 export const metadata = { title: "Configurações" };
 
@@ -50,6 +51,7 @@ export default async function SettingsPage() {
   return (
     <div className="page" style={{ maxWidth: 1240 }}>
       <div className="page-head">
+        <HeroFx />
         <div>
           <div className="eyebrow" data-enter>{ctx.workspace.name}</div>
           <h1 className="page-title" data-enter>Configurações</h1>

@@ -10,6 +10,7 @@ import { InstagramIcon as Instagram, WhatsappIcon } from "../connections/Logos";
 import { corEtapa } from "../mensagens/etapas";
 import { Barras, Num } from "../mensagens/Leads";
 import { entrar } from "../motion/entrar";
+import { HeroFx } from "@/modules/shell/HeroFx";
 
 export interface DadosPulso {
   crm: {
@@ -74,6 +75,7 @@ export function Pulso({ nome, crm, conteudo, ads }: {
   return (
     <div className="vg" ref={raiz}>
       <header className="vg-topo">
+        <HeroFx />
         <div>
           <div className="eyebrow" suppressHydrationWarning>{new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "2-digit", month: "long" }).format(new Date())} · {nome}</div>
           <h1 className="page-title" suppressHydrationWarning>{saudacao()} 👋</h1>

@@ -7,6 +7,7 @@ import { ago } from "@/lib/format";
 import { campanhas, opcoesFiltro, parseFiltro } from "@/lib/queries";
 import { CampaignTable } from "@/modules/campaigns/CampaignTable";
 import { Filters } from "@/modules/dashboard/Filters";
+import { HeroFx } from "@/modules/shell/HeroFx";
 
 export const metadata = { title: "Campanhas" };
 
@@ -18,6 +19,7 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
   return (
     <div className="page">
       <div className="page-head">
+        <HeroFx />
         <div>
           <div className="eyebrow" data-enter>Meta + Google</div>
           <h1 className="page-title" data-enter>Campanhas</h1>

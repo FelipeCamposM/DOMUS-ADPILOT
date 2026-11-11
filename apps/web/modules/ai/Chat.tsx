@@ -10,6 +10,7 @@ import remarkGfm from "remark-gfm";
 import type { ChatAction, ChatMsg, ChatState } from "@/lib/ai";
 import { toast } from "../shell/toast";
 import { aprovarAcao, cancelarResposta, enviarMensagem, novaConversa, rejeitarAcao } from "./actions";
+import { HeroFx } from "@/modules/shell/HeroFx";
 
 const SUGESTOES = [
   "Como estão as campanhas hoje?",
@@ -228,6 +229,7 @@ function Vazio({ onPick }: { onPick: (t: string) => void }) {
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", paddingBlock: "4vh" }}>
     <div className="ia-vazio">
+      <HeroFx />
       <div className="eyebrow" data-enter>AI Analyst</div>
       <h1 data-enter>
         <span className="ia-prompt">❯ </span><span ref={ref} /><span className="caret" aria-hidden />

@@ -1,6 +1,7 @@
 import { can, requireCtx } from "@/lib/ctx";
 import { conhecimentoDaMarca, marcasDoWorkspace } from "@/lib/marcas";
 import { Marcas } from "@/modules/marcas/Marcas";
+import { HeroFx } from "@/modules/shell/HeroFx";
 
 export const metadata = { title: "Marcas" };
 
@@ -13,6 +14,7 @@ export default async function MarcasPage({ searchParams }: { searchParams: Promi
   return (
     <div className="page" style={{ maxWidth: 1100 }}>
       <div className="page-head">
+        <HeroFx />
         <div>
           <div className="eyebrow" data-enter>{ctx.workspace.name}</div>
           <h1 className="page-title" data-enter>Marcas</h1>

@@ -9,6 +9,7 @@ import { ImageProjectView } from "@/modules/studio/ImageProjectView";
 import { ProjectView } from "@/modules/studio/ProjectView";
 import { EditProjectView } from "@/modules/studio/edicao/EditProjectView";
 import { Consumo } from "@/modules/studio/Consumo";
+import { HeroFx } from "@/modules/shell/HeroFx";
 
 export default async function ProjetoPage({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireCtx();
@@ -21,6 +22,7 @@ export default async function ProjetoPage({ params }: { params: Promise<{ id: st
     return (
       <div className="page">
         <div className="page-head">
+          <HeroFx />
           <div>
             <Link href="/studio" className="eyebrow" data-enter style={{ textDecoration: "none" }}><ChevronLeft size={12} aria-hidden /> Studio</Link>
             <h1 className="page-title" data-enter>{p.title}</h1>
@@ -38,6 +40,7 @@ export default async function ProjetoPage({ params }: { params: Promise<{ id: st
     return (
       <div className="page">
         <div className="page-head">
+          <HeroFx />
           <div>
             <Link href="/studio" className="eyebrow" data-enter style={{ textDecoration: "none" }}><ChevronLeft size={12} aria-hidden /> Studio</Link>
             <h1 className="page-title" data-enter>{p.title}</h1>
@@ -66,6 +69,7 @@ export default async function ProjetoPage({ params }: { params: Promise<{ id: st
   return (
     <div className="page">
       <div className="page-head">
+        <HeroFx />
         <div>
           <Link href="/studio" className="eyebrow" data-enter style={{ textDecoration: "none" }}><ChevronLeft size={12} aria-hidden /> Studio</Link>
           <h1 className="page-title" data-enter>{p.title}</h1>

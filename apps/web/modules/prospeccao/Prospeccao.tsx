@@ -19,6 +19,7 @@ import { LeadDetalhe } from "./LeadDetalhe";
 import { LeadLista } from "./LeadLista";
 import { MapGuard } from "./MapGuard";
 import { Kpi, Seg, Slider } from "./ui";
+import { HeroFx } from "@/modules/shell/HeroFx";
 
 const LeadMap = dynamic(() => import("./Mapas").then((m) => m.LeadMap), { ssr: false, loading: () => <div className="pp-mapa pp-mapa-carregando" style={{ height: 320 }} /> });
 
@@ -257,6 +258,7 @@ export function Prospeccao({ campanhas, campanhaId, leads: leadsServidor, etapas
   return (
     <div className="page pp" style={{ maxWidth: 1480 }}>
       <header className="pp-topo">
+        <HeroFx />
         <div>
           <span className="eyebrow"><Radar aria-hidden /> CRM · Prospecção</span>
           <h1 className="crm-titulo">Prospecção de leads</h1>
