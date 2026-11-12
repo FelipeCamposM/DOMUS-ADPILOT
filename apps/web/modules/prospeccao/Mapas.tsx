@@ -1,11 +1,11 @@
 "use client";
 
 import "leaflet/dist/leaflet.css";
-import type { Lead } from "@domus-ads/core/prospeccao";
+import type { Lead, LeadCampaign } from "@domus-ads/core/prospeccao";
 import L from "leaflet";
 import { ArrowRight, Crosshair, Loader2, LocateFixed, MapPin, Minus, Plus, Search, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Circle, MapContainer, Marker, TileLayer, Tooltip, useMap, useMapEvents } from "react-leaflet";
+import { Circle, CircleMarker, MapContainer, Marker, TileLayer, Tooltip, useMap, useMapEvents } from "react-leaflet";
 import { STATUS } from "./comum";
 import { MapGuard, MapPlaceholder } from "./MapGuard";
 
@@ -153,7 +153,7 @@ export function LocationPicker({ value, radiusKm, disabled, onChange, extra }: {
           <MapTiles />
           <FitRadius lat={value.lat} lng={value.lng} radiusKm={radiusKm} />
           <ClickToMove onPick={pick} disabled={disabled} />
-          <Circle center={[value.lat, value.lng]} radius={radiusKm * 1000} pathOptions={{ className: "pp-raio", weight: 2, fillOpacity: 0.1, dashArray: "6 6" }} />
+          <Circle center={[value.lat, value.lng]} radius={radiusKm * 1000} pathOptions={{ className: "pp-raio", color: "#a855f7", weight: 2, fillOpacity: 0.1, dashArray: "6 6" }} />
           <Marker position={[value.lat, value.lng]} icon={PIN} draggable={!disabled}
             eventHandlers={{ dragend: (e) => { const p = (e.target as L.Marker).getLatLng(); pick(p.lat, p.lng); } }} />
         </MapContainer>
@@ -241,7 +241,7 @@ function InteractiveLeadMap({ leads, selectedId, onSelect, radiusKm, center }: L
         <MapTiles />
         <FitLeads points={points} />
         <FocusSelected lead={mapped.find((x) => x.id === selectedId)} />
-        {center && radiusKm ? <Circle center={center} radius={radiusKm * 1000} pathOptions={{ className: "pp-raio", weight: 1.5, fillOpacity: 0.05, dashArray: "5 6" }} /> : null}
+        {center && radiusKm ? <Circle center={center} radius={radiusKm * 1000} pathOptions={{ className: "pp-raio", color: "#a855f7", weight: 1.5, fillOpacity: 0.05, dashArray: "5 6" }} /> : null}
         {mapped.map((lead) => {
           const active = lead.id === selectedId;
           const color = (STATUS[lead.websiteStatus] ?? STATUS.unknown).color;
@@ -267,4 +267,60 @@ export function LeadMap(props: LeadMapProps) {
   const has = props.leads.some((lead) => Number.isFinite(lead.latitude) && Number.isFinite(lead.longitude));
   if (!has) return <MapPlaceholder message="Os pinos aparecem quando a busca traz as coordenadas das empresas." />;
   return <MapGuard><InteractiveLeadMap {...props} /></MapGuard>;
+}
+
+// ───────────── Mapa de todas as buscas (lista "Suas buscas") ─────────────
+
+interface CampanhasMapProps { campanhas: LeadCampaign[]; leads: Lead[]; destaque?: string; onDestaque: (id?: string) => void; onOpen: (id: string) => void }
+
+function InteractiveCampanhasMap({ campanhas, leads, destaque, onDestaque, onOpen }: CampanhasMapProps) {
+  const areas = useMemo(() => campanhas.filter((c) => Number.isFinite(c.centerLat) && Number.isFinite(c.centerLng)), [campanhas]);
+  const pontos = useMemo(() => leads.filter((x) => !x.deletedAt && Number.isFinite(x.latitude) && Number.isFinite(x.longitude)), [leads]);
+  const [map, setMap] = useState<L.Map | null>(null);
+  const enquadrar = () => {
+    if (!map || !areas.length) return;
+    const b = L.latLngBounds([]);
+    areas.forEach((c) => b.extend(L.latLng(c.centerLat!, c.centerLng!).toBounds(c.radiusKm * 2000)));
+    map.fitBounds(b, { padding: [40, 40], maxZoom: 15 });
+  };
+  useEffect(enquadrar, [map, areas.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  // passar o mouse numa busca da lista leva o mapa até ela
+  useEffect(() => {
+    const c = areas.find((x) => x.id === destaque);
+    if (map && c) map.flyToBounds(L.latLng(c.centerLat!, c.centerLng!).toBounds(c.radiusKm * 2000), { padding: [40, 40], maxZoom: 15, duration: 0.6 });
+  }, [destaque]); // eslint-disable-line react-hooks/exhaustive-deps
+  const origem: [number, number] = areas[0] ? [areas[0].centerLat!, areas[0].centerLng!] : [-15.78, -47.93];
+  return (
+    <section className="pp-mapa pp-mapa-res" aria-label="Mapa das buscas">
+      <MapContainer ref={setMap} center={origem} zoom={12} className="pp-mapa-in" style={{ height: "100%" }} scrollWheelZoom zoomControl={false}>
+        <MapTiles />
+        {pontos.map((l) => {
+          const fraco = destaque && l.campaignId !== destaque;
+          return <CircleMarker key={l.id} center={[l.latitude!, l.longitude!]} radius={4} interactive={false}
+            pathOptions={{ stroke: false, fillColor: (STATUS[l.websiteStatus] ?? STATUS.unknown).color, fillOpacity: fraco ? 0.15 : 0.85 }} />;
+        })}
+        {areas.map((c) => {
+          const ativo = c.id === destaque;
+          return (
+            <Circle key={c.id} center={[c.centerLat!, c.centerLng!]} radius={c.radiusKm * 1000}
+              pathOptions={{ className: `pp-raio${ativo ? " pp-raio-ativo" : ""}`, color: ativo ? "#d8b4fe" : "#a855f7", weight: ativo ? 2.5 : 1.5, fillOpacity: ativo ? 0.12 : 0.04, dashArray: ativo ? undefined : "5 6" }}
+              eventHandlers={{ click: () => onOpen(c.id), mouseover: () => onDestaque(c.id), mouseout: () => onDestaque(undefined) }}>
+              <Tooltip direction="top" sticky>{c.name} · {c.foundCount} leads</Tooltip>
+            </Circle>
+          );
+        })}
+      </MapContainer>
+      <ZoomHud map={map} onRecentrar={enquadrar} rotulo="Enquadrar todas as buscas" />
+      <ul className="pp-hud pp-legenda" aria-label="Legenda">
+        {(["no_site", "social_only", "broken", "weak", "healthy"] as const).map((k) => (
+          <li key={k}><span style={{ background: STATUS[k].color }} />{STATUS[k].label}</li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+export function CampanhasMap(props: CampanhasMapProps) {
+  if (!props.campanhas.some((c) => Number.isFinite(c.centerLat))) return <MapPlaceholder message="As áreas das buscas aparecem aqui." />;
+  return <MapGuard><InteractiveCampanhasMap {...props} /></MapGuard>;
 }

@@ -2,7 +2,7 @@
 
 import { hasAds, OPPORTUNITY, whatsappNumber, type BuscaForm as Form, type Lead, type LeadCampaign, type LeadStage, type ScoreWeights, type WebsiteStatus } from "@domus-ads/core/prospeccao";
 import {
-  ArrowLeft, Bot, Briefcase, Building2, Download, FolderInput, Globe2, KanbanSquare, ListChecks, Loader2, Mail, Megaphone, MousePointerClick, Plus, Radar, Search, Settings2,
+  ArrowLeft, ArrowRight, Bot, Briefcase, Building2, Download, FolderInput, Globe2, KanbanSquare, ListChecks, Loader2, Mail, Megaphone, MousePointerClick, Plus, Radar, Search, Settings2,
   SlidersHorizontal, Square, Star, Trash2, TriangleAlert,
 } from "lucide-react";
 import dynamic from "next/dynamic";
@@ -22,6 +22,7 @@ import { MapGuard } from "./MapGuard";
 import { Slider } from "./ui";
 import { Seletor } from "@/modules/shell/Seletor";
 
+const CampanhasMap = dynamic(() => import("./Mapas").then((m) => m.CampanhasMap), { ssr: false, loading: () => <div className="pp-mapa pp-mapa-carregando" style={{ height: "100%" }} /> });
 const LeadMap = dynamic(() => import("./Mapas").then((m) => m.LeadMap), { ssr: false, loading: () => <div className="pp-mapa pp-mapa-carregando" style={{ height: 320 }} /> });
 
 export type Aba = "search" | "results" | "pipeline" | "settings";
@@ -53,28 +54,37 @@ const STATUS_OPCOES = [
 const dataCurta = (ms: number) => new Date(ms).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
 
 /** Um card por busca. `<article>`, não `<button>`: o botão de excluir mora dentro do card. */
-function CampaignCard({ c, onOpen, onDelete }: { c: LeadCampaign; onOpen: () => void; onDelete: () => void }) {
-  const st = CAMPAIGN_STATUS[c.status] ?? CAMPAIGN_STATUS.failed;
+/** Uma busca na lista: nome, onde, quantos leads e a mistura de status (barra empilhada). */
+function BuscaLinha({ c, n, st, ativa, onOpen, onDelete, onHover }: {
+  c: LeadCampaign; n: number; st: ResumoBusca; ativa: boolean; onOpen: () => void; onDelete: () => void; onHover: (on: boolean) => void;
+}) {
+  const s = CAMPAIGN_STATUS[c.status] ?? CAMPAIGN_STATUS.failed;
   return (
-    <article onClick={onOpen} className="panel pp-busca-card" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter") onOpen(); }}>
-      <div className="pp-busca-card-topo">
-        <span className="icon-tile"><Building2 aria-hidden /></span>
-        <span className="cluster" style={{ gap: 4 }}>
-          <span className="pp-selo" data-tone={st.tone === "brand" ? "accent" : st.tone}>{c.status === "running" && <Loader2 className="animate-spin" aria-hidden />}{st.label}</span>
-          <button className="btn btn-ghost btn-xs pp-so-hover" aria-label={`Excluir busca ${c.name}`} title="Excluir busca" onClick={(e) => { e.stopPropagation(); onDelete(); }}><Trash2 aria-hidden /></button>
+    <li className="pp-busca-linha" data-ativa={ativa || undefined} onMouseEnter={() => onHover(true)} onMouseLeave={() => onHover(false)}>
+      <button type="button" className="pp-busca-abre" onClick={onOpen} onFocus={() => onHover(true)} onBlur={() => onHover(false)} aria-label={`Abrir ${c.name}`}>
+        <span className="pp-busca-topo">
+          <em className="tabular">{String(n).padStart(2, "0")}</em>
+          <b className="pp-trunc">{c.name}</b>
+          <span className="pp-selo" data-tone={s.tone === "brand" ? "accent" : s.tone}>{c.status === "running" && <Loader2 className="animate-spin" aria-hidden />}{s.label}</span>
         </span>
-      </div>
-      <div className="pp-busca-card-id">
-        <h3 className="pp-trunc">{c.name}</h3>
-        <p className="pp-trunc">{c.niches.join(", ")} · {c.locationLabel} · {String(c.radiusKm).replace(".", ",")} km</p>
-      </div>
-      <div className="pp-busca-card-pe">
-        <p><b className="tabular">{c.foundCount}</b> leads</p>
-        <span>{dataCurta(c.createdAt)}</span>
-      </div>
-    </article>
+        <small className="pp-trunc">{c.niches.join(", ")} · {c.locationLabel} · {String(c.radiusKm).replace(".", ",")} km · {dataCurta(c.createdAt)}</small>
+        <span className="pp-busca-mix" aria-hidden>
+          {st.n > 0 ? (["no_site", "social_only", "broken", "weak", "healthy", "unknown"] as const).map((k) => st.porStatus[k]
+            ? <i key={k} style={{ flexGrow: st.porStatus[k], background: STATUS[k].color }} /> : null) : <i style={{ flexGrow: 1 }} />}
+        </span>
+        <span className="pp-busca-nums">
+          <span><b className="tabular">{st.n}</b>leads</span>
+          <span><b className="tabular">{st.oport}</b>oportunidades</span>
+          <span><b className="tabular">{st.email}</b>com e-mail</span>
+          {st.n > 0 && <span><b className="tabular">{Math.round(st.soma / st.n)}</b>score médio</span>}
+        </span>
+      </button>
+      <button type="button" className="pp-busca-x" aria-label={`Excluir busca ${c.name}`} title="Excluir busca" onClick={onDelete}><Trash2 aria-hidden /></button>
+    </li>
   );
 }
+interface ResumoBusca { porStatus: Partial<Record<string, number>>; email: number; oport: number; soma: number; n: number }
+const RESUMO_VAZIO: ResumoBusca = { porStatus: {}, email: 0, oport: 0, soma: 0, n: 0 };
 
 function Vazio({ title, text, action }: { title: string; text: string; action: ReactNode }) {
   return (
@@ -135,6 +145,7 @@ export function Prospeccao({ campanhas, campanhaId, leads: leadsServidor, etapas
   const [toggles, setToggles] = useState<Set<Toggle>>(new Set());
   const [showTrash, setShowTrash] = useState(false);
   const [selectedId, setSelectedId] = useState<string>();
+  const [destaque, setDestaque] = useState<string>();
   const [offer, setOffer] = useState(config.oferta);
   const [weights, setWeights] = useState<ScoreWeights>(config.pesos);
   const [salvando, setSalvando] = useState(false);
@@ -256,6 +267,21 @@ export function Prospeccao({ campanhas, campanhaId, leads: leadsServidor, etapas
     router.refresh();
   }
 
+  // lista de buscas: números de cada uma e o total de oportunidades
+  const resumoBuscas = useMemo(() => {
+    const por = new Map<string, ResumoBusca>();
+    let oport = 0;
+    for (const l of leads) {
+      if (l.deletedAt) continue;
+      const r = por.get(l.campaignId) ?? { porStatus: {}, email: 0, oport: 0, soma: 0, n: 0 };
+      r.porStatus[l.websiteStatus] = (r.porStatus[l.websiteStatus] ?? 0) + 1;
+      if (l.email) r.email++;
+      if (OPPORTUNITY.includes(l.websiteStatus)) { r.oport++; oport++; }
+      r.soma += l.score; r.n++;
+      por.set(l.campaignId, r);
+    }
+    return { por, oport };
+  }, [leads]);
   const pending = showTrash || analise ? [] : filtered.filter((l) => !l.aiInsight).slice(0, BATCH_SIZE);
   const flip = (t: Toggle) => setToggles((prev) => { const next = new Set(prev); if (next.has(t)) next.delete(t); else next.add(t); return next; });
   const newSearch = <button className="btn btn-primary btn-sm" onClick={() => setTab("search")}><Plus aria-hidden />Nova busca</button>;
@@ -365,15 +391,48 @@ export function Prospeccao({ campanhas, campanhaId, leads: leadsServidor, etapas
           </aside>
         </section>
       ) : (
-        <>
-          {faixa("Suas buscas", "Resultados", <>
-            <input ref={arquivo} type="file" accept=".md,text/markdown" hidden onChange={(e) => void importMd(e.target.files?.[0])} />
-            <button className="btn btn-secondary btn-sm" onClick={() => arquivo.current?.click()}><FolderInput aria-hidden />Importar .md</button>
-          </>)}
-          {campanhas.length > 0
-            ? <div className="pp-buscas-grade">{campanhas.map((c) => <CampaignCard key={c.id} c={c} onOpen={() => ir(c.id)} onDelete={() => removeCampaign(c.id)} />)}</div>
-            : <Vazio title="Nenhuma busca ainda" text="Escolha um nicho e um ponto no mapa para encontrar empresas." action={newSearch} />}
-        </>
+        <section className="pp-console" data-enter>
+          <aside className="pp-console-lado">
+            <header className="pp-console-cab">
+              {trilha("Resultados")}
+              <h2>Suas buscas<i>.</i></h2>
+              {nav}
+            </header>
+            <div className="pp-buscas-resumo">
+              {([["Buscas", campanhas.length], ["Leads", stats.total], ["Oportunidades", resumoBuscas.oport], ["Com e-mail", stats.email]] as const).map(([l, v]) => (
+                <span key={l}><b className="tabular">{v}</b><small>{l}</small></span>
+              ))}
+            </div>
+            <div className="pp-console-corpo">
+              {campanhas.length > 0 ? (
+                <ol className="pp-buscas-lista" aria-label="Buscas">
+                  {campanhas.map((c, i) => (
+                    <BuscaLinha key={c.id} c={c} n={i + 1} st={resumoBuscas.por.get(c.id) ?? RESUMO_VAZIO} ativa={destaque === c.id}
+                      onOpen={() => ir(c.id)} onDelete={() => removeCampaign(c.id)} onHover={(on) => setDestaque(on ? c.id : undefined)} />
+                  ))}
+                </ol>
+              ) : (
+                <div className="pp-det-vazio"><span className="pp-hud-ico"><Radar aria-hidden /></span><b>Nenhuma busca ainda</b><small>Escolha um nicho e um ponto no mapa para encontrar empresas.</small></div>
+              )}
+            </div>
+            <footer className="pp-console-pe">
+              <input ref={arquivo} type="file" accept=".md,text/markdown" hidden onChange={(e) => void importMd(e.target.files?.[0])} />
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => arquivo.current?.click()}><FolderInput aria-hidden />Importar base .md</button>
+              <button type="button" className="pp-cta" onClick={() => setTab("search")}>
+                <span className="pp-cta-ico"><Plus aria-hidden /></span><span className="pp-cta-txt">Nova busca</span><span className="pp-cta-seta"><ArrowRight aria-hidden /></span>
+              </button>
+            </footer>
+          </aside>
+          <div className="pp-console-mapa">
+            <CampanhasMap campanhas={campanhas} leads={leads} destaque={destaque} onDestaque={setDestaque} onOpen={(id) => ir(id)} />
+            {campanhas.length > 0 && (
+              <div className="pp-hud pp-hud-dica">
+                <span className="pp-hud-ico pp-hud-ico-sm"><MousePointerClick aria-hidden /></span>
+                <span><b>Clique numa área para abrir a busca</b><small>Os pontos são os leads, na cor do status do site</small></span>
+              </div>
+            )}
+          </div>
+        </section>
       ))}
 
       {tab === "pipeline" && <>
