@@ -1,14 +1,14 @@
 "use client";
 
 import { CATEGORIAS_MODELO, FRIO, MAX_TEXTO_WA, preencherModelo, templateSchema, temLink, VARIAVEIS_MODELO } from "@domus-ads/core/mensagens";
-import { Loader2, MessageSquareText, Pencil, Plus, ShieldCheck, Trash2 } from "lucide-react";
+import { Loader2, MessageSquareText, Pencil, Plus, ShieldCheck, Sparkles, Trash2, Wand2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useLayoutEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
 import { entrar } from "../motion/entrar";
 import { confirmar } from "../shell/confirmar";
 import { Dialog } from "../shell/Dialog";
 import { toast } from "../shell/toast";
-import { apagarTemplate, salvarTemplate } from "./actions";
+import { apagarTemplate, gerarModeloIA, resultadoAjuste, salvarTemplate } from "./actions";
 import { formatar, type Modelo } from "./Mensagens";
 
 type Edicao = { id: string | null; nome: string; texto: string; categoria: string };
@@ -17,6 +17,7 @@ type Edicao = { id: string | null; nome: string; texto: string; categoria: strin
 export function Modelos({ modelos }: { modelos: Modelo[] }) {
   const router = useRouter();
   const [edit, setEdit] = useState<Edicao | null>(null);
+  const [comIA, setComIA] = useState(false);
   const grade = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => entrar(grade.current?.children ?? [], { y: 12, scale: 0.98 }, { stagger: 0.04, duration: 0.5 }), []);
   return (
@@ -41,23 +42,54 @@ export function Modelos({ modelos }: { modelos: Modelo[] }) {
             <p>{formatar(preencherModelo(m.texto, EXEMPLO))}</p>
           </article>
         ))}
-        <button className="crm-modelo crm-modelo-novo" onClick={() => setEdit({ id: null, nome: "", texto: "", categoria: "Geral" })}><Plus aria-hidden /> Novo modelo</button>
+        <button className="crm-modelo crm-modelo-novo crm-modelo-ia" onClick={() => { setComIA(true); setEdit({ id: null, nome: "", texto: "", categoria: "Geral" }); }}><Sparkles aria-hidden /> Criar com IA</button>
+        <button className="crm-modelo crm-modelo-novo" onClick={() => { setComIA(false); setEdit({ id: null, nome: "", texto: "", categoria: "Geral" }); }}><Plus aria-hidden /> Novo modelo</button>
       </div>
       {!modelos.length && <p className="subtle small" style={{ margin: 0 }}>Modelos aceitam {Object.keys(VARIAVEIS_MODELO).join(", ")}, trocados pelos dados do contato na hora de usar.</p>}
-      {edit && <EditarModelo inicial={edit} categorias={[...new Set([...CATEGORIAS_MODELO, ...modelos.map((m) => m.categoria)])]} fechar={() => setEdit(null)} />}
+      {edit && <EditarModelo inicial={edit} focoIA={comIA} categorias={[...new Set([...CATEGORIAS_MODELO, ...modelos.map((m) => m.categoria)])]} fechar={() => setEdit(null)} />}
     </>
   );
 }
 
 const EXEMPLO = { nome: "Maria Souza", numero: "5531999999999", site: "seu site" };
 
-function EditarModelo({ inicial, categorias, fechar }: { inicial: Edicao; categorias: string[]; fechar: () => void }) {
+const IDEIAS = ["Boas-vindas para quem veio do site", "Follow-up depois de mandar orçamento", "Lembrete de pagamento gentil", "Pedir avaliação no Google", "Reativar cliente sumido"];
+const AJUSTES = ["Mais curta", "Mais próxima e informal", "Mais profissional", "Corrigir o português", "Com uma pergunta no fim"];
+
+function EditarModelo({ inicial, categorias, fechar, focoIA }: { inicial: Edicao; categorias: string[]; fechar: () => void; focoIA?: boolean }) {
   const router = useRouter();
   const [edit, setEdit] = useState(inicial);
   const [erro, setErro] = useState<string | null>(null);
   const [pend, start] = useTransition();
   const campo = useRef<HTMLTextAreaElement>(null);
-  const mudar = (d: Partial<Edicao>) => { setEdit({ ...edit, ...d }); setErro(null); };
+  const mudar = (d: Partial<Edicao>) => { setEdit((e) => ({ ...e, ...d })); setErro(null); };
+  // IA: escreve do zero (texto vazio) ou ajusta o texto atual; roda na vaga rápida do worker, acompanha até ~2 min
+  const [pedido, setPedido] = useState("");
+  const [escrevendo, setEscrevendo] = useState(false);
+  const vivo = useRef(true);
+  useEffect(() => () => { vivo.current = false; }, []);
+  const comIA = async (p: string) => {
+    if (escrevendo) return;
+    setEscrevendo(true); setErro(null);
+    const r = await gerarModeloIA({ texto: edit.texto, pedido: p, categoria: edit.categoria });
+    if (!r.ok) { setEscrevendo(false); setErro(r.error); return; }
+    for (let i = 0; i < 80 && vivo.current; i++) {
+      await new Promise((ok) => setTimeout(ok, 1500));
+      const s = await resultadoAjuste(r.data);
+      if (!s.ok) { setErro(s.error); break; }
+      if (s.data.status === "COMPLETED" && s.data.texto) {
+        const nome = s.data.nome;
+        setEdit((e) => ({ ...e, texto: s.data.texto!, nome: e.nome.trim() || nome || e.nome }));
+        setPedido("");
+        toast.ok("Modelo escrito pela IA: revise e salve");
+        break;
+      }
+      if (s.data.status === "FAILED" || s.data.status === "CANCELLED") { setErro(s.data.erro ?? "A IA não conseguiu escrever o modelo"); break; }
+      if (i === 79) setErro("A IA demorou demais. Tente de novo.");
+    }
+    if (vivo.current) setEscrevendo(false);
+  };
+  const temTexto = !!edit.texto.trim();
   const salvar = () => start(async () => {
     const v = templateSchema.safeParse(edit);
     if (!v.success) return setErro(v.error.issues[0]?.message ?? "Dados inválidos");
@@ -77,10 +109,26 @@ function EditarModelo({ inicial, categorias, fechar }: { inicial: Edicao; catego
     <Dialog open onClose={fechar} title={edit.id ? "Editar modelo" : "Novo modelo"} largo>
       <form className="mdl" onSubmit={(e) => { e.preventDefault(); salvar(); }}>
         <div className="mdl-editor">
+          <section className="mdl-ia" aria-busy={escrevendo}>
+            <header><span className="mdl-ia-ico">{escrevendo ? <Loader2 className="animate-spin" aria-hidden /> : <Wand2 aria-hidden />}</span>
+              <span className="stack" style={{ gap: 1 }}><b>{temTexto ? "Ajustar com IA" : "Criar com IA"}</b>
+                <small>{escrevendo ? "A IA está escrevendo o modelo…" : temTexto ? "Reescreve o texto abaixo do jeito que você pedir" : "Descreva o modelo; a IA escreve com as variáveis prontas"}</small></span></header>
+            <div className="cluster" style={{ gap: 4, flexWrap: "wrap" }}>
+              {(temTexto ? AJUSTES : IDEIAS).map((a) => <button key={a} type="button" className="chip" style={{ height: 26, fontSize: 11.5 }} disabled={escrevendo} onClick={() => void comIA(a)}>{a}</button>)}
+            </div>
+            <div className="mdl-ia-campo">
+              <input className="input" value={pedido} maxLength={400} disabled={escrevendo} autoFocus={focoIA} aria-label="Pedido para a IA"
+                placeholder={temTexto ? "Ex.: cite o desconto de 10% até sexta" : "Ex.: follow-up 3 dias depois do orçamento, perguntando se ficou alguma dúvida"}
+                onChange={(e) => setPedido(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void comIA(pedido); } }} />
+              <button type="button" className="btn btn-primary btn-sm" disabled={escrevendo || (!temTexto && !pedido.trim())} onClick={() => void comIA(pedido)}>
+                {escrevendo ? <Loader2 className="animate-spin" aria-hidden /> : <Sparkles aria-hidden />}{temTexto ? "Ajustar" : "Escrever"}
+              </button>
+            </div>
+          </section>
           <div className="cluster" style={{ gap: 10, alignItems: "flex-end" }}>
             <div className="field" style={{ flex: 2, minWidth: 180 }}>
               <label className="label" htmlFor="md-nome">Nome do modelo *</label>
-              <input id="md-nome" className="input" value={edit.nome} maxLength={60} onChange={(e) => mudar({ nome: e.target.value })} autoFocus placeholder="Ex.: Boas-vindas, Proposta enviada" />
+              <input id="md-nome" className="input" value={edit.nome} maxLength={60} onChange={(e) => mudar({ nome: e.target.value })} autoFocus={!focoIA} placeholder="Ex.: Boas-vindas, Proposta enviada" />
             </div>
             <div className="field" style={{ flex: 1, minWidth: 140 }}>
               <label className="label" htmlFor="md-cat">Categoria</label>
@@ -91,7 +139,7 @@ function EditarModelo({ inicial, categorias, fechar }: { inicial: Edicao; catego
           <div className="field">
             <label className="label" htmlFor="md-texto">Texto *</label>
             <textarea ref={campo} id="md-texto" className="input" rows={10} style={{ height: "auto", paddingBlock: 12, resize: "vertical" }} maxLength={MAX_TEXTO_WA}
-              value={edit.texto} onChange={(e) => mudar({ texto: e.target.value })} placeholder="Olá {primeiro_nome}, tudo bem? …" />
+              value={edit.texto} disabled={escrevendo} onChange={(e) => mudar({ texto: e.target.value })} placeholder="Olá {primeiro_nome}, tudo bem? …" />
             <span className="cluster" style={{ gap: 6 }}>
               <span className="subtle caption">Inserir:</span>
               {Object.entries(VARIAVEIS_MODELO).map(([v, d]) => <button key={v} type="button" className="mdl-var" title={d} onClick={() => inserir(v)}>{v}</button>)}

@@ -2992,3 +2992,17 @@ li[data-estado="feito"] .pp-aviso-txt b { color: rgb(var(--c-text-secondary)); }
 @media (hover: none) { .pp-busca-x { opacity: 1; } }
 .pp-raio-ativo { stroke: rgb(var(--c-glow)); filter: drop-shadow(0 0 8px rgb(var(--c-brand))); }
 .pp-console-pe > .btn-ghost { align-self: center; }
+
+/* CRM → Modelos: criar/ajustar com IA */
+.crm-modelo-ia { color: rgb(var(--c-glow)); border-style: solid; border-color: rgb(var(--c-brand) / .45); background: linear-gradient(135deg, rgb(var(--c-brand) / .14), rgb(var(--c-brand) / .03)); }
+.crm-modelo-ia:hover { background: linear-gradient(135deg, rgb(var(--c-brand) / .24), rgb(var(--c-brand) / .06)); box-shadow: 0 0 26px -10px rgb(var(--c-brand)); }
+.mdl-ia { position: relative; display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: var(--radius-lg); border: 1px solid rgb(var(--c-brand) / .4);
+  background: linear-gradient(135deg, rgb(var(--c-brand) / .12), rgb(var(--c-brand) / .02)); flex-shrink: 0; }
+.mdl-ia > header { display: flex; align-items: center; gap: 10px; }
+.mdl-ia b { font-size: 13.5px; }
+.mdl-ia small { font-size: 11.5px; color: rgb(var(--c-text-tertiary)); }
+.mdl-ia-ico { width: 32px; height: 32px; flex: none; display: grid; place-items: center; border-radius: 10px; color: #fff; background: var(--gradient-btn); box-shadow: var(--glow-sm); }
+.mdl-ia-ico svg { width: 15px; height: 15px; }
+.mdl-ia-campo { display: flex; gap: 6px; }
+.mdl-ia-campo .input { flex: 1; min-width: 0; height: 36px; }
+.mdl-ia[aria-busy="true"]::after { content: ""; position: absolute; left: 14px; right: 14px; bottom: -1px; height: 2px; border-radius: 2px; background: var(--gradient-btn); animation: sel-prog 1.1s ease-in-out infinite; transform-origin: left; }

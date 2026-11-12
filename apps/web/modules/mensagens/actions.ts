@@ -413,12 +413,30 @@ export async function ajustarComIA(input: unknown) {
   });
 }
 
+/** CRM → Configurações → Modelos: a IA escreve (texto vazio) ou ajusta um modelo, com as variáveis. Mesma vaga rápida do "Ajustar com IA". */
+export async function gerarModeloIA(input: unknown) {
+  return run(async () => {
+    const ctx = await admin();
+    const p = z.object({
+      texto: z.string().max(MAX_TEXTO_WA, "Modelo muito longo"),
+      pedido: z.string().trim().max(400, "Pedido muito longo"),
+      categoria: z.string().trim().max(30, "Categoria muito longa").default("Geral"),
+    }).parse(input);
+    if (!p.texto.trim() && !p.pedido) throw new Error("Diga que modelo você quer (ex.: follow-up depois do orçamento)");
+    const sql = db();
+    await workerOnline();
+    const [ia] = await sql`select 1 from ads.ai_accounts where status = 'ACTIVE' limit 1`;
+    if (!ia) throw new Error("Nenhuma conta de IA ativa. Conecte uma em Configurações → Contas de IA.");
+    return enqueueJob(sql, { workspaceId: null, type: "AI_AJUSTAR_MENSAGEM", payload: { numero: "", texto: p.texto, pedido: p.pedido, modelo: { categoria: p.categoria || "Geral" } }, createdBy: ctx.user.id, maxAttempts: 1 });
+  });
+}
+
 export async function resultadoAjuste(jobId: string) {
   return run(async () => {
     await admin();
-    const [j] = await db()<{ status: string; result: { texto?: string } | null; error: string | null }[]>`
+    const [j] = await db()<{ status: string; result: { texto?: string; nome?: string } | null; error: string | null }[]>`
       select status, result, error from ads.jobs where id = ${z.string().uuid().parse(jobId)} and type = 'AI_AJUSTAR_MENSAGEM'`;
     if (!j) throw new Error("Pedido não encontrado");
-    return { status: j.status, texto: j.result?.texto ?? null, erro: j.error };
+    return { status: j.status, texto: j.result?.texto ?? null, nome: j.result?.nome ?? null, erro: j.error };
   });
 }
