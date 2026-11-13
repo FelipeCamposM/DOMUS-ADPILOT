@@ -283,7 +283,7 @@ body { background: #030205; }
 .cx-chat .term-ai::before { background: var(--cx-mark) center / 17px no-repeat, linear-gradient(135deg, var(--p-500), var(--p-800)); }
 .cx-chat .term-ai > div { background: linear-gradient(180deg, #14101d, #0d0b13); border-color: #ffffff12; box-shadow: inset 2px 0 0 rgb(var(--c-brand) / 0.7); }
 .cx-foot { border-top-color: #ffffff0d; }
-.cx-input { border-radius: 999px; background: #0d0b13; border-color: #ffffff17; }
+.cx-input { border-radius: 22px; padding-left: 16px; background: #0d0b13; border-color: #ffffff17; }
 .cx-send { background: #fff; color: var(--p-700); box-shadow: 0 8px 18px -8px #000; }
 .cx-send[data-stop] { background: #ffffff1f; color: #fff; }
 .cx-hist { border-radius: 16px; }
