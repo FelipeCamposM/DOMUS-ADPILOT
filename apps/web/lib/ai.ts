@@ -2,7 +2,7 @@ import "server-only";
 import { db } from "@domus-ads/core";
 
 export interface ChatMsg { id: number; role: "user" | "assistant" | "system"; content: string; status: string; provider: string | null; meta: Record<string, unknown>; created_at: string }
-export interface ChatAction { id: string; message_id: number | null; type: string; summary: string; reason: string | null; status: string; error: string | null }
+export interface ChatAction { id: string; message_id: number | null; type: string; summary: string; reason: string | null; status: string; error: string | null; numero: string | null }
 export interface ChatState {
   conversation: { id: string; title: string; status: string; provider_pref: string };
   messages: ChatMsg[];
@@ -10,20 +10,21 @@ export interface ChatState {
 }
 
 /** Estado completo de uma conversa (sempre filtrado pelo workspace). Usado na página e no polling. */
-export async function chatState(workspaceId: string, conversationId: string): Promise<ChatState | null> {
+export async function chatState(workspaceId: string, conversationId: string, verVendas = false): Promise<ChatState | null> {
   const sql = db();
   const [conversation] = await sql<ChatState["conversation"][]>`
-    select id, title, status, provider_pref from ads.ai_conversations where id = ${conversationId} and workspace_id = ${workspaceId}`;
+    select id, title, status, provider_pref from ads.ai_conversations where id = ${conversationId} and workspace_id = ${workspaceId}
+      and (tipo <> 'vendas' or ${verVendas})`;
   if (!conversation) return null;
   const messages = await sql<ChatMsg[]>`
     select id::int as id, role, content, status, provider, meta, to_char(created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as created_at
     from ads.ai_messages where conversation_id = ${conversationId} order by id`;
   const actions = await sql<ChatAction[]>`
-    select id, message_id::int as message_id, type, summary, reason, status, error from ads.ai_actions where conversation_id = ${conversationId} order by created_at`;
+    select id, message_id::int as message_id, type, summary, reason, status, error, payload->>'numero' as numero from ads.ai_actions where conversation_id = ${conversationId} order by created_at`;
   return { conversation, messages, actions };
 }
 
-export async function listaConversas(workspaceId: string, tipo: "analista" | "consultor" | "marketing" = "analista") {
+export async function listaConversas(workspaceId: string, tipo: "analista" | "consultor" | "marketing" | "vendas" = "analista") {
   return db()<{ id: string; title: string; status: string; updated_at: Date; pendentes: number }[]>`
     select c.id, c.title, c.status, c.updated_at,
       (select count(*)::int from ads.ai_actions a where a.conversation_id = c.id and a.status = 'PENDING_APPROVAL') as pendentes

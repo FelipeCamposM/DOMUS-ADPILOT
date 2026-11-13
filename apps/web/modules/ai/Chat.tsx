@@ -176,13 +176,16 @@ function AcaoCard({ a, podeEditar, onDecidiu }: { a: ChatAction; podeEditar: boo
   const [status, setStatus] = useState(a.status);
   const ref = useRef<HTMLDivElement>(null);
   const post = a.type === "CRIAR_POST_INSTAGRAM";
+  const zap = a.type.startsWith("WHATSAPP_");
+  const pronto = a.type === "WHATSAPP_ENVIAR" ? "Mensagem na fila de envio do WhatsApp" : a.type === "WHATSAPP_RASCUNHO" ? "Rascunho deixado na conversa"
+    : a.type === "CRIAR_MODELO_MENSAGEM" ? "Modelo criado" : zap ? "Feito na conversa" : null;
   useEffect(() => setStatus(a.status), [a.status]);
   const decidir = (aprovar: boolean) => start(async () => {
     const r = aprovar ? await aprovarAcao(a.id) : await rejeitarAcao(a.id);
     if (!r.ok) { toast.err(r.error); setStatus("FAILED"); }
     else {
       setStatus(aprovar ? "EXECUTED" : "REJECTED");
-      toast.ok(!aprovar ? "Proposta cancelada" : post ? "Post aprovado: a arte é gerada e vai para o seu WhatsApp aprovar" : "Mudança aplicada e registrada na auditoria");
+      toast.ok(!aprovar ? "Proposta cancelada" : post ? "Post aprovado: a arte é gerada e vai para o seu WhatsApp aprovar" : pronto ?? "Mudança aplicada e registrada na auditoria");
       if (aprovar) gsap.fromTo(ref.current, { boxShadow: "0 0 0 0 rgb(168 85 255 / 0.7)" }, { boxShadow: "0 0 0 18px rgb(168 85 255 / 0)", duration: 0.9, ease: "power2.out" });
     }
     onDecidiu();
@@ -195,6 +198,9 @@ function AcaoCard({ a, podeEditar, onDecidiu }: { a: ChatAction; podeEditar: boo
           {a.reason && <div className="muted small" style={{ marginTop: 2 }}>{a.reason}</div>}
           {status === "FAILED" && a.error && <div className="error-text" style={{ marginTop: 4 }}>{a.error}</div>}
           {post && status === "EXECUTED" && <Link href="/conteudos" className="small" style={{ display: "inline-block", marginTop: 4, color: "rgb(var(--c-brand))" }}>Acompanhar em Conteúdos →</Link>}
+          {(zap || a.type === "CRIAR_MODELO_MENSAGEM") && status === "EXECUTED" && (
+            <Link href={a.numero ? `/crm?c=${a.numero}` : "/crm/config"} className="small" style={{ display: "inline-block", marginTop: 4, color: "rgb(var(--c-brand))" }}>{a.numero ? "Abrir a conversa →" : "Ver em Modelos →"}</Link>
+          )}
         </div>
         {status === "PENDING_APPROVAL" && podeEditar ? (
           <div className="cluster action-card-btns" style={{ gap: 6, flexWrap: "nowrap" }}>

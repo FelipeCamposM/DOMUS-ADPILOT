@@ -106,7 +106,7 @@ export function Shell(p: ShellProps) {
         </Dialog>
       )}
       <CommandPalette open={paleta} onClose={fecharPaleta} campanhas={p.campanhas} />
-      <Consultor key={p.workspaceId} podeEditar={["editor", "admin", "owner"].includes(p.workspaces.find((w) => w.id === p.workspaceId)?.role ?? "")} />
+      <Consultor key={p.workspaceId} admin={p.admin} podeEditar={["editor", "admin", "owner"].includes(p.workspaces.find((w) => w.id === p.workspaceId)?.role ?? "")} />
       <Motion />
     </div>
     {/* fora do .shell (fixed = contexto de empilhamento próprio): toasts ficam acima dos modais, que vão para o <body> */}

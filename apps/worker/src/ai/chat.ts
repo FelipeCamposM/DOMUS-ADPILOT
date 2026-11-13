@@ -1,10 +1,10 @@
-import { db, iaPreferencias, parseActionBlocks, resumoPostConsultor, toDecimal, type GoogleSearchSpec, type Json } from "@domus-ads/core";
+import { db, ehAcaoVendas, formatarNumero, iaPreferencias, parseActionBlocks, resumoPostConsultor, toDecimal, type AcaoVendas, type GoogleSearchSpec, type Json } from "@domus-ads/core";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { CONV_DIR } from "../env";
 import { runCli, type AiProvider } from "./cli";
 import { resolveConfigDir } from "./login";
-import { contextoPagina, instrucoes, snapshot, snapshotMarketing } from "./context";
+import { contextoPagina, instrucoes, snapshot, snapshotMarketing, snapshotVendas } from "./context";
 import { blockedUntil, type Usage } from "./limits";
 
 interface Conta { id: string; provider: AiProvider; name: string; config_dir: string; priority: number }
@@ -64,7 +64,7 @@ export async function runChatTurn(conversationId: string, signal: AbortSignal, l
         select session_id, last_message_id::int as last_message_id from ads.ai_sessions where conversation_id = ${conv.id} and ai_account_id = ${conta.id}`;
       const naoVistas = msgs.filter((m) => m.id !== pergunta.id && m.status === "DONE" && (m.role === "user" || m.role === "assistant") && (!sess || m.id > sess.last_message_id));
       const prompt = [
-        conv.tipo === "marketing" ? await snapshotMarketing(conv.workspace_id) : await snapshot(conv.workspace_id),
+        conv.tipo === "marketing" ? await snapshotMarketing(conv.workspace_id) : conv.tipo === "vendas" ? await snapshotVendas(pergunta.meta?.pagina) : await snapshot(conv.workspace_id),
         conv.tipo !== "analista" ? await contextoPagina(conv.workspace_id, pergunta.meta?.pagina) : "",
         naoVistas.length ? `<historico${sess ? "_que_voce_nao_viu" : ""}>\n${historico(naoVistas)}\n</historico${sess ? "_que_voce_nao_viu" : ""}>` : "",
         `<mensagem_do_usuario>\n${pergunta.content}\n</mensagem_do_usuario>`,
@@ -90,7 +90,7 @@ export async function runChatTurn(conversationId: string, signal: AbortSignal, l
             insert into ads.ai_sessions (conversation_id, ai_account_id, session_id, last_message_id) values (${conv.id}, ${conta.id}, ${r.sessionId}, ${resp!.id})
             on conflict (conversation_id, ai_account_id) do update set session_id = excluded.session_id, last_message_id = excluded.last_message_id`;
         }
-        const { n: acoes, erros } = await registrarAcoes(conv.workspace_id, conv.id, resp!.id, texto);
+        const { n: acoes, erros } = await registrarAcoes(conv.workspace_id, conv.id, resp!.id, texto, conv.tipo);
         // proposta fora do formato: avisa na própria resposta em vez de sumir calada
         if (erros.length) texto += `\n\n> ⚠️ Uma proposta veio com erro e foi descartada (${erros.slice(0, 3).join("; ")}). Peça de novo que eu refaço.`;
         await gravando;
@@ -150,11 +150,21 @@ function historico(msgs: Msg[]): string {
 }
 
 /** Propostas da IA viram ads.ai_actions PENDING_APPROVAL, só para campanhas deste workspace. Nada executa aqui. */
-async function registrarAcoes(workspaceId: string, conversationId: string, messageId: number, texto: string): Promise<{ n: number; erros: string[] }> {
+async function registrarAcoes(workspaceId: string, conversationId: string, messageId: number, texto: string, tipo: string): Promise<{ n: number; erros: string[] }> {
   const sql = db();
   const { actions, erros } = parseActionBlocks(texto);
   let n = 0;
   for (const a of actions) {
+    if (ehAcaoVendas(a)) {
+      if (tipo !== "vendas") { erros.push("ação de vendas fora do modo Vendas"); continue; }
+      const resumo = await resumoVendas(a);
+      if (!resumo) { erros.push("contato ou etapa não encontrado"); continue; }
+      await sql`
+        insert into ads.ai_actions (workspace_id, conversation_id, message_id, type, payload, summary, reason)
+        values (${workspaceId}, ${conversationId}, ${messageId}, ${a.type}, ${sql.json(a as unknown as Json)}, ${resumo}, ${a.reason ?? null})`;
+      n++;
+      continue;
+    }
     if (a.type === "CRIAR_POST_INSTAGRAM") {
       const [perfil] = await sql<{ username: string }[]>`select username from ads.instagram_accounts where id = ${a.igAccountId} and workspace_id = ${workspaceId}`;
       if (!perfil) { erros.push("perfil do Instagram não encontrado"); continue; }
@@ -200,6 +210,23 @@ async function registrarAcoes(workspaceId: string, conversationId: string, messa
     n++;
   }
   return { n, erros };
+}
+
+/** Texto do cartão de aprovação das ações de vendas (null = contato/etapa inexistente: descarta). */
+async function resumoVendas(a: AcaoVendas): Promise<string | null> {
+  const corte = (t: string) => { const u = t.replace(/\s+/g, " "); return u.length > 90 ? `${u.slice(0, 90)}…` : u; };
+  if (a.type === "CRIAR_MODELO_MENSAGEM") return `Criar modelo “${a.nome}” (${a.categoria}): ${corte(a.texto)}`;
+  const sql = db();
+  const [c] = await sql<{ nome: string | null }[]>`select nome from ads.whatsapp_contatos where numero = ${a.numero}`;
+  if (!c) return null;
+  const quem = c.nome?.trim() || formatarNumero(a.numero);
+  if (a.type === "WHATSAPP_ETAPA") {
+    const [e] = await sql<{ nome: string }[]>`select nome from ads.crm_etapas where chave = ${a.etapa}`;
+    return e ? `Mover ${quem} para “${e.nome}” no funil` : null;
+  }
+  if (a.type === "WHATSAPP_ENVIAR") return `Enviar no WhatsApp para ${quem}: “${corte(a.texto)}”`;
+  if (a.type === "WHATSAPP_RASCUNHO") return `Deixar rascunho na conversa com ${quem}: “${corte(a.texto)}”`;
+  return `Nota na conversa com ${quem}: “${corte(a.texto)}”`;
 }
 
 /** "Ajustar rascunho “X”: 5 → 1 grupo · 52 → 9 palavras-chave · orçamento 50.00 → 5.00/dia" */

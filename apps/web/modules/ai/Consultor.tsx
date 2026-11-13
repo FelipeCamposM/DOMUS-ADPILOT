@@ -1,7 +1,7 @@
 "use client";
 
 import { confirmar } from "../shell/confirmar";
-import { ArrowLeft, ArrowUp, ArrowUpRight, History, Loader2, Megaphone, Plus, Square, Target, Trash2, X } from "lucide-react";
+import { ArrowLeft, ArrowUp, ArrowUpRight, Handshake, History, Loader2, Megaphone, Plus, Square, Target, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import type { ChatMsg, ChatState } from "@/lib/ai";
@@ -14,7 +14,7 @@ import { executarTela, lerTela, passosDaMensagem } from "./tela";
 
 interface Item { id: string; title: string; status: string; updated_at: string }
 
-type Modo = "consultor" | "marketing";
+type Modo = "consultor" | "marketing" | "vendas";
 /** Cada modo é um consultor diferente (instruções e dados próprios no worker) com histórico separado. */
 const MODOS: Record<Modo, { rotulo: string; titulo: string; sub: string; intro: string; placeholder: string; sugestoes: { t: string; d: string }[] }> = {
   consultor: {
@@ -37,15 +37,28 @@ const MODOS: Record<Modo, { rotulo: string; titulo: string; sub: string; intro: 
       { t: "Me dá 5 ganchos fortes para Reels sobre o meu produto", d: "Primeiros 2 segundos que prendem" },
     ],
   },
+  vendas: {
+    rotulo: "Vendas", titulo: "Consultor de vendas", sub: "WhatsApp · funil · modelos", placeholder: "Peça uma mensagem, um follow-up, um modelo…",
+    intro: "Sou seu vendedor. Leio as conversas e o funil, escrevo as mensagens no seu tom, deixo rascunho ou mando por você, anoto, mudo o lead de etapa e crio modelos de mensagem. Nada acontece sem o seu Aprovar.",
+    sugestoes: [
+      { t: "Escreve a resposta para esta conversa", d: "Leio a conversa aberta e deixo o rascunho" },
+      { t: "Quem está esfriando e o que eu mando para cada um?", d: "Follow-up de quem parou de responder" },
+      { t: "Cria um modelo de primeiro contato para leads do site", d: "Com {primeiro_nome} e {site}" },
+      { t: "Resume esta conversa numa nota e move para a próxima etapa", d: "Nota interna + funil" },
+    ],
+  },
 };
-const lerModo = (): Modo => { try { return localStorage.getItem("adpilot:modo") === "marketing" ? "marketing" : "consultor"; } catch { return "consultor"; } };
+const ICONE: Record<Modo, typeof Target> = { consultor: Target, marketing: Megaphone, vendas: Handshake };
+const lerModo = (): Modo => { try { const m = localStorage.getItem("adpilot:modo"); return m === "marketing" || m === "vendas" ? m : "consultor"; } catch { return "consultor"; } };
 const lerSalvo = (m: Modo) => { try { return localStorage.getItem(`adpilot:${m}`); } catch { return null; } };
 const salvarConv = (m: Modo, id: string | null) => { try { if (id) localStorage.setItem(`adpilot:${m}`, id); else localStorage.removeItem(`adpilot:${m}`); } catch { /* sem storage: só não lembra a conversa */ } };
 
 const saudacao = () => { const h = new Date().getHours(); return h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite"; };
 
 /** Consultor de tráfego pago: bolha flutuante no canto direito, com histórico próprio (conversas tipo "consultor"). */
-export function Consultor({ podeEditar }: { podeEditar: boolean }) {
+export function Consultor({ podeEditar, admin }: { podeEditar: boolean; admin: boolean }) {
+  // Vendas mexe no WhatsApp/CRM da plataforma: só o admin da plataforma vê
+  const modos: Modo[] = admin ? ["consultor", "marketing", "vendas"] : ["consultor", "marketing"];
   const [aberto, setAberto] = useState(false);
   const [modo, setModo] = useState<Modo>("consultor");
   const M = MODOS[modo];
@@ -81,7 +94,7 @@ export function Consultor({ podeEditar }: { podeEditar: boolean }) {
   }, [modo]);
 
   // modo lembrado entre visitas (lido depois de montar: localStorage não existe no servidor)
-  useEffect(() => setModo(lerModo()), []);
+  useEffect(() => { const m = lerModo(); setModo(m === "vendas" && !admin ? "consultor" : m); }, [admin]);
   const trocarModo = (m: Modo) => {
     if (m === modo || rodando) return;
     try { localStorage.setItem("adpilot:modo", m); } catch { /* só não lembra */ }
@@ -194,14 +207,14 @@ export function Consultor({ podeEditar }: { podeEditar: boolean }) {
             <button className="cx-icon-btn" onClick={nova} title="Nova conversa" aria-label="Nova conversa"><Plus size={18} aria-hidden /></button>
             <button className="cx-icon-btn" onClick={() => setAberto(false)} title="Fechar (Esc)" aria-label="Fechar"><X size={17} aria-hidden /></button>
           </header>
-          <div className="cx-modos" role="tablist" aria-label="Modo do consultor" data-modo={modo}>
+          <div className="cx-modos" role="tablist" aria-label="Modo do consultor" style={{ "--n": modos.length, "--i": Math.max(0, modos.indexOf(modo)) } as React.CSSProperties}>
             <span className="cx-modos-pill" aria-hidden />
-            {(["consultor", "marketing"] as const).map((m) => (
+            {modos.map((m) => { const Icone = ICONE[m]; return (
               <button key={m} role="tab" aria-selected={modo === m} className="cx-modo" onClick={() => trocarModo(m)} disabled={!!rodando && modo !== m}
                 title={rodando && modo !== m ? "Espere a resposta terminar" : undefined}>
-                {m === "consultor" ? <Target size={14} aria-hidden /> : <Megaphone size={14} aria-hidden />} {MODOS[m].rotulo}
+                <Icone size={14} aria-hidden /> {MODOS[m].rotulo}
               </button>
-            ))}
+            ); })}
           </div>
 
           {vista === "historico" ? (

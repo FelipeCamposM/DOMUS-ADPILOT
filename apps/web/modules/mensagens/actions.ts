@@ -1,7 +1,7 @@
 "use server";
 
 import {
-  audit, chaveEtapa, contatoSchema, db, ETAPA_ENTRADA, etapaCrmSchema, filtroCrmSchema, enqueueJob, etapaSchema, FRIO, leadSiteSchema, MAX_TEXTO_WA, numeroSchema, temLink, templateSchema, tipoMidia, whatsappAvisos,
+  audit, chaveEtapa, contatoSchema, db, ETAPA_ENTRADA, etapaCrmSchema, filtroCrmSchema, enqueueJob, etapaSchema, leadSiteSchema, MAX_TEXTO_WA, numeroSchema, templateSchema, tipoMidia, travasPrimeiroContato, whatsappAvisos, workerOnline,
 } from "@domus-ads/core";
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
@@ -14,11 +14,6 @@ async function admin() {
   const ctx = await requireCtx();
   if (!isPlatformAdmin(ctx)) throw new Error("Só o administrador da plataforma usa as mensagens");
   return ctx;
-}
-
-async function workerOnline() {
-  const [w] = await db()<{ ok: boolean }[]>`select last_seen > now() - interval '90 seconds' as ok from ads.worker_status order by last_seen desc limit 1`;
-  if (!w?.ok) throw new Error("O worker está offline: a mensagem só sai com o PC do worker ligado.");
 }
 
 const texto = z.string().trim().max(MAX_TEXTO_WA, `Mensagem muito longa (até ${MAX_TEXTO_WA} caracteres)`);
@@ -34,7 +29,7 @@ export async function enviarMensagem(input: unknown) {
     const avisos = await whatsappAvisos();
     const [contato] = await sql`select 1 from ads.whatsapp_contatos where numero = ${m.para}`;
     if (!contato && m.para !== avisos) throw new Error("Salve o contato (nome e número) antes de mandar mensagem");
-    if (m.para !== avisos) await travasPrimeiroContato(m.para, m.texto);
+    if (m.para !== avisos) await travasPrimeiroContato(sql, m.para, m.texto);
     // anexo: um arquivo da biblioteca deste workspace (enviado agora ou já existente); a mensagem guarda a chave
     let midia: { storage: string; r2_key: string; mime: string; name: string } | null = null;
     if (m.creativeId) {
@@ -72,7 +67,7 @@ export async function agendarMensagem(input: unknown) {
     const sql = db();
     const [contato] = await sql`select 1 from ads.whatsapp_contatos where numero = ${m.para}`;
     if (!contato) throw new Error("Salve o contato (nome e número) antes de agendar");
-    await travasPrimeiroContato(m.para, m.texto);
+    await travasPrimeiroContato(db(), m.para, m.texto);
     const [n] = await sql<{ n: number }[]>`select count(*)::int as n from ads.whatsapp_envios where para = ${m.para} and status = 'PENDENTE' and agendado_para > now()`;
     if ((n?.n ?? 0) >= 10) throw new Error("Já há 10 mensagens agendadas para esta conversa");
     const [r] = await sql<{ id: string }[]>`insert into ads.whatsapp_envios (para, texto, status, direcao, tipo, autor, agendado_para, created_at)
@@ -100,28 +95,6 @@ export async function usarModelo(id: string) {
     await admin();
     await db()`update ads.whatsapp_templates set usos = usos + 1, usado_em = now() where id = ${z.string().uuid().parse(id)}`;
   });
-}
-
-/**
- * Contra ban: enquanto a pessoa nunca respondeu, a conversa é "fria". Nela: sem link, no máximo FRIO.porConversa
- * mensagens e um teto de conversas novas por hora e por dia (sem disparo em massa).
- */
-async function travasPrimeiroContato(para: string, texto: string) {
-  const sql = db();
-  const [c] = await sql<{ ins: number; outs: number }[]>`
-    select count(*) filter (where direcao = 'IN')::int as ins, count(*) filter (where direcao = 'OUT' and status <> 'FALHOU')::int as outs
-    from ads.whatsapp_envios where para = ${para}`;
-  if (c!.ins > 0) return;
-  if (temLink(texto)) throw new Error("Sem link na primeira mensagem: é o que mais vira denúncia de spam. Mande o link depois que a pessoa responder.");
-  if (c!.outs >= FRIO.porConversa) throw new Error(`Espere a pessoa responder: já foram ${c!.outs} mensagens sem resposta nesta conversa.`);
-  if (c!.outs > 0) return; // conversa já começada não conta como nova
-  const [n] = await sql<{ hora: number; dia: number }[]>`
-    select count(distinct para) filter (where primeira > now() - interval '1 hour')::int as hora, count(distinct para)::int as dia
-    from (select para, min(created_at) as primeira from ads.whatsapp_envios o where direcao = 'OUT' and autor <> 'DOMUS (automático)'
-      and not exists (select 1 from ads.whatsapp_envios i where i.para = o.para and i.direcao = 'IN')
-      group by para having min(created_at) > now() - interval '24 hours') x`;
-  if (n!.hora >= FRIO.porHora) throw new Error(`Limite de ${FRIO.porHora} conversas novas por hora (protege o número de ban). Tente mais tarde ou espere respostas.`);
-  if (n!.dia >= FRIO.porDia) throw new Error(`Limite de ${FRIO.porDia} conversas novas por dia (protege o número de ban). Amanhã libera.`);
 }
 
 /** Etapa do funil (null = deixa de ser lead). Mudar de etapa zera o "parado há". */

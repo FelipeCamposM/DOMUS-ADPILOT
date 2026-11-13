@@ -239,7 +239,7 @@ function Conversa({ c, titulo, aviso, modelos, biblioteca, voltar, abrir, editar
   const campo = useRef<HTMLTextAreaElement>(null);
   const arquivo = useRef<HTMLInputElement>(null);
   // lead vindo da prospecção: a mensagem sugerida já fica no campo até a primeira mensagem sair
-  const [texto, setTexto] = useState(() => (!c.msgs.some((m) => m.direcao === "OUT") && c.contato?.lead_dados?.rascunho) || "");
+  const [texto, setTexto] = useState(() => c.contato?.lead_dados?.rascunho || ""); // rascunho da Prospecção ou do consultor de vendas (some ao enviar)
   const [nota, setNota] = useState(false);
   const [anexo, setAnexo] = useState<Anexo | null>(null);
   const [menu, setMenu] = useState<"modelos" | "anexo" | null>(null);

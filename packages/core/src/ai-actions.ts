@@ -2,6 +2,9 @@ import { z } from "zod";
 import type { Actor } from "./audit";
 import { faltasItem, FORMATOS_CAL, itemCalSchema } from "./calendario";
 import { setCampaignBudget, setCampaignStatus } from "./campaigns";
+import { travasPrimeiroContato, workerOnline } from "./contatos";
+import { enqueueJob } from "./jobs";
+import { MAX_TEXTO_WA, numeroSchema, templateSchema } from "./mensagens";
 import { db, type Json } from "./db";
 import { googleSearchSchema } from "./google-search";
 
@@ -27,8 +30,18 @@ export const aiActionSchema = z.discriminatedUnion("type", [
     quando: z.union([z.literal("agora"), z.string().datetime({ offset: true, message: "Horário inválido" })]),
     reason: z.string().max(500).optional(),
   }),
+  // consultor de vendas (CRM/WhatsApp, só admin da plataforma): agir nas conversas e nos modelos, sempre com aprovação
+  z.object({ type: z.literal("WHATSAPP_ENVIAR"), numero: numeroSchema, texto: z.string().trim().min(1, "Mensagem vazia").max(MAX_TEXTO_WA, "Mensagem muito longa"), reason: z.string().max(500).optional() }),
+  z.object({ type: z.literal("WHATSAPP_RASCUNHO"), numero: numeroSchema, texto: z.string().trim().min(1, "Mensagem vazia").max(MAX_TEXTO_WA, "Mensagem muito longa"), reason: z.string().max(500).optional() }),
+  z.object({ type: z.literal("WHATSAPP_NOTA"), numero: numeroSchema, texto: z.string().trim().min(1, "Nota vazia").max(MAX_TEXTO_WA, "Nota muito longa"), reason: z.string().max(500).optional() }),
+  z.object({ type: z.literal("WHATSAPP_ETAPA"), numero: numeroSchema, etapa: z.string().regex(/^[A-Z0-9_]{2,40}$/, "Etapa inválida"), reason: z.string().max(500).optional() }),
+  templateSchema.extend({ type: z.literal("CRIAR_MODELO_MENSAGEM"), reason: z.string().max(500).optional() }),
 ]);
 export type AiAction = z.infer<typeof aiActionSchema>;
+export type AcaoVendas = Extract<AiAction, { type: `WHATSAPP_${string}` | "CRIAR_MODELO_MENSAGEM" }>;
+/** Ações do consultor de vendas: mexem no WhatsApp da plataforma, então só o admin da plataforma propõe e aprova. */
+export const TIPOS_VENDAS = ["WHATSAPP_ENVIAR", "WHATSAPP_RASCUNHO", "WHATSAPP_NOTA", "WHATSAPP_ETAPA", "CRIAR_MODELO_MENSAGEM"] as const;
+export const ehAcaoVendas = (a: { type: string }): a is AcaoVendas => (TIPOS_VENDAS as readonly string[]).includes(a.type);
 
 /** Extrai blocos ```domus-action {json}``` da resposta da IA. Blocos inválidos são ignorados (e contados). */
 export function parseActionBlocks(text: string): { actions: AiAction[]; invalid: number; erros: string[] } {
@@ -65,6 +78,11 @@ export async function approveAiAction(workspaceId: string, actionId: string, act
         update ads.campaign_drafts set spec = ${sql.json(p.spec as unknown as Json)}, name = ${p.spec.nome}, validated_at = null, error = null, updated_at = now()
         where id = ${p.draftId} and workspace_id = ${workspaceId} and status in ('DRAFT', 'FAILED')`;
       if (!r.count) throw new Error("Rascunho não encontrado ou já publicado/em geração");
+      await sql`update ads.ai_actions set status = 'EXECUTED' where id = ${a.id}`;
+      return;
+    }
+    if (ehAcaoVendas(p)) {
+      await executarVendas(p, actor);
       await sql`update ads.ai_actions set status = 'EXECUTED' where id = ${a.id}`;
       return;
     }
@@ -120,6 +138,40 @@ async function criarPostDoConsultor(workspaceId: string, p: PostConsultor, actor
       insert into ads.calendario_itens (calendario_id, workspace_id, data_hora, formato, tema, objetivo, roteiro, legenda, hashtags, status)
       values (${cal!.id}, ${workspaceId}, ${quando}, ${p.formato}, ${p.tema}, ${p.objetivo}, ${tx.json(p.roteiro as unknown as Json)}, ${p.legenda}, ${p.hashtags}, 'APROVADO')`;
   });
+}
+
+/** Executa a ação de vendas aprovada (mesmas travas da tela de Mensagens). */
+async function executarVendas(p: AcaoVendas, actor: Actor) {
+  const sql = db();
+  if (p.type === "CRIAR_MODELO_MENSAGEM") {
+    const [n] = await sql<{ n: number }[]>`select count(*)::int as n from ads.whatsapp_templates`;
+    if ((n?.n ?? 0) >= 100) throw new Error("Limite de 100 modelos");
+    await sql`insert into ads.whatsapp_templates (nome, texto, categoria, created_by) values (${p.nome}, ${p.texto}, ${p.categoria}, ${actor.userId})`;
+    return;
+  }
+  const [c] = await sql<{ numero: string }[]>`select numero from ads.whatsapp_contatos where numero = ${p.numero}`;
+  if (!c) throw new Error("Contato não encontrado em Mensagens");
+  if (p.type === "WHATSAPP_RASCUNHO") {
+    await sql`update ads.whatsapp_contatos set lead_dados = coalesce(lead_dados, '{}'::jsonb) || ${sql.json({ rascunho: p.texto })}, updated_at = now() where numero = ${p.numero}`;
+    return;
+  }
+  if (p.type === "WHATSAPP_NOTA") {
+    await sql`insert into ads.whatsapp_envios (para, texto, status, direcao, autor) values (${p.numero}, ${p.texto}, 'NOTA', 'NOTA', ${actor.email ?? "Consultor de vendas"})`;
+    return;
+  }
+  if (p.type === "WHATSAPP_ETAPA") {
+    const [et] = await sql`select 1 from ads.crm_etapas where chave = ${p.etapa}`;
+    if (!et) throw new Error("Essa coluna do funil não existe mais");
+    await sql`update ads.whatsapp_contatos set etapa = ${p.etapa}, lead_em = coalesce(lead_em, now()),
+      etapa_em = case when etapa is distinct from ${p.etapa} then now() else etapa_em end, updated_at = now() where numero = ${p.numero}`;
+    return;
+  }
+  await travasPrimeiroContato(sql, p.numero, p.texto);
+  await workerOnline();
+  const [r] = await sql<{ id: string }[]>`insert into ads.whatsapp_envios (para, texto, status, direcao, tipo, autor)
+    values (${p.numero}, ${p.texto}, 'PENDENTE', 'OUT', 'texto', ${actor.email ?? "Consultor de vendas"}) returning id`;
+  await enqueueJob(sql, { workspaceId: null, type: "WHATSAPP_ENVIAR", payload: { id: r!.id }, createdBy: actor.userId, maxAttempts: 1 });
+  await sql`update ads.whatsapp_contatos set lido_em = now(), etapa = case when etapa = 'NOVO' then 'CONTATO' else etapa end, lead_dados = lead_dados - 'rascunho' where numero = ${p.numero}`;
 }
 
 export const OBJETIVO_CONSULTOR = "Posts pedidos ao consultor de marketing";
