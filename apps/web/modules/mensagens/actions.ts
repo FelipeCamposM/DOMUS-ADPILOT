@@ -161,6 +161,38 @@ export async function definirValor(numero: string, valor: string) {
   });
 }
 
+const novoLeadSchema = contatoSchema.extend({
+  etapa: z.string().regex(/^[A-Z0-9_]{2,40}$/, "Etapa inválida"),
+  email: z.union([z.literal(""), z.string().trim().email("E-mail inválido").max(120, "E-mail muito longo")]).default(""),
+  valor: valorSchema,
+  nota: z.string().trim().max(1000, "Observação muito longa").default(""),
+});
+
+/** Lead cadastrado à mão no funil: já vira conversa em Mensagens (contato salvo), com origem "Manual". Nada é enviado. */
+export async function criarLead(input: unknown) {
+  return run(async () => {
+    const ctx = await admin();
+    const l = novoLeadSchema.parse(input);
+    const sql = db();
+    const [et] = await sql<{ nome: string }[]>`select nome from ads.crm_etapas where chave = ${l.etapa}`;
+    if (!et) throw new Error("Essa coluna não existe mais. Atualize a página.");
+    const [ja] = await sql<{ nome: string }[]>`select nome from ads.whatsapp_contatos where numero = ${l.numero} and etapa is not null`;
+    if (ja) throw new Error(`Esse número já está no funil (${ja.nome})`);
+    const dados = { origem: "Manual", ...(l.email && { email: l.email }), ...(l.nota && { mensagem: l.nota }) };
+    await sql.begin(async (tx) => {
+      await tx`
+        insert into ads.whatsapp_contatos (numero, nome, salvo, etapa, lead_em, etapa_em, lead_valor, lead_dados, created_by)
+        values (${l.numero}, ${l.nome}, true, ${l.etapa}, now(), now(), ${l.valor}, ${tx.json(dados)}, ${ctx.user.id})
+        on conflict (numero) do update set nome = excluded.nome, salvo = true, etapa = excluded.etapa, lead_em = now(), etapa_em = now(),
+          lead_valor = excluded.lead_valor, lead_dados = coalesce(ads.whatsapp_contatos.lead_dados, '{}'::jsonb) || excluded.lead_dados, updated_at = now()`;
+      await tx`delete from ads.whatsapp_ocultas where numero = ${l.numero}`;
+    });
+    await audit(sql, { workspaceId: ctx.workspace.id, actor: ctx.actor, action: `Novo lead manual: ${et.nome}`, entityType: "whatsapp_contato", entityId: l.numero, entityName: l.nome });
+    revalidatePath("/crm", "layout");
+    return l.numero;
+  });
+}
+
 // ───────────── Colunas do funil ─────────────
 
 /** Cria (chave null) ou edita uma coluna. A entrada (Novo) fica sempre aberta. */

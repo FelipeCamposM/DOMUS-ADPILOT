@@ -5,7 +5,7 @@ import { gsap } from "gsap";
 import { Flip } from "gsap/Flip";
 import {
   ArrowDownRight, ArrowRightLeft, ArrowUpRight, Bookmark, CalendarClock, Check, ChevronDown, CircleDollarSign, Clock, ExternalLink, Flame, Globe, Hourglass, Link2,
-  Mail, Megaphone, MessageCircle, Search, Settings2, ShieldCheck, SlidersHorizontal, Sparkles, Star, Target, Timer, Trash2, Trophy, X,
+  Mail, Megaphone, MessageCircle, Loader2, UserPlus, Search, Settings2, ShieldCheck, SlidersHorizontal, Sparkles, Star, Target, Timer, Trash2, Trophy, X,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -16,7 +16,7 @@ import { confirmar } from "../shell/confirmar";
 import { Dialog } from "../shell/Dialog";
 import { Popover } from "../shell/Popover";
 import { toast } from "../shell/toast";
-import { apagarFiltro, definirEtapa, definirValor, favoritarFiltro, salvarFiltro } from "./actions";
+import { apagarFiltro, criarLead, definirEtapa, definirValor, favoritarFiltro, salvarFiltro } from "./actions";
 import { EditarFunil } from "./EditarFunil";
 import { corEtapa, EtapaSeletor } from "./etapas";
 import { HeroFx } from "@/modules/shell/HeroFx";
@@ -89,6 +89,7 @@ export function Leads({ leads, etapas, sites, salvos }: { leads: Lead[]; etapas:
   const mudar = (p: Partial<FiltrosCrm>) => setF((x) => ({ ...x, ...p }));
   const [modalFiltros, setModalFiltros] = useState(false);
   const [funil, setFunil] = useState(false);
+  const [novo, setNovo] = useState(false);
   const [detalhe, setDetalhe] = useState<string | null>(null);
   const [arrastando, setArrastando] = useState<string | null>(null);
   const [alvo, setAlvo] = useState<string | null>(null);
@@ -193,7 +194,11 @@ export function Leads({ leads, etapas, sites, salvos }: { leads: Lead[]; etapas:
     <div className="panel wa-vazio" style={{ padding: "48px 16px" }}>
       <Sparkles size={38} aria-hidden /><b>Nenhum lead ainda</b>
       <span className="subtle small" style={{ textAlign: "center", maxWidth: 420 }}>Conecte um site e cole o formulário. Quem preencher aparece aqui, na primeira coluna. Você também pode marcar qualquer conversa como lead.</span>
-      <Link className="btn btn-primary btn-sm" style={{ marginTop: 6 }} href="/crm/sites"><Globe aria-hidden /> Conectar site</Link>
+      <span className="cluster" style={{ gap: 8, marginTop: 6 }}>
+        <button className="btn btn-primary btn-sm" onClick={() => setNovo(true)}><UserPlus aria-hidden /> Novo lead</button>
+        <Link className="btn btn-ghost btn-sm" href="/crm/sites"><Globe aria-hidden /> Conectar site</Link>
+      </span>
+      {novo && <NovoLead etapas={etapas} fechar={() => setNovo(false)} />}
     </div>
   );
 
@@ -215,7 +220,10 @@ export function Leads({ leads, etapas, sites, salvos }: { leads: Lead[]; etapas:
           <h1 className="crm-titulo">Funil de vendas</h1>
           <p className="subtle small" style={{ margin: 0 }}>Arraste os cartões entre as colunas. Clique num cartão para ver tudo sobre o lead.</p>
         </div>
-        <Segmento valor={f.periodo} onChange={(periodo) => mudar({ periodo })} />
+        <span className="cluster" style={{ gap: 10 }}>
+          <Segmento valor={f.periodo} onChange={(periodo) => mudar({ periodo })} />
+          <button className="btn btn-primary btn-sm" onClick={() => setNovo(true)}><UserPlus aria-hidden /> Novo lead</button>
+        </span>
       </header>
 
       <section className="crm-kpis" aria-label="Indicadores">
@@ -330,6 +338,7 @@ export function Leads({ leads, etapas, sites, salvos }: { leads: Lead[]; etapas:
 
       {aberta && <LeadDetalhe l={aberta} etapas={etapas} aberto={aberto(aberta)} mover={mover} fechar={() => setDetalhe(null)} />}
       {modalFiltros && <ModalFiltros inicial={f} origens={todasOrigens} sites={sites} contar={contar} aplicar={(r) => { setF(r); setModalFiltros(false); }} fechar={() => setModalFiltros(false)} />}
+      {novo && <NovoLead etapas={etapas} fechar={() => setNovo(false)} />}
       {funil && <EditarFunil etapas={etapas} contagem={Object.fromEntries(etapas.map((e) => [e.chave, lista.filter((l) => colunaDe(l) === e.chave).length]))} fechar={() => setFunil(false)} />}
     </div>
   );
@@ -630,5 +639,63 @@ function Anel({ pct, vazio }: { pct: number; vazio: boolean }) {
       <circle cx="22" cy="22" r="18" className="crm-anel-fundo" />
       <circle ref={ref} cx="22" cy="22" r="18" className="crm-anel-traco" strokeDasharray={C} strokeDashoffset={C} />
     </svg>
+  );
+}
+
+/** Cadastro manual: cria o lead na coluna escolhida e a conversa em Mensagens (nada é enviado). */
+function NovoLead({ etapas, fechar }: { etapas: EtapaCrm[]; fechar: () => void }) {
+  const router = useRouter();
+  const entrada = etapas.find((e) => e.chave === ETAPA_ENTRADA) ?? etapas.find((e) => e.tipo !== "GANHO" && e.tipo !== "PERDIDO") ?? etapas[0];
+  const [v, setV] = useState({ nome: "", numero: "", email: "", valor: "", nota: "", etapa: entrada?.chave ?? ETAPA_ENTRADA });
+  const [erro, setErro] = useState<string | null>(null);
+  const [pend, start] = useTransition();
+  const campo = (k: keyof typeof v) => ({ value: v[k], onChange: (e: { target: { value: string } }) => { setV((x) => ({ ...x, [k]: e.target.value })); setErro(null); } });
+  const salvar = (conversar: boolean) => start(async () => {
+    const r = await criarLead(v);
+    if (!r.ok) return setErro(r.error);
+    toast.ok(`${v.nome.trim()} entrou no funil`);
+    fechar();
+    if (conversar) router.push(`/crm?c=${r.data}`);
+    else router.refresh();
+  });
+  const ok = v.nome.trim().length >= 2 && !!v.numero.trim();
+  return (
+    <Dialog open onClose={fechar} title="Novo lead">
+      <form className="stack" style={{ gap: 12 }} onSubmit={(e) => { e.preventDefault(); salvar(false); }}>
+        <div className="field">
+          <label className="label" htmlFor="nl-nome">Nome *</label>
+          <input id="nl-nome" className="input" maxLength={80} required autoFocus placeholder="Ex.: Maria Souza (Castilho Advogados)" {...campo("nome")} />
+        </div>
+        <div className="field">
+          <label className="label" htmlFor="nl-num">WhatsApp com DDD *</label>
+          <input id="nl-num" className="input" inputMode="tel" required placeholder="31 99999-9999 ou +1 555 123 4567" {...campo("numero")} />
+          <span className="subtle caption">A conversa já aparece em Mensagens. Nada é enviado sozinho.</span>
+        </div>
+        <div className="cluster" style={{ gap: 12, alignItems: "flex-start" }}>
+          <div className="field" style={{ flex: "1 1 200px" }}>
+            <label className="label" htmlFor="nl-email">E-mail</label>
+            <input id="nl-email" className="input" type="email" maxLength={120} placeholder="opcional" {...campo("email")} />
+          </div>
+          <div className="field" style={{ flex: "1 1 140px" }}>
+            <label className="label" htmlFor="nl-valor">Valor (R$)</label>
+            <input id="nl-valor" className="input" inputMode="decimal" placeholder="Ex.: 1.500,00" {...campo("valor")} />
+          </div>
+        </div>
+        <div className="field">
+          <span className="label">Coluna</span>
+          <EtapaSeletor etapas={etapas} valor={v.etapa} onChange={(k) => k && setV((x) => ({ ...x, etapa: k }))} nenhum="Escolha" align="left" />
+        </div>
+        <div className="field">
+          <label className="label" htmlFor="nl-nota">Observação</label>
+          <textarea id="nl-nota" className="input" rows={3} maxLength={1000} placeholder="De onde veio, o que procura…" {...campo("nota")} />
+        </div>
+        {erro && <p className="error-text" role="alert">{erro}</p>}
+        <div className="cluster" style={{ justifyContent: "flex-end", gap: 8 }}>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={fechar}>Cancelar</button>
+          <button type="button" className="btn btn-sm" disabled={pend || !ok} onClick={() => salvar(true)}><WhatsappIcon aria-hidden /> Criar e conversar</button>
+          <button type="submit" className="btn btn-primary btn-sm" disabled={pend || !ok}>{pend ? <Loader2 className="animate-spin" aria-hidden /> : <><UserPlus aria-hidden /> Criar lead</>}</button>
+        </div>
+      </form>
+    </Dialog>
   );
 }
