@@ -137,6 +137,7 @@ const edicaoSchema = z.array(z.object({
   subtext: z.string().trim().max(220, "Texto de apoio muito longo"),
   narration: z.string().trim().max(600, "Narração muito longa"),
   itens: z.array(z.string().trim().min(1, "Item vazio").max(90, "Item muito longo")).max(4, "No máximo 4 itens").optional(),
+  visual: z.string().trim().max(400, "Descrição do visual muito longa").optional(),
 }));
 
 /**

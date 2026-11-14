@@ -13,9 +13,14 @@ Responda APENAS com um bloco \`\`\`json contendo exatamente este formato:
   "title": "nome curto do vídeo",
   "duration": <segundos, igual ao pedido>,
   "fps": 30,
+  "plano": { "ideia": "a ideia central do vídeo em 1 frase", "publico": "para quem fala e o que essa pessoa sente/quer",
+    "gancho": "por que a 1ª cena prende nos 2 primeiros segundos", "arco": "o caminho do vídeo: problema → virada → prova → chamada (como ele convence)",
+    "tom": "tom de voz e ritmo", "cta": "o que a pessoa deve fazer no fim e por quê" },
   "scenes": [
     { "start": 0, "end": 3, "tipo": "abertura", "headline": "texto grande na tela", "subtext": "apoio opcional",
-      "narration": "o que a voz fala nesta cena", "destaque": ["palavra"], "animation": "fade-up", "visual": "descrição do visual da cena" }
+      "narration": "o que a voz fala nesta cena", "destaque": ["palavra"], "animation": "fade-up",
+      "visual": "o que aparece e se move na tela (elementos, metáfora visual, transição de entrada/saída)",
+      "intencao": "o papel desta cena no vídeo: o que o público deve sentir ou entender aqui" }
   ],
   "sfx": [ { "time": 2.9, "effect": "whoosh", "volume": 0.6 } ],
   "music": { "tag": "technology", "volume": 0.25 }
@@ -40,6 +45,9 @@ Regras:
 - animation: uma de ${ANIMACOES.join(", ")}.
 - sfx: só nos momentos de transição/impacto (3 a 8 no total); effect: um de ${SFX_CATEGORIAS.join(", ")}. Se o briefing pedir sem efeitos, "sfx": [].
 - music: se o briefing pedir uma tag, use-a; se for "auto", escolha a que combina com o produto e o tom; se for "none", "music": null. Tags: ${MUSICA_TAGS.join(", ")}.
+- "plano" e "intencao" são para o cliente aprovar sabendo o que vai ser feito: escreva em português claro, direto, sem jargão, frases curtas.
+- "visual" de cada cena (até 60 palavras): descreva de verdade o que vai aparecer e animar (elementos, metáfora do que é dito, como entra e sai),
+  não repita a headline.
 - Use só fatos do briefing e da <base_de_conhecimento>. Não invente preço, prazo, estatística ou promessa que não esteja neles.
 
 ${SKILL_COPY}`;

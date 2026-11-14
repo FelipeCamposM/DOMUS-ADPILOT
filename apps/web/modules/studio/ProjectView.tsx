@@ -2,7 +2,7 @@
 
 import { confirmar } from "../shell/confirmar";
 import { gsap } from "gsap";
-import { AudioLines, Bookmark, Bot, Mic, Check, ClipboardCheck, Palette, Clapperboard, Download, FileCode2, Film, Loader2, PenLine, RefreshCw, Rocket, Square, Trash2, Upload, Wand2 } from "lucide-react";
+import { AudioLines, Bookmark, Bot, Mic, Check, ClipboardCheck, Palette, Clapperboard, Download, Eye, FileCode2, Film, Image as ImageIcon, Loader2, Music2, PenLine, RefreshCw, Rocket, Sparkles, Square, Target, Trash2, Upload, Volume2, Wand2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Escolha } from "../motion/Escolha";
@@ -12,13 +12,21 @@ import { ajustarComIA, apagarVideo, cancelarVideo, gerarDeNovo, narrarComMinhaVo
 import { FalaPorFala, GravarVoz, type VozGravada } from "./GravarVoz";
 import { PlayerVideo } from "./PlayerVideo";
 
-interface Cena { start: number; end: number; headline: string; subtext?: string; narration?: string; animation?: string; tipo?: string; itens?: string[] }
+interface Cena {
+  start: number; end: number; headline: string; subtext?: string; narration?: string; animation?: string; tipo?: string; itens?: string[];
+  visual?: string; intencao?: string; destaque?: string[]; asset?: string; numero?: { valor: number; prefixo?: string; sufixo?: string };
+}
+interface Plano { ideia?: string; publico?: string; gancho?: string; arco?: string; tom?: string; cta?: string }
+const PLANO: [keyof Plano, string][] = [["ideia", "Ideia central"], ["publico", "Para quem"], ["gancho", "Gancho"], ["arco", "Como convence"], ["tom", "Tom e ritmo"], ["cta", "Chamada final"]];
+const ANIM: Record<string, string> = { "fade-up": "sobe com fade", scale: "zoom", slide: "desliza", "split-words": "palavra por palavra", "mask-reveal": "revela com máscara", counter: "contador", glitch: "glitch", cta: "botão de chamada" };
+const SFX: Record<string, string> = { whoosh: "whoosh", impact: "impacto", click: "clique", pop: "pop", notification: "notificação", typing: "digitação", success: "sucesso", transition: "transição", bass: "grave", interface: "interface", paper: "papel" };
+const MUSICA_NOME: Record<string, string> = { corporate: "corporativa", technology: "tecnologia", energetic: "energética", premium: "premium", minimal: "minimalista", emotional: "emocional", dark: "dark" };
 const TIPO: Record<string, string> = { abertura: "Abertura", titulo: "Título", lista: "Lista", numero: "Número", comparacao: "Antes/depois", produto: "Produto", citacao: "Depoimento", cta: "CTA" };
-const editavel = (s: Cena) => ({ headline: s.headline, subtext: s.subtext ?? "", narration: s.narration ?? "", ...(s.itens ? { itens: [...s.itens] } : {}) });
+const editavel = (s: Cena) => ({ headline: s.headline, subtext: s.subtext ?? "", narration: s.narration ?? "", visual: s.visual ?? "", ...(s.itens ? { itens: [...s.itens] } : {}) });
 export interface ProjetoView {
   id: string; title: string; status: string; step_detail: string | null; error: string | null; progress: number | null;
   brief: { formato: string; duracao: number; voz: string; vozNome?: string; falas?: (string | null)[]; lerRoteiro?: boolean; musica: string; produto: string; estiloVisual?: string };
-  storyboard: { scenes: Cena[]; duration: number; music: { tag: string } | null } | null;
+  storyboard: { scenes: Cena[]; duration: number; music: { tag: string } | null; sfx?: { time: number; effect: string }[]; plano?: Plano | null; direcao?: { nome: string; descricao: string } | null } | null;
   creative: { id: string; duration_ms: number | null; size_bytes: string | null; width: number | null; height: number | null; arquivado: boolean; avisos: string[]; music: string | null } | null;
   thumb: boolean;
   paleta: Paleta | null;
@@ -284,6 +292,7 @@ export function ProjectView({ p, podeEditar, vozes }: { p: ProjetoView; podeEdit
               </Escolha>
             </div>
           )}
+          {p.storyboard && <PlanoVideo sb={p.storyboard} estilo={p.brief.estiloVisual} />}
           {p.storyboard && paleta && <PaletaRevisao valor={paleta} onChange={setPaleta} editavel={podeEditar && !rodando} destaque={revisao} />}
           <div className="stack" style={{ padding: 14, gap: 10 }}>
             {(p.storyboard?.scenes ?? []).map((s, i) => (
@@ -291,8 +300,9 @@ export function ProjectView({ p, podeEditar, vozes }: { p: ProjetoView; podeEdit
                 <div className="cluster" style={{ gap: 8 }}>
                   <span className="badge badge-brand">Cena {i + 1}</span>
                   <span className="subtle caption tabular">{seg(s.start)} → {seg(s.end)}</span>
-                  {s.tipo ? <span className="badge">{TIPO[s.tipo] ?? s.tipo}</span> : s.animation && <span className="badge">{s.animation}</span>}
+                  {s.tipo ? <span className="badge">{TIPO[s.tipo] ?? s.tipo}</span> : s.animation && <span className="badge">{ANIM[s.animation] ?? s.animation}</span>}
                 </div>
+                {s.intencao && <div className="sb-intencao"><Target size={13} aria-hidden /><span><b>Intenção</b> {s.intencao}</span></div>}
                 <input className="input-sm" style={{ fontWeight: 650, fontSize: 14 }} aria-label={`Título da cena ${i + 1}`} value={cenas[i]?.headline ?? ""} disabled={!podeEditar || rodando} maxLength={140}
                   onChange={(e) => setCenas((c) => c.map((x, j) => (j === i ? { ...x, headline: e.target.value } : x)))} />
                 <input className="input-sm" placeholder="Texto de apoio (opcional)" aria-label={`Apoio da cena ${i + 1}`} value={cenas[i]?.subtext ?? ""} disabled={!podeEditar || rodando} maxLength={220}
@@ -306,6 +316,15 @@ export function ProjectView({ p, podeEditar, vozes }: { p: ProjetoView; podeEdit
                     ))}
                   </div>
                 )}
+                <NaTela s={s} sfx={(p.storyboard?.sfx ?? []).filter((e) => e.time >= s.start && (e.time < s.end || (i === (p.storyboard?.scenes.length ?? 0) - 1 && e.time <= s.end)))} />
+                {(p.brief.estiloVisual ?? "livre") === "livre" ? (
+                  <label className="sb-visual">
+                    <span><Eye size={13} aria-hidden /> O que aparece e anima</span>
+                    <textarea className="input-sm" rows={2} style={{ height: "auto", paddingBlock: 8, resize: "vertical" }} maxLength={400} disabled={!podeEditar || rodando}
+                      placeholder="Descreva o visual da cena (a animação segue isto)" aria-label={`Visual da cena ${i + 1}`} value={cenas[i]?.visual ?? ""}
+                      onChange={(e) => setCenas((c) => c.map((x, j) => (j === i ? { ...x, visual: e.target.value } : x)))} />
+                  </label>
+                ) : s.visual ? <div className="sb-visual-fixo"><Eye size={13} aria-hidden /><span>{s.visual} <i>(layout pronto do estilo: o movimento segue o modelo)</i></span></div> : null}
                 {p.brief.voz !== "none" && (
                   <textarea className="input-sm" rows={2} style={{ height: "auto", paddingBlock: 8, resize: "vertical" }} placeholder={p.brief.voz === "propria" ? "Legenda da sua fala" : "Narração"}
                     title={p.brief.voz === "propria" ? "O que você falou neste trecho. Corrigir aqui muda só a legenda; o áudio é o seu." : undefined} aria-label={`Narração da cena ${i + 1}`}
@@ -319,6 +338,45 @@ export function ProjectView({ p, podeEditar, vozes }: { p: ProjetoView; podeEdit
       </div>
     </div>
   );
+}
+
+/** O porquê do vídeo: plano, direção de arte e o que vai junto (música, efeitos), para aprovar sabendo o que vai ser gerado. */
+function PlanoVideo({ sb, estilo }: { sb: NonNullable<ProjetoView["storyboard"]>; estilo?: string }) {
+  const itens = PLANO.filter(([k]) => sb.plano?.[k]);
+  const efeitos = sb.sfx?.length ?? 0;
+  return (
+    <section className="sb-plano" aria-label="Plano do vídeo">
+      {itens.length > 0 && (
+        <dl className="sb-plano-grade">
+          {itens.map(([k, rotulo]) => <div key={k} data-k={k}><dt>{rotulo}</dt><dd>{sb.plano![k]}</dd></div>)}
+        </dl>
+      )}
+      <div className="sb-plano-extra">
+        {sb.direcao ? (
+          <div className="sb-direcao"><Sparkles size={14} aria-hidden /><span><b>Direção de arte: {sb.direcao.nome}</b> {sb.direcao.descricao}</span></div>
+        ) : estilo && estilo !== "livre" ? (
+          <div className="sb-direcao"><Sparkles size={14} aria-hidden /><span><b>Estilo com cenas prontas</b> layout e movimento vêm do modelo do estilo escolhido; a IA escreveu os textos e escolheu o tipo de cada cena.</span></div>
+        ) : null}
+        <span className="sb-chip"><Music2 size={12} aria-hidden /> {sb.music ? `Música ${MUSICA_NOME[sb.music.tag] ?? sb.music.tag}` : "Sem música"}</span>
+        <span className="sb-chip"><Volume2 size={12} aria-hidden /> {efeitos ? `${efeitos} efeito${efeitos === 1 ? "" : "s"} sonoro${efeitos === 1 ? "" : "s"}` : "Sem efeitos sonoros"}</span>
+        <span className="sb-chip"><Film size={12} aria-hidden /> {sb.scenes.length} cenas · {seg(sb.duration)}</span>
+      </div>
+      {!itens.length && !sb.direcao && <p className="subtle caption" style={{ margin: 0 }}>Roteiro gerado antes do plano detalhado: gere um roteiro novo para ver ideia, gancho e intenção de cada cena.</p>}
+    </section>
+  );
+}
+
+/** Tudo que entra na tela da cena além dos textos: palavras em destaque, número, imagem, animação e efeitos no tempo dela. */
+function NaTela({ s, sfx }: { s: Cena; sfx: { time: number; effect: string }[] }) {
+  const partes = [
+    s.animation && !s.tipo ? { i: Wand2, t: `Entrada: ${ANIM[s.animation] ?? s.animation}` } : null,
+    s.destaque?.length ? { i: Sparkles, t: `Destaque: ${s.destaque.join(", ")}` } : null,
+    s.numero ? { i: Target, t: `Número animado: ${s.numero.prefixo ?? ""}${s.numero.valor}${s.numero.sufixo ?? ""}` } : null,
+    s.asset ? { i: ImageIcon, t: `Imagem: ${s.asset.replace(/^assets\//, "")}` } : null,
+    ...sfx.map((e) => ({ i: Volume2, t: `${SFX[e.effect] ?? e.effect} em ${seg(e.time)}` })),
+  ].filter((x): x is { i: typeof Wand2; t: string } => !!x);
+  if (!partes.length) return null;
+  return <div className="sb-natela">{partes.map(({ i: I, t }, k) => <span key={k} className="sb-chip"><I size={12} aria-hidden /> {t}</span>)}</div>;
 }
 
 /** Etapas do pipeline com a atual brilhando; barra de progresso com o gradiente DOMUS. */

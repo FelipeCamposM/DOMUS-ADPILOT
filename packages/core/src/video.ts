@@ -141,6 +141,13 @@ export const storyboardSchema = z.object({
   title: z.string().min(1).max(120),
   duration: z.number().positive().max(120),
   fps: z.literal(30).default(30),
+  // o porquê do vídeo, para o cliente aprovar sabendo o que vai ser feito (não vai para a animação)
+  plano: z.object({
+    ideia: z.string().max(400), publico: z.string().max(300), gancho: z.string().max(300),
+    arco: z.string().max(500), tom: z.string().max(200), cta: z.string().max(300),
+  }).partial().optional(),
+  // direção de arte escolhida já no roteiro (estilo Livre), mostrada na aprovação e usada na composição
+  direcao: z.object({ nome: z.string().max(80), descricao: z.string().max(1500) }).optional(),
   scenes: z.array(z.object({
     start: z.number().min(0),
     end: z.number().positive(),
@@ -158,6 +165,7 @@ export const storyboardSchema = z.object({
     asset: z.string().regex(/^assets\/[\w.-]+$/, "Arquivo inválido").optional(),
     animation: z.string().max(60).default("fade-up"),
     visual: z.string().max(400).optional().default(""),
+    intencao: z.string().max(300).optional(), // o que a cena precisa fazer o público sentir/entender
   }).refine((s) => s.end > s.start, "Cena com fim antes do início")).min(1).max(20),
   sfx: z.array(z.object({
     time: z.number().min(0),

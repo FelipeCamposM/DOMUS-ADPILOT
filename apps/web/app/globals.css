@@ -3006,3 +3006,25 @@ li[data-estado="feito"] .pp-aviso-txt b { color: rgb(var(--c-text-secondary)); }
 .mdl-ia-campo { display: flex; gap: 6px; }
 .mdl-ia-campo .input { flex: 1; min-width: 0; height: 36px; }
 .mdl-ia[aria-busy="true"]::after { content: ""; position: absolute; left: 14px; right: 14px; bottom: -1px; height: 2px; border-radius: 2px; background: var(--gradient-btn); animation: sel-prog 1.1s ease-in-out infinite; transform-origin: left; }
+
+/* Studio · aprovação do roteiro: plano, intenção e o que aparece em cada cena */
+.sb-plano { margin: 12px 14px 0; padding: 14px; border-radius: 14px; background: rgb(var(--c-brand) / 0.06); border: 1px solid rgb(var(--c-brand) / 0.22); display: grid; gap: 12px; }
+.sb-plano-grade { margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px 16px; }
+.sb-plano-grade > div { min-width: 0; }
+.sb-plano-grade dt { font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgb(var(--c-brand)); margin-bottom: 3px; }
+.sb-plano-grade dd { margin: 0; font-size: 13px; line-height: 1.5; color: rgb(var(--c-text-primary)); }
+.sb-plano-grade > [data-k="ideia"], .sb-plano-grade > [data-k="arco"] { grid-column: 1 / -1; }
+.sb-plano-extra { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.sb-direcao { flex: 1 1 100%; display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; line-height: 1.5; color: rgb(var(--c-text-secondary)); }
+.sb-direcao b { color: rgb(var(--c-text-primary)); margin-right: 4px; }
+.sb-direcao svg { flex: none; margin-top: 3px; color: rgb(var(--c-brand)); }
+.sb-chip { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 9px; border-radius: 999px; font-size: 11.5px; color: rgb(var(--c-text-secondary)); background: rgb(255 255 255 / 0.04); border: 1px solid rgb(255 255 255 / 0.08); max-width: 100%; }
+.sb-chip svg { flex: none; color: rgb(var(--c-brand)); }
+.sb-natela { display: flex; flex-wrap: wrap; gap: 6px; }
+.sb-intencao, .sb-visual-fixo { display: flex; gap: 7px; align-items: flex-start; font-size: 12.5px; line-height: 1.5; color: rgb(var(--c-text-secondary)); }
+.sb-intencao svg, .sb-visual-fixo svg { flex: none; margin-top: 3px; color: rgb(var(--c-brand)); }
+.sb-intencao b { color: rgb(var(--c-text-primary)); margin-right: 4px; }
+.sb-visual-fixo i { color: rgb(var(--c-text-tertiary)); }
+.sb-visual { display: grid; gap: 5px; }
+.sb-visual > span { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; color: rgb(var(--c-text-tertiary)); }
+.sb-visual > span svg { color: rgb(var(--c-brand)); }

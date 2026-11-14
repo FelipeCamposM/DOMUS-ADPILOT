@@ -87,6 +87,13 @@ export async function runVideo(payload: VideoPayload, c: Ctx) {
       // a paleta que o vídeo vai usar vai junto para a revisão: o usuário vê (e corrige) as cores antes de gastar com o render
       const { P } = paletaCenas(brief, ctxCriativo.brand);
       const paleta = { origem: ctxCriativo.brand.cores.length ? ctxCriativo.origem : "estilo", marca: ctxCriativo.marca, cores: [P.bg, P.a, P.tx, P.a2], fonteTitulo: P.ft, fonteTexto: P.fb };
+      // estilo Livre: a direção de arte é escolhida aqui e vai para a aprovação (a composição usa a mesma)
+      if (brief.estiloVisual === "livre") {
+        const [salvoR] = brief.estiloSalvo ? await sql<{ nome: string; descricao: string }[]>`
+          select nome, descricao from ads.estilos_video where id = ${brief.estiloSalvo} and workspace_id = ${p.workspace_id}` : [];
+        const d = salvoR ? { nome: `Estilo salvo: ${salvoR.nome}`, descricao: salvoR.descricao || "repete a linguagem visual do vídeo que você salvou" } : await escolherDirecao(p.workspace_id, p.id);
+        sb.direcao = { nome: d.nome.slice(0, 80), descricao: d.descricao.slice(0, 1500) };
+      }
       // pausa para aprovação: voz, animação e render (o que gasta créditos) só depois que o usuário aprovar o roteiro
       await sql`update ads.video_projects set storyboard = ${sql.json(sb as unknown as Json)}, title = ${sb.title}, status = 'REVIEW', paleta = ${sql.json(paleta)},
         step_detail = 'Roteiro pronto: revise e aprove para gerar o vídeo', error = null, updated_at = now() where id = ${p.id}`;
@@ -183,7 +190,8 @@ export async function runVideo(payload: VideoPayload, c: Ctx) {
     // últimos vídeos (a composição guarda qual foi)
     const [salvo] = !deCenas && brief.estiloSalvo ? await sql<{ nome: string; descricao: string; referencia: string }[]>`
       select nome, descricao, referencia from ads.estilos_video where id = ${brief.estiloSalvo} and workspace_id = ${p.workspace_id}` : [];
-    const direcao = deCenas ? undefined : salvo ? { nome: salvo.nome, descricao: salvo.descricao || "a linguagem visual do vídeo de referência abaixo" } : await escolherDirecao(p.workspace_id, p.id);
+    const direcao = deCenas ? undefined : salvo ? { nome: salvo.nome, descricao: salvo.descricao || "a linguagem visual do vídeo de referência abaixo" }
+      : sb.direcao ?? await escolherDirecao(p.workspace_id, p.id); // a aprovada no roteiro
     if (direcao) await c.log(`${salvo ? "Estilo salvo" : "Direção de arte"}: ${direcao.nome}`);
     const sistema = deCenas ? sistemaAjusteCenas(brief) : sistemaComposicao(brief, direcao, ajuste, salvo?.referencia);
     let html = !porIA
