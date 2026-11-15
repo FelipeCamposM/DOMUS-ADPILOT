@@ -152,6 +152,30 @@ export function filtroPaginas(dominios: string[]): string | null {
   return `^https?://(www\\.)?(${hosts})([/:?#]|$)`;
 }
 
+/**
+ * Acha sozinho a propriedade do Search Console de um site entre as que a conta enxerga:
+ * prefixo de URL do próprio endereço primeiro; senão a propriedade de domínio mais específica que cobre o endereço
+ * (siaplus.digitaldomus.com.br cai em sc-domain:digitaldomus.com.br).
+ */
+export function escolherGsc(propriedades: string[], dominios: string[]): string | null {
+  const hosts = dominios.map((d) => d.toLowerCase().replace(/^www\./, ""));
+  for (const h of hosts) {
+    const url = propriedades.find((p) => /^https?:\/\//i.test(p) && [h, `www.${h}`].includes(new URL(p).hostname.toLowerCase()) && new URL(p).pathname === "/");
+    if (url) return url;
+  }
+  const dom = propriedades.filter((p) => p.startsWith("sc-domain:")).map((p) => p.slice(10).toLowerCase())
+    .filter((d) => hosts.some((h) => h === d || h.endsWith(`.${d}`)))
+    .sort((a, b) => b.length - a.length)[0];
+  return dom ? `sc-domain:${dom}` : null;
+}
+
+export async function propriedadesGsc(token: string): Promise<string[]> {
+  const r = await fetch("https://searchconsole.googleapis.com/webmasters/v3/sites", { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(15_000) });
+  if (!r.ok) throw new Error(`Search Console: ${r.status}`);
+  const j = (await r.json()) as { siteEntry?: { siteUrl: string; permissionLevel: string }[] };
+  return (j.siteEntry ?? []).filter((s) => s.permissionLevel !== "siteUnverifiedUser").map((s) => s.siteUrl);
+}
+
 export async function relatorioGsc(token: string, site: string, dias: number, dominios: string[] = []): Promise<RelatorioGsc> {
   // o Search Console fecha os dados com ~2 dias de atraso: o período termina 2 dias atrás
   const { atual, anterior } = periodos(dias, 2);

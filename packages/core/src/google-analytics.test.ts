@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { filtroPaginas, periodos } from "./google-analytics";
+import { escolherGsc, filtroPaginas, periodos } from "./google-analytics";
 import { leadSiteSchema } from "./mensagens";
 
 test("período atual e anterior de mesmo tamanho, sem buraco nem sobreposição", () => {
@@ -17,6 +17,16 @@ test("filtro do Search Console separa domínio de subdomínio", () => {
   expect(re.test("https://digitaldomus.com.br.evil.com/")).toBe(false);
   expect(new RegExp(filtroPaginas(["siaplus.digitaldomus.com.br"])!).test("https://siaplus.digitaldomus.com.br/planos")).toBe(true);
   expect(filtroPaginas([])).toBeNull();
+});
+
+test("acha a propriedade do Search Console pelo domínio", () => {
+  const props = ["sc-domain:digitaldomus.com.br", "sc-domain:outro.com", "https://www.loja.com.br/", "https://loja.com.br/blog/"];
+  expect(escolherGsc(props, ["siaplus.digitaldomus.com.br"])).toBe("sc-domain:digitaldomus.com.br");
+  expect(escolherGsc(props, ["digitaldomus.com.br"])).toBe("sc-domain:digitaldomus.com.br");
+  expect(escolherGsc(props, ["loja.com.br"])).toBe("https://www.loja.com.br/");
+  expect(escolherGsc([...props, "sc-domain:siaplus.digitaldomus.com.br"], ["siaplus.digitaldomus.com.br"])).toBe("sc-domain:siaplus.digitaldomus.com.br");
+  expect(escolherGsc(props, ["naodigitaldomus.com.br"])).toBeNull();
+  expect(escolherGsc(props, [])).toBeNull();
 });
 
 test("GA4 e Search Console opcionais no site", () => {

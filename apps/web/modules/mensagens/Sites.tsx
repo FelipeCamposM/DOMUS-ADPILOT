@@ -113,7 +113,7 @@ export function Sites({ sites, contaGoogle }: { sites: SiteLead[]; contaGoogle: 
               <footer className="crm-site-acoes">
                 {st.chave.startsWith("sistema:") ? <span className="chip" style={{ height: 24 }}><Plug aria-hidden /> Via API</span>
                   : <button className="btn btn-secondary btn-xs" onClick={() => setCodigo(st)}><Code2 aria-hidden /> Código</button>}
-                {(st.ga4_propriedade || st.gsc_site) && <Link className="btn btn-secondary btn-xs" href={`/crm/sites/${st.id}`}><BarChart3 aria-hidden /> Estatísticas</Link>}
+                {(st.ga4_propriedade || st.gsc_site || (st.dominios.length > 0 && !st.chave.startsWith("sistema:"))) && <Link className="btn btn-secondary btn-xs" href={`/crm/sites/${st.id}`}><BarChart3 aria-hidden /> Estatísticas</Link>}
                 <span style={{ flex: 1 }} />
                 <button className="btn btn-ghost btn-xs" title={st.ativo ? "Pausar: o formulário para de aceitar leads" : "Reativar o formulário"} onClick={async () => {
                   const r = await alternarSite(st.id, !st.ativo);
@@ -212,7 +212,7 @@ function GscCampo({ valor, mudar }: { valor: string; mudar: (v: string) => void 
   };
   return (
     <div className="field" style={{ flex: "1 1 260px" }}>
-      <label className="label" htmlFor="st-gsc">Site no Search Console</label>
+      <label className="label" htmlFor="st-gsc">Site no Search Console <span className="subtle">(opcional)</span></label>
       <div className="cluster" style={{ gap: 6, flexWrap: "nowrap" }}>
         <select className="select" aria-label="Tipo da propriedade no Search Console" value={tipo} style={{ flex: "none" }}
           onChange={(e) => { const t = e.target.value as "dominio" | "url"; setTipo(t); mudar(montar(t, texto)); }}>
@@ -222,7 +222,7 @@ function GscCampo({ valor, mudar }: { valor: string; mudar: (v: string) => void 
         <input id="st-gsc" className="input" style={{ minWidth: 0 }} value={texto} maxLength={200} onChange={(e) => mudar(e.target.value ? (tipo === "dominio" ? `sc-domain:${e.target.value}` : e.target.value) : "")}
           onBlur={() => mudar(montar(tipo, texto))} placeholder={tipo === "dominio" ? "seusite.com.br" : "https://www.seusite.com.br/"} />
       </div>
-      <span className="subtle caption">{tipo === "dominio" ? "No seletor do Search Console aparece só o endereço (sem https): vale para todos os subdomínios." : "No seletor aparece com https://: vale só para esse endereço."}</span>
+      <span className="subtle caption">Vazio = acha sozinho pelo domínio do site (subdomínio cai na propriedade do domínio principal, só com as páginas dele).</span>
     </div>
   );
 }
