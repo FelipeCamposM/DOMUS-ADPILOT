@@ -34,7 +34,7 @@ export interface Contato {
   etapa: string | null; site: string | null; lead_em: string | null; consentimento_em: string | null;
   lead_dados: { mensagem?: string; pagina?: string | null; utm?: Record<string, string>; email?: string; origem?: string; rascunho?: string; prospeccao?: string } | null;
 }
-export interface SiteLead { id: string; nome: string; chave: string; dominios: string[]; mensagem_inicial: string; ativo: boolean; ultimo_lead: string | null; leads: number }
+export interface SiteLead { id: string; nome: string; chave: string; dominios: string[]; mensagem_inicial: string; ativo: boolean; ultimo_lead: string | null; leads: number; ga4_propriedade: string | null; gsc_site: string | null }
 export interface Modelo { id: string; nome: string; texto: string; categoria: string; usos: number }
 export interface ItemBiblioteca { id: string; nome: string; tipo: "imagem" | "video"; thumb: boolean }
 type Anexo = { creativeId: string | null; nome: string; tipo: "imagem" | "video"; previa: string | null; pct: number };

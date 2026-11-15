@@ -1,13 +1,14 @@
 "use client";
 
 import { CONSENTIMENTO, leadSiteSchema, preencherModelo } from "@domus-ads/core/mensagens";
-import { ArrowRight, Code2, Copy, Globe, Loader2, MessageCircle, Pause, Pencil, Play, Plug, Plus, ShieldCheck, Trash2 } from "lucide-react";
+import { ArrowRight, BarChart3, Code2, Copy, Globe, KeyRound, Loader2, MessageCircle, Pause, Pencil, Play, Plug, Plus, ShieldCheck, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { confirmar } from "../shell/confirmar";
 import { Dialog } from "../shell/Dialog";
 import { toast } from "../shell/toast";
-import { alternarSite, apagarSite, salvarSite } from "./actions";
+import { alternarSite, apagarSite, salvarContaGoogle, salvarSite } from "./actions";
 import { ha, type SiteLead } from "./Mensagens";
 
 const MSG_PADRAO = "Olá! Vim pelo site {site} e quero saber mais.";
@@ -57,14 +58,14 @@ function codigoFormulario(origem: string, chave: string) {
 </script>`;
 }
 
-type Edicao = { id: string | null; nome: string; dominios: string; mensagem_inicial: string };
+type Edicao = { id: string | null; nome: string; dominios: string; mensagem_inicial: string; ga4: string; gsc: string };
 
 /** Conexões de sites: cada site tem um formulário; quem preenche vira lead no CRM. */
-export function Sites({ sites }: { sites: SiteLead[] }) {
+export function Sites({ sites, contaGoogle }: { sites: SiteLead[]; contaGoogle: string | null }) {
   const router = useRouter();
   const [edit, setEdit] = useState<Edicao | null>(null);
   const [codigo, setCodigo] = useState<SiteLead | null>(null);
-  const novo = () => setEdit({ id: null, nome: "", dominios: "", mensagem_inicial: MSG_PADRAO });
+  const novo = () => setEdit({ id: null, nome: "", dominios: "", mensagem_inicial: MSG_PADRAO, ga4: "", gsc: "" });
 
   return (
     <div className="stack" style={{ gap: 20 }}>
@@ -90,6 +91,8 @@ export function Sites({ sites }: { sites: SiteLead[] }) {
         <button className="btn btn-primary btn-sm" onClick={novo}><Plus aria-hidden /> Conectar site</button>
       </div>
 
+      <ContaGoogle email={contaGoogle} />
+
       {sites.length ? (
         <div className="crm-sites">
           {sites.map((st) => (
@@ -110,12 +113,13 @@ export function Sites({ sites }: { sites: SiteLead[] }) {
               <footer className="crm-site-acoes">
                 {st.chave.startsWith("sistema:") ? <span className="chip" style={{ height: 24 }}><Plug aria-hidden /> Via API</span>
                   : <button className="btn btn-secondary btn-xs" onClick={() => setCodigo(st)}><Code2 aria-hidden /> Código</button>}
+                {(st.ga4_propriedade || st.gsc_site) && <Link className="btn btn-secondary btn-xs" href={`/crm/sites/${st.id}`}><BarChart3 aria-hidden /> Estatísticas</Link>}
                 <span style={{ flex: 1 }} />
                 <button className="btn btn-ghost btn-xs" title={st.ativo ? "Pausar: o formulário para de aceitar leads" : "Reativar o formulário"} onClick={async () => {
                   const r = await alternarSite(st.id, !st.ativo);
                   if (!r.ok) toast.err(r.error); else router.refresh();
                 }}>{st.ativo ? <><Pause aria-hidden /> Pausar</> : <><Play aria-hidden /> Ativar</>}</button>
-                <button className="btn btn-ghost btn-xs" aria-label={`Editar ${st.nome}`} onClick={() => setEdit({ id: st.id, nome: st.nome, dominios: st.dominios.join(", "), mensagem_inicial: st.mensagem_inicial })}><Pencil aria-hidden /></button>
+                <button className="btn btn-ghost btn-xs" aria-label={`Editar ${st.nome}`} onClick={() => setEdit({ id: st.id, nome: st.nome, dominios: st.dominios.join(", "), mensagem_inicial: st.mensagem_inicial, ga4: st.ga4_propriedade ?? "", gsc: st.gsc_site ?? "" })}><Pencil aria-hidden /></button>
                 <button className="btn btn-ghost btn-xs" aria-label={`Apagar ${st.nome}`} onClick={async () => {
                   if (!(await confirmar(`Apagar o site “${st.nome}”? O formulário dele para de funcionar; os leads que já chegaram continuam no CRM.`))) return;
                   const r = await apagarSite(st.id);
@@ -150,7 +154,7 @@ function EditarSite({ inicial, fechar, criado }: { inicial: Edicao; fechar: () =
     const r = await salvarSite(edit.id, edit);
     if (!r.ok) return setErro(r.error);
     toast.ok(edit.id ? "Site salvo" : "Site conectado: agora copie o código do formulário");
-    criado(r.data ? { id: "", nome: edit.nome, chave: r.data, dominios: [], mensagem_inicial: edit.mensagem_inicial, ativo: true, ultimo_lead: null, leads: 0 } : null);
+    criado(r.data ? { id: "", nome: edit.nome, chave: r.data, dominios: [], mensagem_inicial: edit.mensagem_inicial, ativo: true, ultimo_lead: null, leads: 0, ga4_propriedade: null, gsc_site: null } : null);
   });
   return (
     <Dialog open onClose={fechar} title={edit.id ? "Editar site" : "Conectar site"}>
@@ -174,6 +178,18 @@ function EditarSite({ inicial, fechar, criado }: { inicial: Edicao; fechar: () =
           <div className="wa-previa-modelo"><span className="subtle caption">Prévia com “Maria Souza”:</span>
             <p>{preencherModelo(edit.mensagem_inicial, { nome: "Maria Souza", numero: "5531999999999", site: edit.nome || "seu site" })}</p></div>
         )}
+        <div className="cluster" style={{ gap: 12, alignItems: "flex-start" }}>
+          <div className="field" style={{ flex: "1 1 180px" }}>
+            <label className="label" htmlFor="st-ga4">ID da propriedade do GA4</label>
+            <input id="st-ga4" className="input" inputMode="numeric" value={edit.ga4} maxLength={15} onChange={(e) => mudar({ ga4: e.target.value })} placeholder="Ex.: 412345678" />
+            <span className="subtle caption">GA4 → Administrador → Detalhes da propriedade.</span>
+          </div>
+          <div className="field" style={{ flex: "1 1 220px" }}>
+            <label className="label" htmlFor="st-gsc">Site no Search Console</label>
+            <input id="st-gsc" className="input" value={edit.gsc} maxLength={200} onChange={(e) => mudar({ gsc: e.target.value })} placeholder="sc-domain:seusite.com.br" />
+            <span className="subtle caption">Propriedade de domínio ou a URL com / no fim.</span>
+          </div>
+        </div>
         {erro && <p className="error-text" role="alert">{erro}</p>}
         <div className="cluster" style={{ justifyContent: "flex-end", gap: 8 }}>
           <button type="button" className="btn btn-ghost btn-sm" onClick={fechar}>Cancelar</button>
@@ -181,6 +197,50 @@ function EditarSite({ inicial, fechar, criado }: { inicial: Edicao; fechar: () =
         </div>
       </form>
     </Dialog>
+  );
+}
+
+/** Conta de serviço do Google: uma chave só lê o GA4 e o Search Console de todos os sites que derem acesso ao e-mail dela. */
+function ContaGoogle({ email }: { email: string | null }) {
+  const router = useRouter();
+  const [json, setJson] = useState("");
+  const [pend, start] = useTransition();
+  const salvar = (v: string | null) => start(async () => {
+    const r = await salvarContaGoogle(v);
+    if (!r.ok) return void toast.err(r.error);
+    setJson("");
+    toast.ok(v ? "Conta Google validada e salva" : "Conta Google removida");
+    router.refresh();
+  });
+  return (
+    <section className="panel" style={{ padding: 16, display: "grid", gap: 12 }} data-enter>
+      <div className="cluster" style={{ gap: 10 }}>
+        <span className="wa-avatar"><KeyRound size={18} aria-hidden /></span>
+        <span className="stack" style={{ gap: 2, flex: 1, minWidth: 0 }}>
+          <b>Estatísticas: Google Analytics e Search Console</b>
+          <span className="subtle caption">{email ? <>Conta conectada. Dê acesso a <b style={{ wordBreak: "break-all" }}>{email}</b> em cada site.</> : "Conecte uma conta de serviço do Google para ver as visitas e as buscas de cada site (só leitura)."}</span>
+        </span>
+        {email && <button className="btn btn-ghost btn-xs" onClick={async () => { await navigator.clipboard.writeText(email); toast.ok("E-mail copiado"); }}><Copy aria-hidden /> Copiar e-mail</button>}
+        {email && <button className="btn btn-ghost btn-xs" disabled={pend} onClick={async () => { if (await confirmar("Remover a conta Google? As estatísticas dos sites param de carregar.")) salvar(null); }}><Trash2 aria-hidden /> Remover</button>}
+      </div>
+      <details>
+        <summary className="subtle small" style={{ cursor: "pointer" }}>{email ? "Trocar a chave ou ver o passo a passo" : "Passo a passo (5 min)"}</summary>
+        <ol className="small" style={{ margin: "10px 0", paddingLeft: 20, display: "grid", gap: 4 }}>
+          <li>No <a href="https://console.cloud.google.com/apis/library" target="_blank" rel="noreferrer">Google Cloud</a>, ative a <b>Google Analytics Data API</b> e a <b>Google Search Console API</b> no projeto.</li>
+          <li>Em IAM → <b>Contas de serviço</b>, crie uma conta (sem papel). Em Chaves → Adicionar chave → <b>JSON</b>: baixa um arquivo.</li>
+          <li>Abra o arquivo, copie tudo e cole abaixo (só aqui: a chave fica cifrada no banco, nunca volta para a tela).</li>
+          <li>No GA4 de cada site: Administrador → Gerenciamento de acesso à propriedade → + → e-mail da conta → <b>Leitor</b>.</li>
+          <li>No Search Console: Configurações → Usuários e permissões → Adicionar usuário → e-mail da conta → <b>Restrito</b>.</li>
+        </ol>
+        <div className="stack" style={{ gap: 8 }}>
+          <textarea className="input" rows={4} style={{ height: "auto", paddingBlock: 10, fontFamily: "var(--font-mono, monospace)", fontSize: 12 }} spellCheck={false} autoComplete="off"
+            placeholder='{ "type": "service_account", "client_email": "...", "private_key": "..." }' aria-label="Chave JSON da conta de serviço" value={json} onChange={(e) => setJson(e.target.value)} />
+          <div className="cluster" style={{ justifyContent: "flex-end" }}>
+            <button className="btn btn-primary btn-sm" disabled={pend || json.trim().length < 50} onClick={() => salvar(json)}>{pend ? <Loader2 className="animate-spin" aria-hidden /> : "Validar e salvar"}</button>
+          </div>
+        </div>
+      </details>
+    </section>
   );
 }
 

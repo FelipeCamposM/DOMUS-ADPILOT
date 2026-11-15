@@ -4,28 +4,29 @@ import { gsap } from "gsap";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { compact, int, money } from "@/lib/format";
 
-interface Ponto { date: string; spend: string; clicks: string; conversions: string; revenue: string }
-const METRICAS = [
-  { key: "spend", label: "Investimento", fmt: (v: number) => money(v) },
-  { key: "clicks", label: "Cliques", fmt: (v: number) => int(v) },
-  { key: "conversions", label: "Resultados", fmt: (v: number) => int(v) },
-  { key: "revenue", label: "Receita", fmt: (v: number) => money(v) },
-] as const;
-type Key = (typeof METRICAS)[number]["key"];
+type Ponto = { date: string };
+export interface MetricaTrend { key: string; label: string; dinheiro?: boolean }
+const METRICAS: MetricaTrend[] = [
+  { key: "spend", label: "Investimento", dinheiro: true },
+  { key: "clicks", label: "Cliques" },
+  { key: "conversions", label: "Resultados" },
+  { key: "revenue", label: "Receita", dinheiro: true },
+];
 
 const W = 960, H = 260, PAD = { l: 56, r: 16, t: 16, b: 28 };
 const diaCurto = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", timeZone: "UTC" }).replace(".", "");
 
 /** Série diária de uma métrica por vez (um eixo só). Linha desenha com GSAP; crosshair + tooltip no hover. */
-export function TrendChart({ data }: { data: Ponto[] }) {
-  const [key, setKey] = useState<Key>("spend");
+export function TrendChart({ data, metricas = METRICAS }: { data: Ponto[]; metricas?: MetricaTrend[] }) {
+  const [key, setKey] = useState(metricas[0]!.key);
   const [hover, setHover] = useState<number | null>(null);
   const lineRef = useRef<SVGPathElement>(null);
   const areaRef = useRef<SVGPathElement>(null);
-  const m = METRICAS.find((x) => x.key === key)!;
+  const m0 = metricas.find((x) => x.key === key) ?? metricas[0]!;
+  const m = { ...m0, fmt: (v: number) => (m0.dinheiro ? money(v) : int(v)) };
 
   const { pts, linha, area, ticks, max } = useMemo(() => {
-    const vals = data.map((d) => Number(d[key]));
+    const vals = data.map((d) => Number((d as unknown as Record<string, unknown>)[key]));
     const bruto = Math.max(...vals, 0);
     const passo = bruto > 0 ? 10 ** Math.floor(Math.log10(bruto)) : 1;
     const max = bruto > 0 ? Math.ceil((bruto * 1.1) / passo) * passo : 1;
@@ -71,7 +72,7 @@ export function TrendChart({ data }: { data: Ponto[] }) {
           <div className="subtle caption tabular">Total no período: {m.fmt(total)}</div>
         </div>
         <div className="cluster" role="tablist" aria-label="Métrica do gráfico" style={{ gap: 6 }}>
-          {METRICAS.map((x) => (
+          {metricas.map((x) => (
             <button key={x.key} role="tab" aria-selected={x.key === key} className="chip" data-active={x.key === key} onClick={() => setKey(x.key)} style={{ height: 28 }}>
               {x.label}
             </button>
@@ -91,7 +92,7 @@ export function TrendChart({ data }: { data: Ponto[] }) {
             return (
               <g key={t}>
                 <line x1={PAD.l} x2={W - PAD.r} y1={y} y2={y} stroke="rgb(var(--c-border))" strokeDasharray={t === 0 ? undefined : "2 4"} />
-                <text x={PAD.l - 10} y={y + 4} textAnchor="end" fontSize="11" fill="rgb(var(--c-text-tertiary))">{key === "spend" || key === "revenue" ? `R$ ${compact(t)}` : compact(t)}</text>
+                <text x={PAD.l - 10} y={y + 4} textAnchor="end" fontSize="11" fill="rgb(var(--c-text-tertiary))">{m.dinheiro ? `R$ ${compact(t)}` : compact(t)}</text>
               </g>
             );
           })}

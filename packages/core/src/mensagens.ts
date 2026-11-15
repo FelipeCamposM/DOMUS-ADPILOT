@@ -130,6 +130,11 @@ export const leadSiteSchema = z.object({
   dominios: z.string().max(500, "Domínios demais").transform(lerDominios)
     .pipe(z.array(z.string().regex(/^[a-z0-9-]+(\.[a-z0-9-]+)+$/, "Domínio inválido: use só o endereço (ex.: meusite.com.br)")).max(10, "Até 10 domínios")),
   mensagem_inicial: z.string().trim().min(5, "Escreva a mensagem que o lead manda ao abrir o WhatsApp").max(500, "Mensagem muito longa"),
+  // estatísticas (opcionais): ID da propriedade do GA4 e site do Search Console; vazio = não liga
+  ga4: z.string().trim().regex(/^(\d{5,15})?$/, "GA4: só os números do ID da propriedade (Administrador → Detalhes da propriedade)").default("")
+    .transform((v) => v || null),
+  gsc: z.string().trim().max(200).regex(/^(sc-domain:[a-z0-9.-]+\.[a-z]{2,}|https?:\/\/\S+\/)?$/i, "Search Console: use sc-domain:seusite.com.br ou a URL com / no fim").default("")
+    .transform((v) => v || null),
 });
 
 /** Origem do navegador está nos domínios do site (subdomínio vale). Lista vazia = qualquer um. */

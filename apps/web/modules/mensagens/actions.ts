@@ -1,7 +1,7 @@
 "use server";
 
 import {
-  audit, chaveEtapa, contatoSchema, db, ETAPA_ENTRADA, etapaCrmSchema, filtroCrmSchema, enqueueJob, etapaSchema, leadSiteSchema, MAX_TEXTO_WA, numeroSchema, templateSchema, tipoMidia, travasPrimeiroContato, whatsappAvisos, workerOnline,
+  audit, chaveEtapa, contaServicoSchema, gravarSegredo, tokenGoogle, contatoSchema, db, ETAPA_ENTRADA, etapaCrmSchema, filtroCrmSchema, enqueueJob, etapaSchema, leadSiteSchema, MAX_TEXTO_WA, numeroSchema, templateSchema, tipoMidia, travasPrimeiroContato, whatsappAvisos, workerOnline,
 } from "@domus-ads/core";
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
@@ -278,12 +278,12 @@ export async function salvarSite(id: string | null, input: unknown) {
     const s = leadSiteSchema.parse(input);
     const sql = db();
     let chave: string | null = null;
-    if (id) await sql`update ads.lead_sites set nome = ${s.nome}, dominios = ${s.dominios}, mensagem_inicial = ${s.mensagem_inicial} where id = ${siteId.parse(id)}`;
+    if (id) await sql`update ads.lead_sites set nome = ${s.nome}, dominios = ${s.dominios}, mensagem_inicial = ${s.mensagem_inicial}, ga4_propriedade = ${s.ga4}, gsc_site = ${s.gsc} where id = ${siteId.parse(id)}`;
     else {
       const [n] = await sql<{ n: number }[]>`select count(*)::int as n from ads.lead_sites`;
       if ((n?.n ?? 0) >= 50) throw new Error("Limite de 50 sites");
-      const [r] = await sql<{ chave: string }[]>`insert into ads.lead_sites (nome, chave, dominios, mensagem_inicial, created_by)
-        values (${s.nome}, ${`lead_${randomBytes(12).toString("base64url")}`}, ${s.dominios}, ${s.mensagem_inicial}, ${ctx.user.id}) returning chave`;
+      const [r] = await sql<{ chave: string }[]>`insert into ads.lead_sites (nome, chave, dominios, mensagem_inicial, ga4_propriedade, gsc_site, created_by)
+        values (${s.nome}, ${`lead_${randomBytes(12).toString("base64url")}`}, ${s.dominios}, ${s.mensagem_inicial}, ${s.ga4}, ${s.gsc}, ${ctx.user.id}) returning chave`;
       chave = r!.chave;
     }
     revalidatePath("/crm", "layout");
@@ -296,6 +296,26 @@ export async function alternarSite(id: string, ativo: boolean) {
     await admin();
     await db()`update ads.lead_sites set ativo = ${ativo} where id = ${siteId.parse(id)}`;
     revalidatePath("/crm", "layout");
+  });
+}
+
+/** Chave JSON da conta de serviço do Google (GA4 + Search Console, só leitura). Testa no Google antes de guardar (cifrada). */
+export async function salvarContaGoogle(json: string | null) {
+  return run(async () => {
+    const ctx = await admin();
+    let email: string | null = null;
+    if (json != null) {
+      let bruto: unknown;
+      try { bruto = JSON.parse(json); } catch { throw new Error("Cole o arquivo JSON inteiro da chave"); }
+      const sa = contaServicoSchema.parse(bruto);
+      await tokenGoogle(sa);
+      email = sa.client_email;
+      json = JSON.stringify(sa);
+    }
+    await gravarSegredo("google_conta_servico", json, ctx.user.id);
+    await audit(db(), { workspaceId: null, actor: ctx.actor, action: json ? "Configurar conta Google (estatísticas)" : "Remover conta Google (estatísticas)", entityType: "settings", entityName: "google_conta_servico" });
+    revalidatePath("/crm/sites", "layout");
+    return email;
   });
 }
 
