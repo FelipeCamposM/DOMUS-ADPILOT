@@ -42,6 +42,7 @@ export function Sidebar({ pendentes, open }: { pendentes: number; open: boolean 
   const navRef = useRef<HTMLElement>(null);
   const indRef = useRef<HTMLDivElement>(null);
   const primeira = useRef(true);
+  const abriu = useRef(open);
 
   useLayoutEffect(() => {
     const alvo = navRef.current?.querySelector<HTMLElement>('a[aria-current="page"]');
@@ -49,7 +50,9 @@ export function Sidebar({ pendentes, open }: { pendentes: number; open: boolean 
     if (!ind) return;
     if (!alvo) { gsap.to(ind, { opacity: 0, duration: 0.2 }); return; }
     const y = alvo.offsetTop;
-    if (primeira.current || matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    // no celular o menu fica escondido (sem posição) até abrir: ao abrir, só posiciona
+    if (primeira.current || abriu.current !== open || matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      abriu.current = open;
       gsap.set(ind, { y, opacity: 1 });
       primeira.current = false;
       return;
@@ -57,7 +60,7 @@ export function Sidebar({ pendentes, open }: { pendentes: number; open: boolean 
     gsap.timeline()
       .to(ind, { y, opacity: 1, duration: 0.55, ease: "expo.out" }, 0)
       .fromTo(ind, { scaleY: 1 }, { scaleY: 0.82, duration: 0.14, ease: "power2.out", yoyo: true, repeat: 1 }, 0);
-  }, [path]);
+  }, [path, open]);
 
   let grupo = "";
   return (

@@ -1,9 +1,9 @@
 "use client";
 
 import { usePulso } from "./usePulso";
-import { LogOut, Menu, MessageCircle, Search } from "lucide-react";
+import { LogOut, MessageCircle, Search } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { ago } from "@/lib/format";
 import { Consultor } from "../ai/Consultor";
@@ -14,6 +14,7 @@ import { Dialog } from "./Dialog";
 import { sair } from "./actions";
 import { CommandPalette } from "./CommandPalette";
 import { Popover } from "./Popover";
+import { BarraMobile } from "./BarraMobile";
 import { Sidebar } from "./Sidebar";
 import { Confirmador } from "./confirmar";
 import { Toaster, toast } from "./toast";
@@ -43,6 +44,9 @@ export function Shell(p: ShellProps) {
   const [zap, setZap] = useState(false);
   const fechar = useCallback(() => setMenu(null), []);
   const fecharPaleta = useCallback(() => setPaleta(false), []);
+  // celular: o menu lateral fecha ao trocar de página
+  const path = usePathname();
+  useEffect(() => setMobile(false), [path]);
 
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
@@ -62,21 +66,20 @@ export function Shell(p: ShellProps) {
       {mobile && <div className="overlay only-mobile" style={{ zIndex: 90 }} onClick={() => setMobile(false)} />}
       <div className="main">
         <header className="topbar">
-          <button className="chip only-mobile" onClick={() => setMobile((v) => !v)} aria-label="Abrir menu"><Menu aria-hidden /></button>
 
           <button className="chip chip-busca" onClick={() => setPaleta(true)} style={{ justifyContent: "flex-start" }}>
-            <Search aria-hidden /> <span style={{ flex: 1, textAlign: "left" }}>Buscar…</span> <span className="kbd">Ctrl K</span>
+            <Search aria-hidden /> <span className="tb-rot" style={{ flex: 1, textAlign: "left" }}>Buscar…</span> <span className="kbd tb-rot">Ctrl K</span>
           </button>
 
-          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+          <div className="tb-dir" style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
             <UsoIA contas={p.contasIA} pref={p.iaPref} podeEditar={p.admin} aberto={menu === "ia"} onToggle={() => setMenu(menu === "ia" ? null : "ia")} onClose={fechar} />
-            <Link href="/settings#worker" className="chip" suppressHydrationWarning title={p.worker.lastSeen ? `Último sinal ${ago(p.worker.lastSeen)}` : "O worker nunca se conectou"}>
+            <Link href="/settings#worker" className="chip tb-worker" suppressHydrationWarning title={p.worker.lastSeen ? `Último sinal ${ago(p.worker.lastSeen)}` : "O worker nunca se conectou"}>
               <span className={`dot ${p.worker.online ? "on" : "err"}`} aria-hidden />
-              Worker {p.worker.online ? "online" : "offline"}
+              <span className="tb-rot">Worker {p.worker.online ? "online" : "offline"}</span>
             </Link>
             {p.whatsapp.estado && (() => {
               const on = p.whatsapp.estado.state === "open";
-              const conteudo = <><span className={`dot ${on ? "on" : "err"}`} aria-hidden /><MessageCircle aria-hidden /> {on ? "WhatsApp" : "WhatsApp desconectado"}</>;
+              const conteudo = <><span className={`dot ${on ? "on" : "err"}`} aria-hidden /><MessageCircle aria-hidden /> <span className="tb-rot">{on ? "WhatsApp" : "WhatsApp desconectado"}</span></>;
               const titulo = on ? `WhatsApp conectado${p.whatsapp.estado.numero ? ` · ${p.whatsapp.estado.numero}` : ""}` : "Clique para conectar com QR code";
               return p.admin
                 ? <button className="chip" data-alerta={!on} onClick={() => setZap(true)} title={titulo}>{conteudo}</button>
@@ -99,6 +102,7 @@ export function Shell(p: ShellProps) {
           </div>
         </header>
         <main className="content" id="conteudo">{p.children}</main>
+        <BarraMobile abrirMenu={() => setMobile((v) => !v)} menuAberto={mobile} />
       </div>
       {p.admin && p.whatsapp.estado && (
         <Dialog open={zap} onClose={() => setZap(false)} title="WhatsApp dos avisos">

@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export const viewport: Viewport = { themeColor: "#050407", colorScheme: "dark" };
+export const viewport: Viewport = { themeColor: "#050407", colorScheme: "dark", viewportFit: "cover" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   // "anim": o CSS só esconde [data-enter] com JS ligado e sem "reduzir movimento"; o Motion assume ou libera.

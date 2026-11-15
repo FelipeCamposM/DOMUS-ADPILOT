@@ -9,6 +9,7 @@ import { ago } from "@/lib/format";
 import { toast } from "../shell/toast";
 import { apagarConversa, cancelarResposta, enviarMensagem, novaConversa } from "./actions";
 import { Mensagem } from "./Chat";
+import { EVENTO_CONSULTOR } from "../shell/BarraMobile";
 import { Mascote } from "./Mascote";
 import { executarTela, lerTela, passosDaMensagem } from "./tela";
 
@@ -110,6 +111,13 @@ export function Consultor({ podeEditar, admin }: { podeEditar: boolean; admin: b
     if (id && !st) void carregar(id);
     setTimeout(() => campo.current?.focus(), 80);
   }, [aberto]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // bola do meio da barra do celular
+  useEffect(() => {
+    const t = () => setAberto((a) => !a);
+    window.addEventListener(EVENTO_CONSULTOR, t);
+    return () => window.removeEventListener(EVENTO_CONSULTOR, t);
+  }, []);
 
   useEffect(() => {
     if (!aberto) return;
