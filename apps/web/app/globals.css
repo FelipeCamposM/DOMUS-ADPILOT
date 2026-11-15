@@ -3059,3 +3059,41 @@ li[data-estado="feito"] .pp-aviso-txt b { color: rgb(var(--c-text-secondary)); }
 .st-disp-ic { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: rgb(255 255 255 / 0.05); border: 1px solid rgb(var(--c-border)); }
 @media (max-width: 640px) { .st-abas { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { .st-aovivo svg { animation: none; } }
+
+/* CRM · Sites: cartão da conta Google (logos, passos com links, arquivo .json) e fontes de cada site */
+.gc { padding: 18px; display: grid; gap: 14px; }
+.gc-topo { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.gc-titulo { font-size: 15px; }
+.gc-logos { display: flex; flex: none; }
+.gc-logos > span { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: #fff; box-shadow: 0 6px 18px -8px #000a; border: 2px solid rgb(var(--c-bg-surface)); }
+.gc-logos > span + span { margin-left: -10px; }
+.gc-email { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border-radius: 14px; background: rgb(var(--c-bg-inset)); border: 1px solid rgb(var(--c-border)); }
+.gc-email > svg { color: rgb(var(--c-brand)); flex: none; }
+.gc-email code { font-size: 12.5px; color: rgb(var(--c-text-primary)); }
+.gc-corpo { display: grid; gap: 14px; }
+.gc-passos { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 10px; }
+.gc-passos li { position: relative; display: flex; flex-direction: column; gap: 4px; padding: 14px 14px 12px 48px; border-radius: 14px; background: rgb(var(--c-bg-inset)); border: 1px solid rgb(var(--c-border)); }
+.gc-passos b { font-size: 13.5px; }
+.gc-n { position: absolute; left: 14px; top: 13px; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 99px; font-size: 12px; font-weight: 700; color: #fff; background: linear-gradient(135deg, var(--p-400), var(--p-700)); }
+.gc-links { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: auto; padding-top: 4px; }
+.gc-links a { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; font-weight: 600; color: rgb(var(--c-glow, var(--c-brand))); text-decoration: none; }
+.gc-links a:hover { text-decoration: underline; }
+.gc-drop { display: grid; justify-items: center; gap: 6px; padding: 26px 16px; border-radius: 16px; text-align: center; cursor: pointer;
+  border: 1.5px dashed rgb(var(--c-brand) / 0.45); background: rgb(var(--c-brand) / 0.05); transition: background 0.2s, border-color 0.2s; }
+.gc-drop:hover, .gc-drop[data-arrastando="true"] { background: rgb(var(--c-brand) / 0.12); border-color: rgb(var(--c-brand)); }
+.gc-drop > svg { color: rgb(var(--c-brand)); }
+.gc-drop:focus-within { outline: 2px solid rgb(var(--c-brand)); outline-offset: 2px; }
+.gc-link { padding: 0; border: 0; background: none; font: inherit; color: rgb(var(--c-glow, var(--c-brand))); font-weight: 600; cursor: pointer; text-decoration: underline; }
+.gc-colar { height: auto; padding-block: 10px; font-family: var(--font-mono, monospace); font-size: 12px; resize: vertical; }
+.gc-pronta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 14px; border-radius: 14px; background: rgb(52 168 83 / 0.08); border: 1px solid rgb(52 168 83 / 0.35); }
+.gc-pronta-ic { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 10px; color: #34A853; background: rgb(52 168 83 / 0.14); flex: none; }
+.crm-sites { grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr)); }
+.crm-site-fontes { display: flex; flex-wrap: wrap; gap: 6px; }
+.crm-site-fonte { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 9px; border-radius: 99px; font-size: 11.5px; white-space: nowrap;
+  color: rgb(var(--c-text-tertiary)); border: 1px dashed rgb(var(--c-border)); }
+.crm-site-fonte svg { flex: none; }
+.crm-site-fonte[data-on="false"] svg { filter: grayscale(1) opacity(0.5); }
+.crm-site-fonte[data-on="true"] { color: rgb(var(--c-text-secondary)); border-style: solid; background: rgb(255 255 255 / 0.03); }
+.crm-site-acoes { flex-wrap: wrap; gap: 6px; margin-top: auto; }
+.crm-site-acoes .btn { white-space: nowrap; }
+.crm-site-icones { display: flex; gap: 2px; margin-left: auto; }

@@ -1,10 +1,12 @@
 "use client";
 
 import { CONSENTIMENTO, leadSiteSchema, preencherModelo } from "@domus-ads/core/mensagens";
-import { ArrowRight, BarChart3, Code2, Copy, Globe, KeyRound, Loader2, MessageCircle, Pause, Pencil, Play, Plug, Plus, ShieldCheck, Trash2 } from "lucide-react";
+import { ArrowRight, BarChart3, Code2, Copy, ExternalLink, FileJson, Globe, KeyRound, Loader2, MessageCircle, Pause, Pencil, Play, Plug, Plus, ShieldCheck, Trash2, Upload } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { GoogleAnalyticsLogo, SearchConsoleLogo } from "../connections/Logos";
+import { HeroFx } from "../shell/HeroFx";
 import { confirmar } from "../shell/confirmar";
 import { Dialog } from "../shell/Dialog";
 import { toast } from "../shell/toast";
@@ -60,7 +62,7 @@ function codigoFormulario(origem: string, chave: string) {
 
 type Edicao = { id: string | null; nome: string; dominios: string; mensagem_inicial: string; ga4: string; gsc: string };
 
-/** Conexões de sites: cada site tem um formulário; quem preenche vira lead no CRM. */
+/** Sites: cada um tem formulário de leads (ou chega por API) e, com a conta Google, as estatísticas do GA4 e do Search Console. */
 export function Sites({ sites, contaGoogle }: { sites: SiteLead[]; contaGoogle: string | null }) {
   const router = useRouter();
   const [edit, setEdit] = useState<Edicao | null>(null);
@@ -69,6 +71,16 @@ export function Sites({ sites, contaGoogle }: { sites: SiteLead[]; contaGoogle: 
 
   return (
     <div className="stack" style={{ gap: 20 }}>
+      <div className="page-head">
+        <HeroFx />
+        <div className="eyebrow" data-enter>CRM</div>
+        <div>
+          <h1 className="page-title" data-enter>Sites</h1>
+          <p className="page-sub" style={{ margin: "8px 0 0" }}>Formulários que viram leads no WhatsApp e as visitas e buscas de cada site.</p>
+        </div>
+        <button className="btn btn-primary btn-sm" onClick={novo}><Plus aria-hidden /> Conectar site</button>
+      </div>
+
       <div className="crm-passos" data-enter>
         {[
           [Globe, "1. Cadastre o site", "Nome e domínio. Só esse domínio consegue mandar leads."],
@@ -86,48 +98,58 @@ export function Sites({ sites, contaGoogle }: { sites: SiteLead[]; contaGoogle: 
         })}
       </div>
 
-      <div className="cluster" style={{ justifyContent: "space-between", gap: 12 }}>
-        <h2 className="crm-h2">Sites conectados <span className="subtle">{sites.length}</span></h2>
-        <button className="btn btn-primary btn-sm" onClick={novo}><Plus aria-hidden /> Conectar site</button>
-      </div>
-
       <ContaGoogle email={contaGoogle} />
+
+      <h2 className="crm-h2">Sites conectados <span className="subtle">{sites.length}</span></h2>
 
       {sites.length ? (
         <div className="crm-sites">
-          {sites.map((st) => (
-            <article key={st.id} className="panel crm-site spotlight" data-ativo={st.ativo} data-enter="scale">
-              <header className="crm-site-topo">
-                <span className="wa-avatar"><Globe size={18} aria-hidden /></span>
-                <span className="stack" style={{ gap: 2, minWidth: 0, flex: 1 }}>
-                  <b className="crm-trunc">{st.nome}</b>
-                  <span className="subtle caption crm-trunc">{st.chave.startsWith("sistema:") ? "Sistema conectado · manda os leads pela API" : st.dominios.length ? st.dominios.join(", ") : "qualquer domínio (preencha!)"}</span>
-                </span>
-                <span className="chip" style={{ height: 24 }}><span className={`dot ${st.ativo ? "on" : ""}`} aria-hidden />{st.ativo ? "Ativo" : "Pausado"}</span>
-              </header>
-              <div className="crm-site-nums">
-                <span><b>{st.leads}</b><small>lead(s)</small></span>
-                <span suppressHydrationWarning><b>{st.ultimo_lead ? ha(st.ultimo_lead).replace("há ", "") : "—"}</b><small>último lead</small></span>
-              </div>
-              <p className="crm-site-msg">“{preencherModelo(st.mensagem_inicial, { nome: "Maria Souza", numero: "", site: st.nome })}”</p>
-              <footer className="crm-site-acoes">
-                {st.chave.startsWith("sistema:") ? <span className="chip" style={{ height: 24 }}><Plug aria-hidden /> Via API</span>
-                  : <button className="btn btn-secondary btn-xs" onClick={() => setCodigo(st)}><Code2 aria-hidden /> Código</button>}
-                {(st.ga4_propriedade || st.gsc_site || (st.dominios.length > 0 && !st.chave.startsWith("sistema:"))) && <Link className="btn btn-secondary btn-xs" href={`/crm/sites/${st.id}`}><BarChart3 aria-hidden /> Estatísticas</Link>}
-                <span style={{ flex: 1 }} />
-                <button className="btn btn-ghost btn-xs" title={st.ativo ? "Pausar: o formulário para de aceitar leads" : "Reativar o formulário"} onClick={async () => {
-                  const r = await alternarSite(st.id, !st.ativo);
-                  if (!r.ok) toast.err(r.error); else router.refresh();
-                }}>{st.ativo ? <><Pause aria-hidden /> Pausar</> : <><Play aria-hidden /> Ativar</>}</button>
-                <button className="btn btn-ghost btn-xs" aria-label={`Editar ${st.nome}`} onClick={() => setEdit({ id: st.id, nome: st.nome, dominios: st.dominios.join(", "), mensagem_inicial: st.mensagem_inicial, ga4: st.ga4_propriedade ?? "", gsc: st.gsc_site ?? "" })}><Pencil aria-hidden /></button>
-                <button className="btn btn-ghost btn-xs" aria-label={`Apagar ${st.nome}`} onClick={async () => {
-                  if (!(await confirmar(`Apagar o site “${st.nome}”? O formulário dele para de funcionar; os leads que já chegaram continuam no CRM.`))) return;
-                  const r = await apagarSite(st.id);
-                  if (!r.ok) toast.err(r.error); else router.refresh();
-                }}><Trash2 aria-hidden /></button>
-              </footer>
-            </article>
-          ))}
+          {sites.map((st) => {
+            const api = st.chave.startsWith("sistema:");
+            const stats = !!(st.ga4_propriedade || st.gsc_site || st.dominios.length);
+            return (
+              <article key={st.id} className="panel crm-site spotlight" data-ativo={st.ativo} data-enter="scale">
+                <header className="crm-site-topo">
+                  <span className="wa-avatar">{api ? <Plug size={18} aria-hidden /> : <Globe size={18} aria-hidden />}</span>
+                  <span className="stack" style={{ gap: 2, minWidth: 0, flex: 1 }}>
+                    <b className="crm-trunc">{st.nome}</b>
+                    <span className="subtle caption crm-trunc">{st.dominios.length ? st.dominios.join(", ") : api ? "sem domínio" : "qualquer domínio (preencha!)"}</span>
+                  </span>
+                  <span className="chip" style={{ height: 24, flex: "none" }}><span className={`dot ${st.ativo ? "on" : ""}`} aria-hidden />{st.ativo ? "Ativo" : "Pausado"}</span>
+                </header>
+                <div className="crm-site-nums">
+                  <span><b>{st.leads}</b><small>lead(s)</small></span>
+                  <span suppressHydrationWarning><b>{st.ultimo_lead ? ha(st.ultimo_lead).replace("há ", "") : "—"}</b><small>último lead</small></span>
+                </div>
+                <div className="crm-site-fontes">
+                  <span className="crm-site-fonte" data-on={api}><Plug size={13} aria-hidden /> {api ? "Leads pela API" : "Formulário"}</span>
+                  <span className="crm-site-fonte" data-on={!!st.ga4_propriedade} title={st.ga4_propriedade ? `Propriedade ${st.ga4_propriedade}` : "Sem GA4: cadastre o ID ao editar"}>
+                    <GoogleAnalyticsLogo size={13} /> {st.ga4_propriedade ? "Analytics" : "Sem Analytics"}
+                  </span>
+                  <span className="crm-site-fonte" data-on={!!(st.gsc_site || st.dominios.length)} title={st.gsc_site ?? (st.dominios.length ? "Achado sozinho pelo domínio" : "Cadastre o domínio")}>
+                    <SearchConsoleLogo size={13} /> {st.gsc_site ? "Search Console" : st.dominios.length ? "Search Console · auto" : "Sem Search Console"}
+                  </span>
+                </div>
+                {!api && <p className="crm-site-msg">“{preencherModelo(st.mensagem_inicial, { nome: "Maria Souza", numero: "", site: st.nome })}”</p>}
+                <footer className="crm-site-acoes">
+                  {stats && <Link className="btn btn-primary btn-xs" href={`/crm/sites/${st.id}`}><BarChart3 aria-hidden /> Estatísticas</Link>}
+                  {!api && <button className="btn btn-secondary btn-xs" onClick={() => setCodigo(st)}><Code2 aria-hidden /> Código</button>}
+                  <span className="crm-site-icones">
+                    <button className="btn btn-ghost btn-xs" title={st.ativo ? "Pausar: para de aceitar leads" : "Reativar"} aria-label={st.ativo ? `Pausar ${st.nome}` : `Ativar ${st.nome}`} onClick={async () => {
+                      const r = await alternarSite(st.id, !st.ativo);
+                      if (!r.ok) toast.err(r.error); else router.refresh();
+                    }}>{st.ativo ? <Pause aria-hidden /> : <Play aria-hidden />}</button>
+                    <button className="btn btn-ghost btn-xs" title="Editar" aria-label={`Editar ${st.nome}`} onClick={() => setEdit({ id: st.id, nome: st.nome, dominios: st.dominios.join(", "), mensagem_inicial: st.mensagem_inicial, ga4: st.ga4_propriedade ?? "", gsc: st.gsc_site ?? "" })}><Pencil aria-hidden /></button>
+                    <button className="btn btn-ghost btn-xs" title="Apagar" aria-label={`Apagar ${st.nome}`} onClick={async () => {
+                      if (!(await confirmar(`Apagar o site “${st.nome}”? ${api ? "O sistema para de conseguir mandar leads" : "O formulário dele para de funcionar"}; os leads que já chegaram continuam no CRM.`))) return;
+                      const r = await apagarSite(st.id);
+                      if (!r.ok) toast.err(r.error); else router.refresh();
+                    }}><Trash2 aria-hidden /></button>
+                  </span>
+                </footer>
+              </article>
+            );
+          })}
         </div>
       ) : (
         <div className="panel wa-vazio" style={{ padding: "48px 16px" }}>
@@ -227,46 +249,113 @@ function GscCampo({ valor, mudar }: { valor: string; mudar: (v: string) => void 
   );
 }
 
-/** Conta de serviço do Google: uma chave só lê o GA4 e o Search Console de todos os sites que derem acesso ao e-mail dela. */
+const PASSOS_GOOGLE: { t: string; d: string; links: [string, string][] }[] = [
+  { t: "Ative as 2 APIs", d: "No projeto do Google Cloud, clique em Ativar em cada uma.", links: [
+    ["Analytics Data API", "https://console.cloud.google.com/apis/library/analyticsdata.googleapis.com"],
+    ["Search Console API", "https://console.cloud.google.com/apis/library/searchconsole.googleapis.com"]] },
+  { t: "Crie a conta de serviço", d: "Só o nome (ex.: adpilot-estatisticas). Pule a etapa de papéis e conclua.", links: [["Criar conta de serviço", "https://console.cloud.google.com/iam-admin/serviceaccounts/create"]] },
+  { t: "Baixe a chave JSON", d: "Na conta criada: aba Chaves → Adicionar chave → Criar nova chave → JSON.", links: [["Contas de serviço", "https://console.cloud.google.com/iam-admin/serviceaccounts"]] },
+  { t: "Dê acesso nos sites", d: "Com o e-mail da conta: Leitor no GA4 (Gerenciamento de acesso) e Restrito no Search Console (Usuários e permissões).", links: [
+    ["Google Analytics", "https://analytics.google.com/analytics/web/"], ["Search Console", "https://search.google.com/search-console/users"]] },
+];
+
+/** Conta de serviço do Google: uma chave lê o GA4 e o Search Console de todos os sites que derem acesso ao e-mail dela (só leitura). */
 function ContaGoogle({ email }: { email: string | null }) {
   const router = useRouter();
+  const [aberto, setAberto] = useState(!email);
   const [json, setJson] = useState("");
+  const [colar, setColar] = useState(false);
+  const [arrastando, setArrastando] = useState(false);
   const [pend, start] = useTransition();
+  const lida = (() => {
+    if (!json.trim()) return null;
+    try {
+      const j = JSON.parse(json) as { type?: string; client_email?: string; private_key?: string; project_id?: string };
+      return j.type === "service_account" && j.client_email && j.private_key ? { email: j.client_email, projeto: j.project_id ?? "" } : { erro: "Não é a chave JSON de uma conta de serviço" };
+    } catch { return { erro: "JSON incompleto: copie o arquivo inteiro" }; }
+  })();
+  const arquivo = async (f: File | undefined) => {
+    if (!f) return;
+    if (f.size > 20_000) return void toast.err("Arquivo grande demais para ser a chave");
+    setJson(await f.text());
+  };
   const salvar = (v: string | null) => start(async () => {
     const r = await salvarContaGoogle(v);
     if (!r.ok) return void toast.err(r.error);
-    setJson("");
+    setJson(""); setColar(false); setAberto(false);
     toast.ok(v ? "Conta Google validada e salva" : "Conta Google removida");
     router.refresh();
   });
+
   return (
-    <section className="panel" style={{ padding: 16, display: "grid", gap: 12 }} data-enter>
-      <div className="cluster" style={{ gap: 10 }}>
-        <span className="wa-avatar"><KeyRound size={18} aria-hidden /></span>
-        <span className="stack" style={{ gap: 2, flex: 1, minWidth: 0 }}>
-          <b>Estatísticas: Google Analytics e Search Console</b>
-          <span className="subtle caption">{email ? <>Conta conectada. Dê acesso a <b style={{ wordBreak: "break-all" }}>{email}</b> em cada site.</> : "Conecte uma conta de serviço do Google para ver as visitas e as buscas de cada site (só leitura)."}</span>
+    <section className="panel gc" data-enter>
+      <div className="gc-topo">
+        <span className="gc-logos"><span><GoogleAnalyticsLogo size={22} /></span><span><SearchConsoleLogo size={22} /></span></span>
+        <span className="stack" style={{ gap: 3, flex: 1, minWidth: 0 }}>
+          <b className="gc-titulo">Google Analytics e Search Console</b>
+          <span className="subtle small">Visitas e buscas de cada site, só leitura, por uma conta de serviço do Google.</span>
         </span>
-        {email && <button className="btn btn-ghost btn-xs" onClick={async () => { await navigator.clipboard.writeText(email); toast.ok("E-mail copiado"); }}><Copy aria-hidden /> Copiar e-mail</button>}
-        {email && <button className="btn btn-ghost btn-xs" disabled={pend} onClick={async () => { if (await confirmar("Remover a conta Google? As estatísticas dos sites param de carregar.")) salvar(null); }}><Trash2 aria-hidden /> Remover</button>}
+        <span className="chip" style={{ height: 26, flex: "none" }}><span className={`dot ${email ? "on" : ""}`} aria-hidden />{email ? "Conectado" : "Não conectado"}</span>
       </div>
-      <details>
-        <summary className="subtle small" style={{ cursor: "pointer" }}>{email ? "Trocar a chave ou ver o passo a passo" : "Passo a passo (5 min)"}</summary>
-        <ol className="small" style={{ margin: "10px 0", paddingLeft: 20, display: "grid", gap: 4 }}>
-          <li>No <a href="https://console.cloud.google.com/apis/library" target="_blank" rel="noreferrer">Google Cloud</a>, ative a <b>Google Analytics Data API</b> e a <b>Google Search Console API</b> no projeto.</li>
-          <li>Em IAM → <b>Contas de serviço</b>, crie uma conta (sem papel). Em Chaves → Adicionar chave → <b>JSON</b>: baixa um arquivo.</li>
-          <li>Abra o arquivo, copie tudo e cole abaixo (só aqui: a chave fica cifrada no banco, nunca volta para a tela).</li>
-          <li>No GA4 de cada site: Administrador → Gerenciamento de acesso à propriedade → + → e-mail da conta → <b>Leitor</b>.</li>
-          <li>No Search Console: Configurações → Usuários e permissões → Adicionar usuário → e-mail da conta → <b>Restrito</b>.</li>
-        </ol>
-        <div className="stack" style={{ gap: 8 }}>
-          <textarea className="input" rows={4} style={{ height: "auto", paddingBlock: 10, fontFamily: "var(--font-mono, monospace)", fontSize: 12 }} spellCheck={false} autoComplete="off"
-            placeholder='{ "type": "service_account", "client_email": "...", "private_key": "..." }' aria-label="Chave JSON da conta de serviço" value={json} onChange={(e) => setJson(e.target.value)} />
-          <div className="cluster" style={{ justifyContent: "flex-end" }}>
-            <button className="btn btn-primary btn-sm" disabled={pend || json.trim().length < 50} onClick={() => salvar(json)}>{pend ? <Loader2 className="animate-spin" aria-hidden /> : "Validar e salvar"}</button>
-          </div>
+
+      {email && (
+        <div className="gc-email">
+          <KeyRound size={16} aria-hidden />
+          <span className="stack" style={{ gap: 1, minWidth: 0, flex: 1 }}>
+            <span className="subtle caption">E-mail da conta: dê acesso a ele em cada site (Leitor no GA4, Restrito no Search Console)</span>
+            <code className="crm-trunc">{email}</code>
+          </span>
+          <button className="btn btn-secondary btn-xs" onClick={async () => { await navigator.clipboard.writeText(email); toast.ok("E-mail copiado"); }}><Copy aria-hidden /> Copiar</button>
+          <button className="btn btn-ghost btn-xs" onClick={() => setAberto((a) => !a)}>{aberto ? "Fechar" : "Trocar chave"}</button>
+          <button className="btn btn-ghost btn-xs" disabled={pend} aria-label="Remover conta Google" title="Remover" onClick={async () => { if (await confirmar("Remover a conta Google? As estatísticas dos sites param de carregar.")) salvar(null); }}><Trash2 aria-hidden /></button>
         </div>
-      </details>
+      )}
+
+      {aberto && (
+        <div className="gc-corpo">
+          <ol className="gc-passos">
+            {PASSOS_GOOGLE.map((p, i) => (
+              <li key={p.t}>
+                <span className="gc-n">{i + 1}</span>
+                <b>{p.t}</b>
+                <span className="subtle caption">{p.d}</span>
+                <span className="gc-links">{p.links.map(([l, h]) => <a key={h} href={h} target="_blank" rel="noreferrer">{l} <ExternalLink size={11} aria-hidden /></a>)}</span>
+              </li>
+            ))}
+          </ol>
+
+          {lida && "email" in lida ? (
+            <div className="gc-pronta">
+              <span className="gc-pronta-ic"><FileJson size={20} aria-hidden /></span>
+              <span className="stack" style={{ gap: 1, minWidth: 0, flex: 1 }}>
+                <b>Chave pronta{lida.projeto ? ` · projeto ${lida.projeto}` : ""}</b>
+                <code className="subtle caption crm-trunc">{lida.email}</code>
+              </span>
+              <button className="btn btn-ghost btn-xs" onClick={() => setJson("")}>Trocar</button>
+              <button className="btn btn-primary btn-sm" disabled={pend} onClick={() => salvar(json)}>{pend ? <Loader2 className="animate-spin" aria-hidden /> : <><ShieldCheck aria-hidden /> Validar e salvar</>}</button>
+            </div>
+          ) : colar ? (
+            <div className="stack" style={{ gap: 8 }}>
+              <textarea className="input gc-colar" rows={5} spellCheck={false} autoComplete="off" autoFocus
+                placeholder='{ "type": "service_account", "client_email": "...", "private_key": "..." }' aria-label="Conteúdo da chave JSON" value={json} onChange={(e) => setJson(e.target.value)} />
+              <div className="cluster" style={{ justifyContent: "space-between" }}>
+                {lida && "erro" in lida ? <span className="error-text small">{lida.erro}</span> : <span />}
+                <button className="btn btn-ghost btn-xs" onClick={() => { setColar(false); setJson(""); }}>Enviar o arquivo</button>
+              </div>
+            </div>
+          ) : (
+            <label className="gc-drop" data-arrastando={arrastando}
+              onDragOver={(e) => { e.preventDefault(); setArrastando(true); }} onDragLeave={() => setArrastando(false)}
+              onDrop={(e) => { e.preventDefault(); setArrastando(false); void arquivo(e.dataTransfer.files[0]); }}>
+              <input type="file" accept=".json,application/json" className="sr-only" onChange={(e) => void arquivo(e.target.files?.[0])} />
+              <Upload size={22} aria-hidden />
+              <b>Arraste o arquivo .json da chave aqui</b>
+              <span className="subtle caption">ou clique para escolher · <button type="button" className="gc-link" onClick={(e) => { e.preventDefault(); setColar(true); }}>colar o conteúdo</button></span>
+              <span className="subtle caption"><ShieldCheck size={12} aria-hidden style={{ verticalAlign: -2 }} /> Fica cifrada no banco e nunca volta para a tela.</span>
+            </label>
+          )}
+        </div>
+      )}
     </section>
   );
 }
