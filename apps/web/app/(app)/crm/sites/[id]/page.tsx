@@ -34,7 +34,7 @@ export default async function EstatisticasSitePage({ params, searchParams }: { p
   const tk = typeof token === "string" ? token : null;
   const [ga, gsc, [leads]] = await Promise.all([
     site.ga4_propriedade && tk ? relatorioGa4(tk, site.ga4_propriedade, dias).catch((e: Error) => e) : null,
-    site.gsc_site && tk ? relatorioGsc(tk, site.gsc_site, dias).catch((e: Error) => e) : null,
+    site.gsc_site && tk ? relatorioGsc(tk, site.gsc_site, dias, site.dominios).catch((e: Error) => e) : null,
     sql<{ atual: number; anterior: number }[]>`
       select count(*) filter (where lead_em >= ${atual.ini}::date and lead_em < ${atual.fim}::date + 1)::int as atual,
              count(*) filter (where lead_em >= ${anterior.ini}::date and lead_em < ${anterior.fim}::date + 1)::int as anterior
@@ -63,7 +63,7 @@ export default async function EstatisticasSitePage({ params, searchParams }: { p
         {ga && !(ga instanceof Error) && <Visitas ga={ga} leads={leads ?? { atual: 0, anterior: 0 }} dias={dias} />}
       </Secao>
 
-      <Secao titulo="Buscas no Google" fonte="Search Console · dados até 2 dias atrás" vazio={!site.gsc_site ? "Cadastre o site do Search Console (CRM → Sites → editar)." : null} erro={gsc instanceof Error ? gsc.message : null}>
+      <Secao titulo="Buscas no Google" fonte={`Search Console · dados até 2 dias atrás${site.dominios.length ? ` · só ${site.dominios.join(", ")}` : ""}`} vazio={!site.gsc_site ? "Cadastre o site do Search Console (CRM → Sites → editar)." : null} erro={gsc instanceof Error ? gsc.message : null}>
         {gsc && !(gsc instanceof Error) && <Buscas gsc={gsc} dias={dias} />}
       </Secao>
     </div>

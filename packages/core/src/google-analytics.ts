@@ -142,12 +142,24 @@ export interface RelatorioGsc {
 }
 type LinhaGsc = { keys?: string[]; clicks: number; impressions: number; ctr: number; position: number };
 
-export async function relatorioGsc(token: string, site: string, dias: number): Promise<RelatorioGsc> {
+/**
+ * Regex (RE2) das páginas dos domínios do site: o domínio exato ou com www., sem outros subdomínios.
+ * Uma propriedade de domínio (sc-domain:) cobre todos os subdomínios; isto separa, ex., digitaldomus.com.br de siaplus.digitaldomus.com.br.
+ */
+export function filtroPaginas(dominios: string[]): string | null {
+  if (!dominios.length) return null;
+  const hosts = dominios.map((d) => d.replace(/^www\./, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+  return `^https?://(www\\.)?(${hosts})([/:?#]|$)`;
+}
+
+export async function relatorioGsc(token: string, site: string, dias: number, dominios: string[] = []): Promise<RelatorioGsc> {
   // o Search Console fecha os dados com ~2 dias de atraso: o período termina 2 dias atrás
   const { atual, anterior } = periodos(dias, 2);
   const url = `https://searchconsole.googleapis.com/webmasters/v3/sites/${encodeURIComponent(site)}/searchAnalytics/query`;
+  const regex = filtroPaginas(dominios);
+  const filtro = regex ? { dimensionFilterGroups: [{ filters: [{ dimension: "page", operator: "includingRegex", expression: regex }] }] } : {};
   const q = (p: { ini: string; fim: string }, dimensions: string[] = [], rowLimit = 10) =>
-    chamar<{ rows?: LinhaGsc[] }>(token, url, { startDate: p.ini, endDate: p.fim, dimensions, rowLimit }, "Search Console").then((r) => r.rows ?? []);
+    chamar<{ rows?: LinhaGsc[] }>(token, url, { startDate: p.ini, endDate: p.fim, dimensions, rowLimit, ...filtro }, "Search Console").then((r) => r.rows ?? []);
   const [tA, tB, dia, buscas, paginas] = await Promise.all([q(atual), q(anterior), q(atual, ["date"], 400), q(atual, ["query"]), q(atual, ["page"])]);
   const tot = (l?: LinhaGsc): TotaisGsc => ({ cliques: l?.clicks ?? 0, impressoes: l?.impressions ?? 0, ctr: l?.ctr ?? 0, posicao: l?.position ?? 0 });
   const item = (l: LinhaGsc) => ({ nome: l.keys?.[0] ?? "", cliques: l.clicks, impressoes: l.impressions, ctr: l.ctr, posicao: l.position });
