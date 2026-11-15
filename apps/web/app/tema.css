@@ -361,3 +361,20 @@ body { background: #030205; }
   .cal-grade:not(:has(.cal-dia[data-tem="true"]))::after { content: "Nada programado neste mês. Use “Planejar período” para a IA sugerir os posts.";
     display: block; padding: 28px 18px; text-align: center; font-size: 13px; color: rgb(var(--c-text-tertiary)); }
 }
+
+/* ── celular: menu lateral deslizando, sheets dos menus do topo, campos sem zoom ── */
+@media (max-width: 900px) {
+  .sidebar, .sidebar[data-open="true"] {
+    display: flex; position: fixed; inset: 0 auto 0 0; width: 260px; z-index: var(--z-overlay);
+    transform: translateX(-105%); visibility: hidden;
+    transition: transform 0.42s var(--ease-cm), visibility 0s linear 0.42s;
+  }
+  .sidebar[data-open="true"] { transform: none; visibility: visible; transition: transform 0.42s var(--ease-cm), visibility 0s; }
+  .sb-fundo { position: fixed; inset: 0; z-index: 90; background: rgb(0 0 0 / 0.55); backdrop-filter: blur(6px); opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+  .sb-fundo[data-open="true"] { opacity: 1; pointer-events: auto; }
+  .pop-fundo { place-items: end center; padding: 12px 12px calc(12px + env(safe-area-inset-bottom)); }
+  .menu.menu-folha { position: relative; width: 100%; max-width: 560px; max-height: 82dvh; overflow-y: auto; border-radius: var(--radius-xl); }
+  /* iOS dá zoom em campo com fonte < 16px */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select { font-size: 16px !important; }
+}
+@media (max-width: 900px) and (prefers-reduced-motion: reduce) { .sidebar, .sb-fundo { transition: none !important; } }

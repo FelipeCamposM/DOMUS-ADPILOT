@@ -63,7 +63,7 @@ export function Shell(p: ShellProps) {
     <>
     <div className="shell">
       <Sidebar pendentes={p.notificacoes.acoes.length} open={mobile} />
-      {mobile && <div className="overlay only-mobile" style={{ zIndex: 90 }} onClick={() => setMobile(false)} />}
+      <div className="sb-fundo only-mobile" data-open={mobile} onClick={() => setMobile(false)} />
       <div className="main">
         <header className="topbar">
 
