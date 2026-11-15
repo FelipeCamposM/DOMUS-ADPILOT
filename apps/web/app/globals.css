@@ -1712,10 +1712,9 @@ fieldset:disabled label.chave { opacity: 0.6; cursor: default; }
 @keyframes crm-chama { 50% { transform: scale(1.18) rotate(-6deg); } }
 .crm-card-acoes { margin-left: auto; display: flex; gap: 2px; opacity: 0.55; transition: opacity var(--dur-fast); }
 .crm-card:hover .crm-card-acoes, .crm-card:focus-within .crm-card-acoes { opacity: 1; }
-.crm-icone { position: relative; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 7px; color: rgb(var(--c-text-secondary)); cursor: pointer; transition: background var(--dur-fast), color var(--dur-fast); }
+.crm-icone { position: relative; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 7px; color: rgb(var(--c-text-secondary)); cursor: pointer; border: 0; padding: 0; background: none; font: inherit; transition: background var(--dur-fast), color var(--dur-fast); }
 .crm-icone:hover { color: rgb(var(--e)); background: rgb(var(--e) / 0.14); }
 .crm-icone svg { width: 14px; height: 14px; }
-.crm-icone select { position: absolute; inset: 0; opacity: 0; cursor: pointer; font-size: 16px; }
 
 /* editor das colunas */
 .crm-previa { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -1821,7 +1820,6 @@ fieldset:disabled label.chave { opacity: 0.6; cursor: default; }
 .crm-barra-dir { display: inline-flex; gap: 8px; margin-left: auto; }
 .crm-ordem { font-weight: 600; }
 .crm-ordem .subtle { font-weight: 500; }
-.crm-ordem select { position: absolute; inset: 0; opacity: 0; cursor: pointer; font-size: 16px; }
 .crm-salvos-btn { max-width: 260px; }
 .crm-salvos-btn[data-favorito="true"] { border-color: rgb(var(--c-warning) / 0.5); background: linear-gradient(90deg, rgb(var(--c-warning) / 0.14), transparent 70%), rgb(var(--c-bg-surface)); }
 .crm-estrela-on { color: rgb(var(--c-warning)) !important; fill: currentColor; filter: drop-shadow(0 0 5px rgb(var(--c-warning) / 0.8)); }
@@ -3103,3 +3101,4 @@ li[data-estado="feito"] .pp-aviso-txt b { color: rgb(var(--c-text-secondary)); }
 .dialog.dialog-lado { width: min(440px, 100vw); height: 100dvh; max-height: none; border-radius: 24px 0 0 24px; border-right: 0; }
 .dialog-lado .dialog-body { flex: 1; }
 .dialog-lado .crm-mf-pe { margin-top: auto; }
+.crm-col-mais { height: 1px; flex: none; }

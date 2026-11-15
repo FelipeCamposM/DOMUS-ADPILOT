@@ -15,6 +15,7 @@ import { entrar, reduzido } from "../motion/entrar";
 import { confirmar } from "../shell/confirmar";
 import { Dialog } from "../shell/Dialog";
 import { Popover } from "../shell/Popover";
+import { Seletor } from "../shell/Seletor";
 import { toast } from "../shell/toast";
 import { apagarFiltro, criarLead, definirEtapa, definirValor, favoritarFiltro, salvarFiltro } from "./actions";
 import { EditarFunil } from "./EditarFunil";
@@ -37,6 +38,8 @@ const SITUACOES: Record<FiltrosCrm["situacao"], string> = {
   todas: "Todas", esperando: "Sua vez de responder", esfriando: "Esfriando (+6 h)", respondeu: "Já responderam", silencio: "Nunca responderam", parado: "Parados (+7 dias)",
 };
 const ORDENS: Record<FiltrosCrm["ordem"], string> = { recentes: "Mais recentes", antigos: "Mais antigos", valor: "Maior valor", parado: "Mais tempo parado", nome: "Nome (A–Z)" };
+const OPCOES_ORDEM = Object.entries(ORDENS).map(([valor, rotulo]) => ({ valor, rotulo }));
+const POR_VEZ = 10; // cartões por coluna; mais aparecem ao rolar (o total no topo é o real)
 const VALORES: Record<FiltrosCrm["valor"], string> = { todos: "Com ou sem valor", com: "Com valor", sem: "Sem valor" };
 const PADRAO = filtroCrmSchema.parse({});
 const janelaDe = (p: FiltrosCrm["periodo"]) => PERIODOS.find((x) => x[0] === p)![2];
@@ -86,6 +89,7 @@ export function Leads({ leads, etapas, sites, salvos }: { leads: Lead[]; etapas:
   const [lista, setLista] = useState(leads);
   useEffect(() => setLista(leads), [leads]);
   // abre com o filtro favorito aplicado
+  const [limites, setLimites] = useState<Record<string, number>>({});
   const [f, setF] = useState<FiltrosCrm>(() => salvos.find((x) => x.favorito)?.filtros ?? PADRAO);
   const mudar = (p: Partial<FiltrosCrm>) => setF((x) => ({ ...x, ...p }));
   const [modalFiltros, setModalFiltros] = useState(false);
@@ -286,11 +290,8 @@ export function Leads({ leads, etapas, sites, salvos }: { leads: Lead[]; etapas:
           <SlidersHorizontal aria-hidden /> Filtros{ativos ? <span className="crm-n">{ativos}</span> : null}
         </button>
         <span className="crm-barra-dir">
-          <label className="crm-btn crm-ordem"><span className="subtle">Ordenar:</span> {ORDENS[f.ordem]}<ChevronDown aria-hidden />
-            <select value={f.ordem} onChange={(e) => mudar({ ordem: e.target.value as FiltrosCrm["ordem"] })} aria-label="Ordenar">
-              {Object.entries(ORDENS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-            </select>
-          </label>
+          <Seletor valor={f.ordem} opcoes={OPCOES_ORDEM} onChange={(v) => mudar({ ordem: v as FiltrosCrm["ordem"] })} ariaLabel="Ordenar" className="crm-btn crm-ordem"
+            gatilho={<><span className="subtle">Ordenar:</span> {ORDENS[f.ordem]}<ChevronDown aria-hidden /></>} />
           <button className="crm-btn" onClick={() => setFunil(true)}><Settings2 aria-hidden /> Colunas</button>
         </span>
       </div>
@@ -326,10 +327,11 @@ export function Leads({ leads, etapas, sites, salvos }: { leads: Lead[]; etapas:
                 <span className="crm-col-prog"><span style={{ width: `${(itens.length / total) * 100}%` }} /></span>
               </header>
               <div className="crm-col-lista">
-                {itens.map((l) => (
+                {itens.slice(0, limites[e.chave] ?? POR_VEZ).map((l) => (
                   <Cartao key={l.numero} l={l} aberto={aberto(l)} etapas={etapas} solto={solto === l.numero} arrastando={arrastando === l.numero}
                     onArrastar={setArrastando} mover={mover} abrir={() => setDetalhe(l.numero)} />
                 ))}
+                {itens.length > (limites[e.chave] ?? POR_VEZ) && <MaisAoRolar mais={() => setLimites((x) => ({ ...x, [e.chave]: (x[e.chave] ?? POR_VEZ) + POR_VEZ }))} />}
                 {!itens.length && <div className="crm-col-vazio">{arrastando ? "Solte aqui" : "Nenhum lead"}</div>}
               </div>
             </section>
@@ -456,6 +458,17 @@ function ModalFiltros({ inicial, origens, sites, contar, aplicar, fechar }: {
     </Dialog>
   );
 }
+/** Paginação invisível: quando o fim da coluna chega perto da tela, mostra mais cartões. */
+function MaisAoRolar({ mais }: { mais: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    // observa de novo a cada render: se ainda estiver visível depois de carregar, carrega mais
+    const o = new IntersectionObserver(([x]) => { if (x?.isIntersecting) mais(); }, { rootMargin: "300px" });
+    o.observe(ref.current!);
+    return () => o.disconnect();
+  });
+  return <div ref={ref} className="crm-col-mais" aria-hidden />;
+}
 function Bloco({ titulo, icone, dica, children }: { titulo: string; icone: ReactNode; dica?: string; children: ReactNode }) {
   return (
     <fieldset className="crm-mf-grupo">
@@ -500,13 +513,8 @@ function Cartao({ l, aberto, etapas, solto, arrastando, onArrastar, mover, abrir
         <Situacao l={l} aberto={aberto} vez={vez} frio={frio} />
         <span className="crm-card-acoes" onClick={parar} onKeyDown={parar}>
           <Link href={`/crm?c=${l.numero}`} className="crm-icone crm-icone-wa" aria-label={`Conversar com ${l.nome} no WhatsApp`} title="Abrir conversa no WhatsApp" draggable={false}><WhatsappIcon aria-hidden /></Link>
-          <label className="crm-icone" title="Mover para…">
-            <ArrowRightLeft aria-hidden />
-            <select value={l.etapa} onChange={(e) => mover(l.numero, e.target.value || null)} aria-label={`Mover ${l.nome} para`}>
-              {etapas.map((e) => <option key={e.chave} value={e.chave}>{e.nome}</option>)}
-              <option value="">Tirar do funil</option>
-            </select>
-          </label>
+          <Seletor valor={l.etapa ?? ""} opcoes={[...etapas.map((e) => ({ valor: e.chave, rotulo: e.nome })), { valor: "", rotulo: "Tirar do funil" }]}
+            onChange={(v) => mover(l.numero, v || null)} ariaLabel={`Mover ${l.nome} para`} title="Mover para…" className="crm-icone" gatilho={<ArrowRightLeft aria-hidden />} />
         </span>
       </footer>
     </article>
