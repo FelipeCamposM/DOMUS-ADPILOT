@@ -65,3 +65,27 @@ export const WhatsappIcon = createLucideIcon("whatsapp", [
   ["path", { d: "M3 21l1.65 -3.8a9 9 0 1 1 3.4 2.9l-5.05 .9", key: "b" }],
   ["path", { d: "M9 10a.5 .5 0 0 0 1 0v-1a.5 .5 0 0 0 -1 0v1a5 5 0 0 0 5 5h1a.5 .5 0 0 0 0 -1h-1a.5 .5 0 0 0 0 1", key: "f" }],
 ]);
+
+/** Google Analytics: as três barras da marca (laranja e âmbar oficiais). */
+export function GoogleAnalyticsLogo({ size = 28 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 48 48" width={size} height={size} aria-hidden>
+      <rect x="31" y="3" width="13" height="42" rx="6.5" fill="#F9AB00" />
+      <rect x="17.5" y="18" width="13" height="27" rx="6.5" fill="#E37400" />
+      <circle cx="10.5" cy="38.5" r="6.5" fill="#E37400" />
+    </svg>
+  );
+}
+
+/** Google Search Console: a janela com a lupa, nas cores da marca. */
+export function SearchConsoleLogo({ size = 28 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 48 48" width={size} height={size} aria-hidden>
+      <rect x="3" y="6" width="36" height="30" rx="4" fill="#C6DAFC" />
+      <path d="M3 10a4 4 0 0 1 4-4h28a4 4 0 0 1 4 4v3H3z" fill="#4285F4" />
+      <circle cx="28" cy="29" r="9" fill="#fff" stroke="#4285F4" strokeWidth="4.5" />
+      <path d="M34.5 35.5 43 44" stroke="#1A73E8" strokeWidth="6" strokeLinecap="round" />
+      <path d="M24 29.5l3 3 5.5-6" fill="none" stroke="#34A853" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
