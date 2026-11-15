@@ -184,11 +184,7 @@ function EditarSite({ inicial, fechar, criado }: { inicial: Edicao; fechar: () =
             <input id="st-ga4" className="input" inputMode="numeric" value={edit.ga4} maxLength={15} onChange={(e) => mudar({ ga4: e.target.value })} placeholder="Ex.: 412345678" />
             <span className="subtle caption">GA4 → Administrador → Detalhes da propriedade.</span>
           </div>
-          <div className="field" style={{ flex: "1 1 220px" }}>
-            <label className="label" htmlFor="st-gsc">Site no Search Console</label>
-            <input id="st-gsc" className="input" value={edit.gsc} maxLength={200} onChange={(e) => mudar({ gsc: e.target.value })} placeholder="sc-domain:seusite.com.br" />
-            <span className="subtle caption">Propriedade de domínio ou a URL com / no fim.</span>
-          </div>
+          <GscCampo valor={edit.gsc} mudar={(gsc) => mudar({ gsc })} />
         </div>
         {erro && <p className="error-text" role="alert">{erro}</p>}
         <div className="cluster" style={{ justifyContent: "flex-end", gap: 8 }}>
@@ -197,6 +193,37 @@ function EditarSite({ inicial, fechar, criado }: { inicial: Edicao; fechar: () =
         </div>
       </form>
     </Dialog>
+  );
+}
+
+/**
+ * Search Console em 2 partes: o tipo da propriedade (como aparece no seletor dele) e o endereço.
+ * Domínio "digitaldomus.com.br" vira "sc-domain:digitaldomus.com.br"; prefixo de URL ganha a "/" do fim.
+ */
+function GscCampo({ valor, mudar }: { valor: string; mudar: (v: string) => void }) {
+  const [tipo, setTipo] = useState<"dominio" | "url">(/^https?:/i.test(valor) ? "url" : "dominio");
+  const texto = tipo === "dominio" ? valor.replace(/^sc-domain:/, "") : valor;
+  const montar = (t: "dominio" | "url", v: string) => {
+    const s = v.trim();
+    if (!s) return "";
+    if (t === "dominio") return `sc-domain:${s.replace(/^sc-domain:/, "").replace(/^https?:\/\//i, "").replace(/[/?#].*$/, "").toLowerCase()}`;
+    const u = /^https?:\/\//i.test(s) ? s : `https://${s}`;
+    return u.endsWith("/") ? u : `${u}/`;
+  };
+  return (
+    <div className="field" style={{ flex: "1 1 260px" }}>
+      <label className="label" htmlFor="st-gsc">Site no Search Console</label>
+      <div className="cluster" style={{ gap: 6, flexWrap: "nowrap" }}>
+        <select className="select" aria-label="Tipo da propriedade no Search Console" value={tipo} style={{ flex: "none" }}
+          onChange={(e) => { const t = e.target.value as "dominio" | "url"; setTipo(t); mudar(montar(t, texto)); }}>
+          <option value="dominio">Domínio</option>
+          <option value="url">Prefixo de URL</option>
+        </select>
+        <input id="st-gsc" className="input" style={{ minWidth: 0 }} value={texto} maxLength={200} onChange={(e) => mudar(e.target.value ? (tipo === "dominio" ? `sc-domain:${e.target.value}` : e.target.value) : "")}
+          onBlur={() => mudar(montar(tipo, texto))} placeholder={tipo === "dominio" ? "seusite.com.br" : "https://www.seusite.com.br/"} />
+      </div>
+      <span className="subtle caption">{tipo === "dominio" ? "No seletor do Search Console aparece só o endereço (sem https): vale para todos os subdomínios." : "No seletor aparece com https://: vale só para esse endereço."}</span>
+    </div>
   );
 }
 

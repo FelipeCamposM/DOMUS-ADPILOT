@@ -52,7 +52,9 @@ async function chamar<T>(token: string, url: string, body: unknown, nome: string
   });
   const j = (await r.json().catch(() => ({}))) as T & { error?: { message?: string; status?: string } };
   if (!r.ok) {
-    if (r.status === 403) throw new Error(`${nome}: a conta de serviço não tem acesso (adicione o e-mail dela como Leitor) ou a API não está ativada no Google Cloud`);
+    if (r.status === 403) throw new Error(nome.startsWith("GA4")
+      ? "GA4: a conta de serviço não tem acesso. No GA4: Administrador → Gerenciamento de acesso à propriedade → adicione o e-mail dela como Leitor"
+      : "Search Console: a conta de serviço não tem acesso. No Search Console: Configurações → Usuários e permissões → adicione o e-mail dela como Restrito (a propriedade cadastrada tem que ser a mesma: domínio ou prefixo de URL)");
     if (r.status === 404) throw new Error(`${nome}: não encontrado (confira o ID/endereço cadastrado)`);
     throw new Error(`${nome}: ${j.error?.message ?? r.status}`);
   }
