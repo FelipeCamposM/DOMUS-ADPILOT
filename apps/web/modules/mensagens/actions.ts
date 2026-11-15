@@ -1,7 +1,7 @@
 "use server";
 
 import {
-  audit, chaveEtapa, contaServicoSchema, gravarSegredo, tokenGoogle, contatoSchema, db, ETAPA_ENTRADA, etapaCrmSchema, filtroCrmSchema, enqueueJob, etapaSchema, leadSiteSchema, MAX_TEXTO_WA, numeroSchema, templateSchema, tipoMidia, travasPrimeiroContato, whatsappAvisos, workerOnline,
+  audit, TAGS, chaveEtapa, contaServicoSchema, gravarSegredo, tokenGoogle, contatoSchema, db, ETAPA_ENTRADA, etapaCrmSchema, filtroCrmSchema, enqueueJob, etapaSchema, leadSiteSchema, MAX_TEXTO_WA, numeroSchema, templateSchema, tipoMidia, travasPrimeiroContato, whatsappAvisos, workerOnline,
 } from "@domus-ads/core";
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
@@ -141,7 +141,7 @@ const novoLeadSchema = contatoSchema.extend({
   nota: z.string().trim().max(1000, "Observação muito longa").default(""),
 });
 
-/** Lead cadastrado à mão no funil: já vira conversa em Mensagens (contato salvo), com origem "Manual". Nada é enviado. */
+/** Lead cadastrado à mão no funil: já vira conversa em Mensagens (contato salvo), com a tag "manual". Nada é enviado. */
 export async function criarLead(input: unknown) {
   return run(async () => {
     const ctx = await admin();
@@ -151,7 +151,7 @@ export async function criarLead(input: unknown) {
     if (!et) throw new Error("Essa coluna não existe mais. Atualize a página.");
     const [ja] = await sql<{ nome: string }[]>`select nome from ads.whatsapp_contatos where numero = ${l.numero} and etapa is not null`;
     if (ja) throw new Error(`Esse número já está no funil (${ja.nome})`);
-    const dados = { origem: "Manual", ...(l.email && { email: l.email }), ...(l.nota && { mensagem: l.nota }) };
+    const dados = { origem: TAGS.manual, ...(l.email && { email: l.email }), ...(l.nota && { mensagem: l.nota }) };
     await sql.begin(async (tx) => {
       await tx`
         insert into ads.whatsapp_contatos (numero, nome, salvo, etapa, lead_em, etapa_em, lead_valor, lead_dados, created_by)

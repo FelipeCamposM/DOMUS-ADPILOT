@@ -3097,3 +3097,9 @@ li[data-estado="feito"] .pp-aviso-txt b { color: rgb(var(--c-text-secondary)); }
 .crm-site-acoes { flex-wrap: wrap; gap: 6px; margin-top: auto; }
 .crm-site-acoes .btn { white-space: nowrap; }
 .crm-site-icones { display: flex; gap: 2px; margin-left: auto; }
+
+/* Dialog como sheet: desliza da direita e ocupa a altura toda */
+.overlay.overlay-lado { place-items: stretch end; padding: 0; }
+.dialog.dialog-lado { width: min(440px, 100vw); height: 100dvh; max-height: none; border-radius: 24px 0 0 24px; border-right: 0; }
+.dialog-lado .dialog-body { flex: 1; }
+.dialog-lado .crm-mf-pe { margin-top: auto; }

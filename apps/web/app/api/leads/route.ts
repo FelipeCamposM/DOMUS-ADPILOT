@@ -1,4 +1,4 @@
-import { CONSENTIMENTO, db, dominioPermitido, leadSchema } from "@domus-ads/core";
+import { CONSENTIMENTO, TAGS, db, dominioPermitido, leadSchema } from "@domus-ads/core";
 import { registrarLead } from "@/lib/leads";
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
@@ -58,7 +58,7 @@ export async function POST(req: Request) {
     const v = leadSchema.safeParse(b);
     if (!v.success) return responder(400, { erro: v.error.issues[0]?.message ?? "Confira os dados do formulário." });
     const l = v.data;
-    const r = await registrarLead(sql, site, { ...l, consentimento: `${CONSENTIMENTO} (formulário do site ${site.nome})` },
+    const r = await registrarLead(sql, site, { ...l, origem: TAGS.site, consentimento: `${CONSENTIMENTO} (formulário do site ${site.nome})` },
       { ipHash, base: new URL(req.url).origin });
     return responder(r.repetido ? 200 : 201, { whatsapp: r.whatsapp });
   } catch (e) {

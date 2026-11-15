@@ -90,6 +90,12 @@ export const reais = (v: string | number, curto = false) =>
   Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: curto ? 0 : 2, minimumFractionDigits: curto ? 0 : 2 });
 
 export const CONSENTIMENTO = "Aceito ser contatado pelo WhatsApp.";
+
+/** Tag do lead no CRM, sempre no mesmo padrão: minúsculas, sem acento, palavras com hífen ("Teste grátis 24h" → "teste-gratis-24h"). */
+export const tagLead = (t: string) =>
+  t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "sem-tag";
+/** Tags fixas: formulário dos sites, cadastro à mão e prospecção. */
+export const TAGS = { site: "cliente-site", manual: "manual", prospeccao: "prospeccao" } as const;
 const curto = (max: number) => z.string().trim().max(max).optional().catch(undefined);
 
 /** O que o formulário do site manda. Consentimento é obrigatório (LGPD): sem ele o lead não entra. */
@@ -97,11 +103,12 @@ export const leadSchema = z.object({
   nome,
   numero: numeroSchema,
   mensagem: z.string().trim().max(1000, "Mensagem muito longa (até 1000 caracteres)").optional().default(""),
+  email: z.union([z.literal(""), z.email("E-mail inválido").max(200)]).optional(),
   consentimento: z.union([z.literal(true), z.enum(["on", "sim", "true", "1"])], { message: "Marque que aceita ser contatado pelo WhatsApp" }),
   pagina: curto(500),
   utm_source: curto(120), utm_medium: curto(120), utm_campaign: curto(120), utm_term: curto(120), utm_content: curto(120),
 }).transform((l) => ({
-  nome: l.nome, numero: l.numero, mensagem: l.mensagem, pagina: l.pagina || null,
+  nome: l.nome, numero: l.numero, mensagem: l.mensagem, email: l.email || null, pagina: l.pagina || null,
   utm: Object.fromEntries(Object.entries({ source: l.utm_source, medium: l.utm_medium, campaign: l.utm_campaign, term: l.utm_term, content: l.utm_content })
     .filter((e): e is [string, string] => !!e[1])),
 }));

@@ -1,5 +1,5 @@
 import "server-only";
-import { enqueueJob, formatarNumero, linkWhatsapp, numeroSalvo, preencherModelo, whatsappAvisos, type db } from "@domus-ads/core";
+import { enqueueJob, formatarNumero, linkWhatsapp, numeroSalvo, preencherModelo, tagLead, whatsappAvisos, type db } from "@domus-ads/core";
 
 export type SiteDoLead = { id: string; nome: string; mensagem_inicial: string };
 export interface NovoLead {
@@ -16,6 +16,7 @@ const REPETIDO_MIN = 10; // mesmo número no mesmo site: não avisa de novo
  */
 export async function registrarLead(sql: ReturnType<typeof db>, s: SiteDoLead, l: NovoLead, o: { ipHash: string | null; base: string }) {
   const numero = await numeroSalvo(sql, l.numero);
+  if (l.origem) l = { ...l, origem: tagLead(l.origem) }; // a tag do CRM sai sempre no mesmo padrão, venha de onde vier
   const utm = l.utm ?? {};
   // só o que veio preenchido (o merge no banco mantém o resto do envio anterior)
   const dados = { ...(l.mensagem && { mensagem: l.mensagem }), ...(l.pagina && { pagina: l.pagina }), ...(Object.keys(utm).length && { utm }),

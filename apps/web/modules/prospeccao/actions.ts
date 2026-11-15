@@ -1,6 +1,6 @@
 "use server";
 
-import { audit, db, enqueueJob, MAX_TEXTO_WA, normalizarNumero } from "@domus-ads/core";
+import { audit, db, enqueueJob, MAX_TEXTO_WA, normalizarNumero, TAGS } from "@domus-ads/core";
 import { buscaSchema, exportarMarkdown, lerMarkdown, PESO_COLUNA, pesosSchema, whatsappNumber, type ScoreWeights } from "@domus-ads/core/prospeccao";
 import { campanhas, leadsProsp, salvarLeadsProsp } from "@domus-ads/core/prospeccao-db";
 import { revalidatePath } from "next/cache";
@@ -175,7 +175,7 @@ export async function importarMd(texto: string) {
 }
 
 /**
- * "Transformar em lead": o prospect vira contato do CRM (Mensagens) na etapa de entrada, com a origem "Prospecção" e a
+ * "Transformar em lead": o prospect vira contato do CRM (Mensagens) na etapa de entrada, com a tag "prospeccao" e a
  * mensagem sugerida já no campo da conversa, para revisar (ou ajustar com IA) e mandar. Nada é enviado aqui.
  */
 export async function transformarEmLead(idLead: string, mensagem: string) {
@@ -189,7 +189,7 @@ export async function transformarEmLead(idLead: string, mensagem: string) {
     if (!numero) throw new Error("Este lead não tem um telefone válido para o WhatsApp");
     const rascunho = z.string().trim().max(MAX_TEXTO_WA, "Mensagem muito longa").parse(mensagem);
     const nome = l.name.trim().slice(0, 80).padEnd(2, ".");
-    const dados = { origem: "Prospecção", email: l.email || undefined, pagina: l.websiteUrl || null, rascunho, prospeccao: l.id };
+    const dados = { origem: TAGS.prospeccao, email: l.email || undefined, pagina: l.websiteUrl || null, rascunho, prospeccao: l.id };
     await sql.begin(async (tx) => {
       await tx`
         insert into ads.whatsapp_contatos (numero, nome, salvo, etapa, lead_em, etapa_em, lead_dados, created_by)

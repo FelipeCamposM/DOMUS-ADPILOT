@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { contatoSchema, dominioPermitido, formatarNumero, leadSchema, leadSiteSchema, linkWhatsapp, normalizarNumero, preencherModelo, temLink } from "./mensagens";
+import { tagLead, contatoSchema, dominioPermitido, formatarNumero, leadSchema, leadSiteSchema, linkWhatsapp, normalizarNumero, preencherModelo, temLink } from "./mensagens";
 
 test("número: DDD vira +55, estrangeiro com +, lixo é recusado", () => {
   expect(normalizarNumero("(31) 99999-8888")).toBe("5531999998888");
@@ -24,7 +24,7 @@ test("lead: sem consentimento não entra; UTM e página guardados", () => {
   expect(leadSchema.safeParse({ nome: "Ana", numero: "31999998888" }).success).toBe(false);
   expect(leadSchema.safeParse({ nome: "Ana", numero: "31999998888", consentimento: "off" }).success).toBe(false);
   expect(leadSchema.parse({ nome: " Ana Lima ", numero: "(31) 99999-8888", consentimento: "on", pagina: "https://x.com/a", utm_source: "instagram", utm_medium: "" }))
-    .toEqual({ nome: "Ana Lima", numero: "5531999998888", mensagem: "", pagina: "https://x.com/a", utm: { source: "instagram" } });
+    .toEqual({ nome: "Ana Lima", numero: "5531999998888", mensagem: "", email: null, pagina: "https://x.com/a", utm: { source: "instagram" } });
 });
 
 test("domínios do site: subdomínio vale, outro site não", () => {
@@ -42,4 +42,13 @@ test("link do WhatsApp, {site} e detecção de link", () => {
   expect(temLink("veja www.site.com")).toBe(true);
   expect(temLink("acesse castilho.adv.br")).toBe(true);
   expect(temLink("Oi Maria, tudo bem? Vi seu contato.")).toBe(false);
+});
+
+test("tag do lead sempre no mesmo padrão", () => {
+  expect(tagLead("Teste grátis 24h")).toBe("teste-gratis-24h");
+  expect(tagLead("Prospecção")).toBe("prospeccao");
+  expect(tagLead("  Compra no site! ")).toBe("compra-no-site");
+  expect(tagLead("cliente-site")).toBe("cliente-site");
+  expect(tagLead("!!!")).toBe("sem-tag");
+  expect(leadSchema.parse({ nome: "Ana", numero: "62 99999-9999", consentimento: true, email: "" }).email).toBeNull();
 });

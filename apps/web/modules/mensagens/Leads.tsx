@@ -1,11 +1,11 @@
 "use client";
 
-import { ETAPA_ENTRADA, filtroCrmSchema, formatarNumero, reais, type EtapaCrm, type FiltroSalvo, type FiltrosCrm } from "@domus-ads/core/mensagens";
+import { ETAPA_ENTRADA, filtroCrmSchema, formatarNumero, reais, TAGS, tagLead, type EtapaCrm, type FiltroSalvo, type FiltrosCrm } from "@domus-ads/core/mensagens";
 import { gsap } from "gsap";
 import { Flip } from "gsap/Flip";
 import {
   ArrowDownRight, ArrowRightLeft, ArrowUpRight, Bookmark, CalendarClock, Check, ChevronDown, CircleDollarSign, Clock, ExternalLink, Flame, Globe, Hourglass, Link2,
-  Mail, Megaphone, MessageCircle, Loader2, UserPlus, Search, Settings2, ShieldCheck, SlidersHorizontal, Sparkles, Star, Target, Timer, Trash2, Trophy, X,
+  Mail, Megaphone, MessageCircle, Loader2, UserPlus, Search, Settings2, ShieldCheck, SlidersHorizontal, Sparkles, Star, Tag, Target, Timer, Trash2, Trophy, X,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -48,7 +48,8 @@ const ligados = (f: FiltrosCrm) => [f.busca.trim(), f.situacao !== "todas", f.si
 const desde = (d: string) => Date.now() - new Date(d).getTime();
 const num = (v: string | null) => (v ? Number(v) : 0);
 /** Origem legível: o que o sistema mandou, o site do formulário ou "Manual" (marcado na conversa). */
-const origemDe = (l: Lead) => l.origem ?? (l.site ? `Site ${l.site}` : "Manual");
+/** Tag do lead (no padrão, mesmo para dado antigo): a que veio com ele; senão formulário de site ou cadastro à mão. */
+const origemDe = (l: Lead) => (l.origem ? tagLead(l.origem) : l.site ? TAGS.site : TAGS.manual);
 /** A bola está com você: o lead escreveu por último, ou chegou e ninguém falou ainda. */
 const suaVez = (l: Lead) => l.ultima_dir === "IN" || (!l.primeira_resp && l.ultima_dir !== "OUT");
 const esfriando = (l: Lead) => suaVez(l) && desde(l.ultima ?? l.lead_em) > 6 * H;
@@ -207,7 +208,7 @@ export function Leads({ leads, etapas, sites, salvos }: { leads: Lead[]; etapas:
   const chips: Chip[] = [
     ...(f.busca.trim() ? [[`“${f.busca.trim()}”`, () => mudar({ busca: "" })] as Chip] : []),
     ...(f.situacao !== "todas" ? [[SITUACOES[f.situacao], () => mudar({ situacao: "todas" })] as Chip] : []),
-    ...f.origens.map((o): Chip => [o, () => mudar({ origens: f.origens.filter((x) => x !== o) })]),
+    ...f.origens.map((o): Chip => [`#${o}`, () => mudar({ origens: f.origens.filter((x) => x !== o) })]),
     ...f.sites.map((s): Chip => [`Site ${s}`, () => mudar({ sites: f.sites.filter((x) => x !== s) })]),
     ...(f.valor !== "todos" ? [[VALORES[f.valor], () => mudar({ valor: "todos" })] as Chip] : []),
   ];
@@ -427,7 +428,7 @@ function ModalFiltros({ inicial, origens, sites, contar, aplicar, fechar }: {
   const corpo = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => entrar(corpo.current?.querySelectorAll(".crm-mf-grupo") ?? [], { y: 10 }, { stagger: 0.05, delay: 0.1, duration: 0.45 }), []);
   return (
-    <Dialog open onClose={fechar} title="Filtros">
+    <Dialog open onClose={fechar} title="Filtros" lado>
       <div className="crm-mf" ref={corpo}>
         <Bloco titulo="Período" icone={<CalendarClock aria-hidden />}>
           {PERIODOS.map(([k, rot]) => <Opcao key={k} on={r.periodo === k} onClick={() => m({ periodo: k })}>{rot}</Opcao>)}
@@ -435,8 +436,8 @@ function ModalFiltros({ inicial, origens, sites, contar, aplicar, fechar }: {
         <Bloco titulo="Situação" icone={<Hourglass aria-hidden />}>
           {Object.entries(SITUACOES).map(([k, v]) => <Opcao key={k} on={r.situacao === k} onClick={() => m({ situacao: k as FiltrosCrm["situacao"] })}>{v}</Opcao>)}
         </Bloco>
-        {origens.length > 0 && <Bloco titulo="Origem" icone={<Globe aria-hidden />} dica="Escolha uma ou mais">
-          {origens.map((o) => <Opcao key={o} on={r.origens.includes(o)} onClick={() => m({ origens: alternar(r.origens, o) })}>{o}</Opcao>)}
+        {origens.length > 0 && <Bloco titulo="Tags" icone={<Tag aria-hidden />} dica="Escolha uma ou mais">
+          {origens.map((o) => <Opcao key={o} on={r.origens.includes(o)} onClick={() => m({ origens: alternar(r.origens, o) })}>#{o}</Opcao>)}
         </Bloco>}
         {sites.length > 1 && <Bloco titulo="Site" icone={<Link2 aria-hidden />} dica="Escolha um ou mais">
           {sites.map((s) => <Opcao key={s} on={r.sites.includes(s)} onClick={() => m({ sites: alternar(r.sites, s) })}>{s}</Opcao>)}
@@ -490,7 +491,7 @@ function Cartao({ l, aberto, etapas, solto, arrastando, onArrastar, mover, abrir
       </div>
       {l.mensagem && <p className="crm-card-msg">{l.mensagem}</p>}
       <div className="crm-card-tags">
-        <span className="crm-tag" title="Origem"><Globe aria-hidden />{origemDe(l)}</span>
+        <span className="crm-tag" title="Tag"><Tag aria-hidden />{origemDe(l)}</span>
         {l.utm && <span className="crm-tag" title={l.campanha ? `Campanha: ${l.campanha}` : "Anúncio"}><Megaphone aria-hidden />{l.utm}</span>}
         {diasParado > 0 && <span className="crm-tag" data-tom="aviso" title="Tempo nesta etapa">Parado {diasParado} d</span>}
       </div>
@@ -552,7 +553,7 @@ function LeadDetalhe({ l, etapas, aberto, mover, fechar }: { l: Lead; etapas: Et
         </dl>
         {l.mensagem && <blockquote className="crm-ficha-msg" data-surge><MessageCircle aria-hidden />{l.mensagem}</blockquote>}
         <ul className="crm-ficha-info" data-surge>
-          <li><Globe aria-hidden /><span>Origem</span><b>{origemDe(l)}</b></li>
+          <li><Tag aria-hidden /><span>Tag</span><b>{origemDe(l)}</b></li>
           {l.site && <li><Link2 aria-hidden /><span>Site</span><b>{l.site}</b></li>}
           {l.pagina && <li><ExternalLink aria-hidden /><span>Página</span><a href={l.pagina} target="_blank" rel="noreferrer" className="crm-trunc">{l.pagina.replace(/^https?:\/\//, "")}</a></li>}
           {(l.utm || l.campanha) && <li><Megaphone aria-hidden /><span>Anúncio</span><b>{[l.utm, l.campanha].filter(Boolean).join(" · ")}</b></li>}
