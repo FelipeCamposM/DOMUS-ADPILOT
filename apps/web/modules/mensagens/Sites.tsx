@@ -13,6 +13,7 @@ import { toast } from "../shell/toast";
 import { alternarSite, apagarSite, salvarContaGoogle, salvarSite } from "./actions";
 import { ha, type SiteLead } from "./Mensagens";
 
+import { Seletor } from "../shell/Seletor";
 const MSG_PADRAO = "Olá! Vim pelo site {site} e quero saber mais.";
 
 /** Formulário pronto para colar no site: manda o lead e abre o WhatsApp dele já com a mensagem escrita. */
@@ -236,11 +237,9 @@ function GscCampo({ valor, mudar }: { valor: string; mudar: (v: string) => void 
     <div className="field" style={{ flex: "1 1 260px" }}>
       <label className="label" htmlFor="st-gsc">Site no Search Console <span className="subtle">(opcional)</span></label>
       <div className="cluster" style={{ gap: 6, flexWrap: "nowrap" }}>
-        <select className="select" aria-label="Tipo da propriedade no Search Console" value={tipo} style={{ flex: "none" }}
-          onChange={(e) => { const t = e.target.value as "dominio" | "url"; setTipo(t); mudar(montar(t, texto)); }}>
-          <option value="dominio">Domínio</option>
-          <option value="url">Prefixo de URL</option>
-        </select>
+        <Seletor ariaLabel="Tipo da propriedade no Search Console" valor={tipo} style={{ flex: "none", height: 36 }}
+          onChange={(x) => { const t = x as "dominio" | "url"; setTipo(t); mudar(montar(t, texto)); }}
+          opcoes={[{ valor: "dominio", rotulo: "Domínio" }, { valor: "url", rotulo: "Prefixo de URL" }]} />
         <input id="st-gsc" className="input" style={{ minWidth: 0 }} value={texto} maxLength={200} onChange={(e) => mudar(e.target.value ? (tipo === "dominio" ? `sc-domain:${e.target.value}` : e.target.value) : "")}
           onBlur={() => mudar(montar(tipo, texto))} placeholder={tipo === "dominio" ? "seusite.com.br" : "https://www.seusite.com.br/"} />
       </div>

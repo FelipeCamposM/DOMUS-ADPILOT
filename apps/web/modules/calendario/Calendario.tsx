@@ -16,6 +16,7 @@ import { gradeDoMes, somaDias } from "./grade";
 import { apagarPlanejamento, aprovarArte, aprovarItens, descartarItem, mudarHorario, novoItem, pedirMudanca, planejarPeriodo, refazerComIA, replanejar, salvarItem, voltarParaSugestao } from "./actions";
 import { HeroFx } from "@/modules/shell/HeroFx";
 
+import { Seletor } from "../shell/Seletor";
 const TZ = "America/Sao_Paulo";
 const ICONE: Record<FormatoCal, typeof ImageIcon> = { FEED: ImageIcon, CARROSSEL: GalleryHorizontal, REELS: Clapperboard };
 const ICONE_POST = { ...ICONE, STORY: CircleDot };
@@ -209,9 +210,8 @@ function Planejar({ open, onClose, contaId, marcas }: { open: boolean; onClose: 
   return (
     <Dialog open={open} onClose={onClose} title="Planejar período">
       <div className="field"><label className="label" htmlFor="pl-marca">Marca</label>
-        <select id="pl-marca" className="select" value={f.marcaId} onChange={(e) => setF({ ...f, marcaId: e.target.value })}>
-          <option value="">Sem marca (usa só o perfil)</option>{marcas.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
-        </select>
+        <Seletor id="pl-marca" className="seletor-campo" ariaLabel="Marca" valor={f.marcaId} onChange={(x) => setF({ ...f, marcaId: x })}
+          opcoes={[{ valor: "", rotulo: "Sem marca (usa só o perfil)" }, ...marcas.map((m) => ({ valor: m.id, rotulo: m.nome }))]} />
         <span className="subtle caption">A IA lê a identidade, o tom e o site da marca.</span></div>
       <div className="field">
         <span className="label">Período</span>
@@ -328,9 +328,8 @@ function Editor({ item, podeEditar, onFechar }: { item: ItemTela; podeEditar: bo
           <div className="field"><label className="label" htmlFor="ed-quando">Data e hora (Brasília)</label>
             <DataPicker id="ed-quando" hora value={v.dataHora} min={hojeBr()} onChange={(d) => setV({ ...v, dataHora: d })} /></div>
           <div className="field"><label className="label" htmlFor="ed-formato">Formato</label>
-            <select id="ed-formato" className="select" value={v.formato} onChange={(e) => setV({ ...v, formato: e.target.value as FormatoCal })}>
-              {(Object.keys(FORMATOS_CAL) as FormatoCal[]).map((k) => <option key={k} value={k}>{FORMATOS_CAL[k]}</option>)}
-            </select></div>
+            <Seletor id="ed-formato" className="seletor-campo" ariaLabel="Formato" valor={v.formato} onChange={(x) => setV({ ...v, formato: x as FormatoCal })}
+              opcoes={(Object.keys(FORMATOS_CAL) as FormatoCal[]).map((k) => ({ valor: k, rotulo: FORMATOS_CAL[k] }))} /></div>
           <span style={{ flex: 1 }} />
           <span className="chip cal-status" data-status={item.status}>{STATUS[item.status]}</span>
         </div>

@@ -8,6 +8,7 @@ import { useState, useTransition } from "react";
 import { toast } from "../shell/toast";
 import { salvarConfigCalendario } from "./actions";
 
+import { Seletor } from "../shell/Seletor";
 /** Até quanto atraso ainda publica, e voz e estilo dos Reels. */
 export function PrazosCalendario({ cfg, podeAdmin }: { cfg: ConfigCal; podeAdmin: boolean }) {
   const router = useRouter();
@@ -27,16 +28,14 @@ export function PrazosCalendario({ cfg, podeAdmin }: { cfg: ConfigCal; podeAdmin
         </div>
         <div className="field">
           <label className="label" htmlFor="voz">Voz dos Reels</label>
-          <select id="voz" className="select" value={v.voz} onChange={(e) => setV({ ...v, voz: e.target.value as ConfigCal["voz"] })}>
-            {Object.entries(VOZES).map(([k, n]) => <option key={k} value={k}>{n}</option>)}
-          </select>
+          <Seletor id="voz" className="seletor-campo" ariaLabel="Voz" valor={v.voz} onChange={(x) => setV({ ...v, voz: x as ConfigCal["voz"] })}
+            opcoes={Object.entries(VOZES).map(([k, n]) => ({ valor: k, rotulo: n }))} />
           <span className="subtle caption">Com uma voz do ElevenLabs favoritada (⭐ no Studio), os Reels usam ela; esta é só a reserva.</span>
         </div>
         <div className="field">
           <label className="label" htmlFor="estilo">Estilo dos Reels</label>
-          <select id="estilo" className="select" value={v.estiloVideo} onChange={(e) => setV({ ...v, estiloVideo: e.target.value as ConfigCal["estiloVideo"] })}>
-            {Object.entries(ESTILOS).map(([k, e]) => <option key={k} value={k}>{e.nome}</option>)}
-          </select>
+          <Seletor id="estilo" className="seletor-campo" ariaLabel="Estilo do vídeo" valor={v.estiloVideo} onChange={(x) => setV({ ...v, estiloVideo: x as ConfigCal["estiloVideo"] })}
+            opcoes={Object.entries(ESTILOS).map(([k, e]) => ({ valor: k, rotulo: e.nome }))} />
         </div>
       </fieldset>
       {podeAdmin ? (

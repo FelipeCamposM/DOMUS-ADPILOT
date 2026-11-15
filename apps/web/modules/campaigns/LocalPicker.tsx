@@ -3,6 +3,7 @@
 import { MapPin, Plus, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { Seletor } from "../shell/Seletor";
 /** UFs com o nome que o Google Ads reconhece. */
 const ESTADOS: [string, string][] = [
   ["AC", "Acre"], ["AL", "Alagoas"], ["AP", "Amapá"], ["AM", "Amazonas"], ["BA", "Bahia"], ["CE", "Ceará"], ["DF", "Distrito Federal"],
@@ -73,9 +74,8 @@ export function LocalPicker({ valor, onChange, disabled }: { valor: string[]; on
       </div>
       {!disabled && (
         <div className="local-busca">
-          <select className="select" value={uf} onChange={(e) => setUf(e.target.value)} aria-label="Estado" style={{ width: 92, height: 38 }}>
-            {ESTADOS.map(([s, n]) => <option key={s} value={s} title={n}>{s}</option>)}
-          </select>
+          <Seletor ariaLabel="Estado" valor={uf} onChange={setUf} style={{ width: 92, height: 38 }}
+            opcoes={ESTADOS.map(([s, n]) => ({ valor: s, rotulo: s, dica: n }))} />
           <div style={{ position: "relative", flex: 1 }}>
             <input ref={campo} className="input-sm" style={{ width: "100%", height: 38 }} value={q} role="combobox" aria-expanded={aberto} aria-controls="local-opcoes" aria-autocomplete="list"
               placeholder={cidades ? `Cidade de ${estado} (${cidades.length} municípios)…` : erro ? "Não consegui carregar as cidades (IBGE)" : "Carregando cidades…"}

@@ -2,19 +2,19 @@
 
 import { gsap } from "gsap";
 import { Check, ChevronDown } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
-export interface OpcaoSeletor { valor: string; rotulo: string; dica?: string }
+export interface OpcaoSeletor { valor: string; rotulo: string; dica?: string; desabilitada?: boolean }
 
 /**
  * Select da plataforma no lugar do <select> nativo: lista flutuante com entrada e saída animadas (GSAP).
  * Vai para o <body> em position: fixed, então não é cortado por menus/modais com overflow. Teclado: ↑ ↓ Enter Esc.
  * `gatilho` troca o botão padrão por um conteúdo próprio (ex.: só um ícone), com a classe `className`.
  */
-export function Seletor({ valor, opcoes, onChange, ariaLabel, icone, disabled, className = "", gatilho, title }: {
+export function Seletor({ valor, opcoes, onChange, ariaLabel, icone, disabled, className = "", gatilho, title, id, style }: {
   valor: string; opcoes: readonly OpcaoSeletor[]; onChange: (v: string) => void; ariaLabel: string;
-  icone?: ReactNode; disabled?: boolean; className?: string; gatilho?: ReactNode; title?: string;
+  icone?: ReactNode; disabled?: boolean; className?: string; gatilho?: ReactNode; title?: string; id?: string; style?: CSSProperties;
 }) {
   const [aberto, setAberto] = useState(false);
   const [montado, setMontado] = useState(false);
@@ -65,7 +65,7 @@ export function Seletor({ valor, opcoes, onChange, ariaLabel, icone, disabled, c
   const escolher = (v: string) => { if (v !== valor) onChange(v); fechar(); };
 
   const teclas = (e: KeyboardEvent<HTMLDivElement>) => {
-    const itens = [...(lista.current?.querySelectorAll<HTMLElement>("[role=option]") ?? [])];
+    const itens = [...(lista.current?.querySelectorAll<HTMLElement>("[role=option]:not(:disabled)") ?? [])];
     const i = itens.indexOf(document.activeElement as HTMLElement);
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
@@ -79,7 +79,7 @@ export function Seletor({ valor, opcoes, onChange, ariaLabel, icone, disabled, c
 
   return (
     <>
-      <button ref={botao} type="button" className={gatilho ? className : `seletor ${className}`} disabled={disabled} aria-label={ariaLabel} title={title} aria-haspopup="listbox" aria-expanded={aberto}
+      <button ref={botao} id={id} style={style} type="button" className={gatilho ? className : `seletor ${className}`} disabled={disabled} aria-label={ariaLabel} title={title} aria-haspopup="listbox" aria-expanded={aberto}
         data-aberto={aberto} onClick={() => (aberto ? fechar() : abrir())}
         onKeyDown={(e) => { if ((e.key === "ArrowDown" || e.key === "ArrowUp") && !aberto) { e.preventDefault(); abrir(); } }}>
         {gatilho ?? <>
@@ -92,7 +92,7 @@ export function Seletor({ valor, opcoes, onChange, ariaLabel, icone, disabled, c
         <div ref={lista} data-flutuante role="listbox" aria-label={ariaLabel} className="seletor-lista" onKeyDown={teclas}
           style={{ top: pos.top, left: Math.min(pos.left, innerWidth - pos.width - 8), minWidth: pos.width }}>
           {opcoes.map((o) => (
-            <button key={o.valor} type="button" role="option" aria-selected={o.valor === valor} className="seletor-opcao" onClick={() => escolher(o.valor)}>
+            <button key={o.valor} type="button" role="option" aria-selected={o.valor === valor} className="seletor-opcao" disabled={o.desabilitada} onClick={() => escolher(o.valor)}>
               <span style={{ flex: 1, minWidth: 0 }}>{o.rotulo}{o.dica && <small>{o.dica}</small>}</span>
               {o.valor === valor && <Check size={14} aria-hidden />}
             </button>

@@ -16,6 +16,7 @@ import type { ConfigCal } from "@domus-ads/core/calendario";
 import { inicializacaoWorker } from "./ai-accounts";
 import { Whatsapp, type EstadoWhatsapp } from "./Whatsapp";
 
+import { Seletor } from "../shell/Seletor";
 export type { ContaIA };
 
 export interface Membro { user_id: string; email: string; role: string }
@@ -114,9 +115,8 @@ export function Settings(p: {
               <tr key={x.user_id}>
                 <td>{x.email}{x.user_id === p.eu && <span className="subtle"> (você)</span>}</td>
                 <td>
-                  <select className="select" value={x.role} disabled={!admin || x.user_id === p.eu || pend} onChange={(e) => rodar(() => alterarPapel(x.user_id, e.target.value), "Papel alterado")} aria-label={`Papel de ${x.email}`}>
-                    {PAPEIS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                  </select>
+                  <Seletor ariaLabel={`Papel de ${x.email}`} valor={x.role} disabled={!admin || x.user_id === p.eu || pend} onChange={(v) => rodar(() => alterarPapel(x.user_id, v), "Papel alterado")}
+                    opcoes={PAPEIS.map(([v, l]) => ({ valor: v, rotulo: l }))} />
                 </td>
                 <td style={{ textAlign: "right" }}>
                   {admin && x.user_id !== p.eu && (
@@ -131,7 +131,7 @@ export function Settings(p: {
           <div className="cluster" style={{ alignItems: "flex-end" }}>
             <div className="field"><label className="label" htmlFor="me">E-mail</label><input id="me" className="input-sm" style={{ width: 240 }} value={m.email} onChange={(e) => setM({ ...m, email: e.target.value })} /></div>
             <div className="field"><label className="label" htmlFor="mr">Papel</label>
-              <select id="mr" className="select" value={m.role} onChange={(e) => setM({ ...m, role: e.target.value })}>{PAPEIS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></div>
+              <Seletor id="mr" className="seletor-campo" ariaLabel="Papel" valor={m.role} onChange={(v) => setM({ ...m, role: v })} opcoes={PAPEIS.map(([v, l]) => ({ valor: v, rotulo: l }))} /></div>
             <div className="field"><label className="label" htmlFor="ms">Senha provisória (só se a pessoa não tiver conta)</label><input id="ms" className="input-sm" type="text" autoComplete="off" style={{ width: 240 }} value={m.senha} onChange={(e) => setM({ ...m, senha: e.target.value })} /></div>
             <button className="btn btn-primary btn-xs" disabled={pend || !m.email} onClick={() => rodar(() => adicionarMembro(m), "Membro adicionado", () => setM({ email: "", role: "editor", senha: "" }))}><Plus aria-hidden /> Adicionar</button>
           </div>

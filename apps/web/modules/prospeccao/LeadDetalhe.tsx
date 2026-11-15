@@ -2,10 +2,11 @@
 
 import { defaultMessage, whatsappNumber, whatsappUrl, type Lead, type LeadStage, type SocialNetwork } from "@domus-ads/core/prospeccao";
 import {
-  AlertTriangle, ArrowRight, Bot, Copy, ExternalLink, Globe, Loader2, Mail, MapPinned, Megaphone, MessageCircle, Phone, RefreshCw, Sparkles, Star, UserCheck, UserPlus,
+  AlertTriangle, ArrowRight, Bot, Copy, ExternalLink, Globe, Loader2, Mail, MapPinned, Megaphone, MessageCircle, Phone, RefreshCw, Sparkles, Star, UserCheck, UserPlus, X,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { DataPicker } from "../shell/DataPicker";
 import { Seletor } from "../shell/Seletor";
 import { toast } from "../shell/toast";
 import { copiar, mapsUrl, normalizeExternalUrl, ScoreRing, Selo, STATUS } from "./comum";
@@ -148,9 +149,12 @@ export function LeadDetalhe({ lead, stages, analisando, iaPronta, onStage, onEdi
               <input className="input-sm" aria-label={`Tags de ${lead.name}`} defaultValue={lead.tags.join(", ")} placeholder="separadas por vírgula"
                 onBlur={(e) => { const tags = e.target.value.split(",").map((x) => x.trim()).filter(Boolean); if (tags.join(",") !== lead.tags.join(",")) onEdit(lead.id, { tags }); }} /></label>
             <label className="pp-campo"><span className="pp-rot">Próxima ação</span>
-              <input className="input-sm" type="datetime-local" aria-label={`Próxima ação de ${lead.name}`}
-                defaultValue={lead.nextActionAt ? new Date(lead.nextActionAt - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 16) : ""}
-                onBlur={(e) => onEdit(lead.id, { nextActionAt: e.target.value ? new Date(e.target.value).getTime() : null })} /></label>
+              <span className="cluster" style={{ gap: 4, flexWrap: "nowrap" }}>
+                <DataPicker hora ariaLabel={`Próxima ação de ${lead.name}`}
+                  value={lead.nextActionAt ? new Date(lead.nextActionAt - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 16) : ""}
+                  onChange={(v) => onEdit(lead.id, { nextActionAt: new Date(v).getTime() })} />
+                {lead.nextActionAt && <button type="button" className="btn btn-ghost btn-xs" aria-label="Tirar a próxima ação" onClick={() => onEdit(lead.id, { nextActionAt: null })}><X aria-hidden /></button>}
+              </span></label>
           </div>
         </section>
       </div>

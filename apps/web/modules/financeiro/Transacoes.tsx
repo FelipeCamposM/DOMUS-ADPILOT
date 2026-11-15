@@ -8,6 +8,7 @@ import { useLayoutEffect, useMemo, useRef, useState, useTransition } from "react
 import { reduzido } from "../motion/entrar";
 import { classificar, virarAssinatura } from "./actions";
 
+import { Seletor } from "../shell/Seletor";
 export type TxFin = TxBase & { status: string; nota: string | null; categoriaManual: boolean; naturezaManual: boolean };
 
 const diaLongo = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "short", timeZone: "UTC" });
@@ -51,15 +52,10 @@ export function Transacoes({ txs, categorias, etiquetas, contas, naturezas, vazi
     <div className="fin-txs">
       <div className="fin-filtros">
         <label className="fin-busca"><Search aria-hidden /><input className="input-sm" placeholder="Buscar descrição, loja ou nota" value={busca} onChange={(e) => setBusca(e.target.value)} aria-label="Buscar transações" /></label>
-        <select className="select" value={cat} onChange={(e) => setCat(e.target.value)} aria-label="Filtrar por categoria">
-          <option value="">Todas as categorias</option>
-          <option value="_">Sem categoria</option>
-          {cats.sort().map((c) => <option key={c}>{c}</option>)}
-        </select>
-        <select className="select" value={etq} onChange={(e) => setEtq(e.target.value)} aria-label="Filtrar por etiqueta">
-          <option value="">Todas as etiquetas</option>
-          {etiquetas.map((e) => <option key={e.id} value={e.nome}>{e.emoji ? `${e.emoji} ` : ""}{e.nome}</option>)}
-        </select>
+        <Seletor ariaLabel="Filtrar por categoria" valor={cat} onChange={setCat}
+          opcoes={[{ valor: "", rotulo: "Todas as categorias" }, { valor: "_", rotulo: "Sem categoria" }, ...cats.sort().map((c) => ({ valor: c, rotulo: c }))]} />
+        <Seletor ariaLabel="Filtrar por etiqueta" valor={etq} onChange={setEtq}
+          opcoes={[{ valor: "", rotulo: "Todas as etiquetas" }, ...etiquetas.map((e) => ({ valor: e.nome, rotulo: `${e.emoji ? `${e.emoji} ` : ""}${e.nome}` }))]} />
         <span className="fin-filtros-total tabular">{lista.length} lançamentos · <b className={total < 0 ? "neg" : "pos"}>{brl(total)}</b></span>
       </div>
       {!dias.length && <div className="empty">{vazio}</div>}
@@ -134,15 +130,11 @@ function Editor({ t, categorias, etiquetas, fechar }: { t: TxFin; categorias: Ca
     <div className="fin-editor" ref={ref}>
       <div className="fin-editor-grade">
         <label>Tipo
-          <select className="select" value={natureza} onChange={(e) => setNatureza(e.target.value as Natureza)}>
-            {NATUREZAS.map((n) => <option key={n} value={n}>{NATUREZA_ROTULO[n]}</option>)}
-          </select>
+          <Seletor className="seletor-campo" ariaLabel="Tipo" valor={natureza} onChange={(x) => setNatureza(x as Natureza)} opcoes={NATUREZAS.map((n) => ({ valor: n, rotulo: NATUREZA_ROTULO[n] }))} />
         </label>
         <label>Categoria
-          <select className="select" value={categoriaId ?? ""} onChange={(e) => setCategoriaId(e.target.value ? Number(e.target.value) : null)}>
-            <option value="">Sem categoria</option>
-            {categorias.filter((c) => c.tipo === tipo).map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
-          </select>
+          <Seletor className="seletor-campo" ariaLabel="Categoria" valor={categoriaId == null ? "" : String(categoriaId)} onChange={(x) => setCategoriaId(x ? Number(x) : null)}
+            opcoes={[{ valor: "", rotulo: "Sem categoria" }, ...categorias.filter((c) => c.tipo === tipo).map((c) => ({ valor: String(c.id), rotulo: c.nome }))]} />
         </label>
         <label className="fin-editor-nota">Nota
           <input className="input-sm" value={nota} maxLength={500} onChange={(e) => setNota(e.target.value)} placeholder="Ex.: jantar de aniversário" />

@@ -21,7 +21,6 @@ import { LeadLista } from "./LeadLista";
 import { MapGuard } from "./MapGuard";
 import { Slider } from "./ui";
 import { Seletor } from "@/modules/shell/Seletor";
-
 const CampanhasMap = dynamic(() => import("./Mapas").then((m) => m.CampanhasMap), { ssr: false, loading: () => <div className="pp-mapa pp-mapa-carregando" style={{ height: "100%" }} /> });
 const LeadMap = dynamic(() => import("./Mapas").then((m) => m.LeadMap), { ssr: false, loading: () => <div className="pp-mapa pp-mapa-carregando" style={{ height: 320 }} /> });
 
@@ -114,9 +113,7 @@ function Pipeline({ leads, stages, onStage, onOpen }: { leads: Lead[]; stages: L
                       <small className="pp-trunc">{(STATUS[lead.websiteStatus] ?? STATUS.unknown).label}{lead.phone ? ` · ${lead.phone}` : ""}</small>
                     </span>
                   </button>
-                  <select className="select pp-cartao-etapa" aria-label={`Etapa de ${lead.name}`} value={lead.stageId} onChange={(e) => onStage(lead.id, e.target.value)}>
-                    {stages.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
-                  </select>
+                  <Seletor className="pp-cartao-etapa" ariaLabel={`Etapa de ${lead.name}`} valor={lead.stageId} onChange={(x) => onStage(lead.id, x)} opcoes={stages.map((x) => ({ valor: x.id, rotulo: x.name }))} />
                 </article>
               ))}
               {!items.length && <p className="pp-coluna-vazia">Nenhum lead nesta etapa.</p>}

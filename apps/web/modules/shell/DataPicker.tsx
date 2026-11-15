@@ -5,6 +5,7 @@ import { useRef, useState, type CSSProperties } from "react";
 import { gradeDoMes } from "../calendario/grade";
 import { Popover } from "./Popover";
 
+import { Seletor } from "./Seletor";
 const SEMANA = ["D", "S", "T", "Q", "Q", "S", "S"];
 const HORARIOS = ["09:00", "12:00", "15:00", "18:00", "20:00"];
 const HORAS = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, "0"));
@@ -66,13 +67,9 @@ export function DataPicker({ value, onChange, hora, min, id, ariaLabel, disabled
         {hora && (
           <div className="dp-hora">
             <Clock aria-hidden />
-            <select className="select" value={hm.slice(0, 2)} onChange={(e) => set(dia || h0, `${e.target.value}:${hm.slice(3)}`)} aria-label="Hora">
-              {HORAS.map((h) => <option key={h}>{h}</option>)}
-            </select>
+            <Seletor ariaLabel="Hora" valor={hm.slice(0, 2)} onChange={(x) => set(dia || h0, `${x}:${hm.slice(3)}`)} opcoes={HORAS.map((h) => ({ valor: h, rotulo: h }))} />
             <b>:</b>
-            <select className="select" value={MINUTOS.includes(hm.slice(3)) ? hm.slice(3) : "00"} onChange={(e) => set(dia || h0, `${hm.slice(0, 2)}:${e.target.value}`)} aria-label="Minutos">
-              {MINUTOS.map((m) => <option key={m}>{m}</option>)}
-            </select>
+            <Seletor ariaLabel="Minutos" valor={MINUTOS.includes(hm.slice(3)) ? hm.slice(3) : "00"} onChange={(x) => set(dia || h0, `${hm.slice(0, 2)}:${x}`)} opcoes={MINUTOS.map((m) => ({ valor: m, rotulo: m }))} />
             <div className="dp-atalhos">
               {HORARIOS.map((h) => <button key={h} type="button" className="chip" data-active={h === hm} onClick={() => set(dia || h0, h)}>{h}</button>)}
             </div>

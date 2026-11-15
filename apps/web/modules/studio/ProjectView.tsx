@@ -12,6 +12,7 @@ import { ajustarComIA, apagarVideo, cancelarVideo, gerarDeNovo, narrarComMinhaVo
 import { FalaPorFala, GravarVoz, type VozGravada } from "./GravarVoz";
 import { PlayerVideo } from "./PlayerVideo";
 
+import { Seletor } from "../shell/Seletor";
 interface Cena {
   start: number; end: number; headline: string; subtext?: string; narration?: string; animation?: string; tipo?: string; itens?: string[];
   visual?: string; intencao?: string; destaque?: string[]; asset?: string; numero?: { valor: number; prefixo?: string; sufixo?: string };
@@ -244,10 +245,8 @@ export function ProjectView({ p, podeEditar, vozes }: { p: ProjetoView; podeEdit
               {roteiro.length > 0 && <button type="button" role="tab" className="chip" style={{ height: 30 }} aria-selected={abaVoz === "minha"} data-active={abaVoz === "minha"} onClick={() => setAbaVoz("minha")}><Mic aria-hidden /> Minha voz</button>}
             </div>
             {abaVoz === "minha" && roteiro.length > 0 ? gravacao(true) : vozes.length > 0 && <div className="cluster" style={{ gap: 6 }}>
-              <select className="select" style={{ flex: 1, minWidth: 180 }} aria-label="Nova voz" value={novaVoz} onChange={(e) => setNovaVoz(e.target.value)} disabled={rodando}>
-                <option value="" disabled>Escolha a voz</option>
-                {vozes.map((v) => <option key={v.id} value={v.id} disabled={v.id === p.brief.voz}>{v.fav ? `⭐ ${v.nome}` : v.nome}</option>)}
-              </select>
+              <Seletor ariaLabel="Nova voz" valor={novaVoz} onChange={setNovaVoz} disabled={rodando} style={{ flex: 1, minWidth: 180 }}
+                opcoes={[{ valor: "", rotulo: "Escolha a voz", desabilitada: true }, ...vozes.map((v) => ({ valor: v.id, rotulo: v.fav ? `⭐ ${v.nome}` : v.nome, desabilitada: v.id === p.brief.voz }))]} />
               <button className="btn btn-primary btn-sm" disabled={pend || rodando || !novaVoz || novaVoz === p.brief.voz}
                 onClick={() => acao(() => trocarVoz(p.id, novaVoz, novaVoz.startsWith("el:") ? vozes.find((v) => v.id === novaVoz)?.nome ?? "" : ""), "Regravando a narração com a voz nova")}>
                 {pend ? <Loader2 className="animate-spin" aria-hidden /> : <><AudioLines aria-hidden /> Trocar voz</>}

@@ -11,6 +11,7 @@ import { toast } from "../shell/toast";
 import { agendarMensagem, usarModelo } from "./actions";
 import { formatar, type Modelo } from "./Mensagens";
 
+import { DataPicker } from "../shell/DataPicker";
 type ContatoModelo = { nome: string; numero: string; site?: string | null };
 const horaAgora = () => new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(new Date());
 
@@ -177,7 +178,7 @@ export function AgendarDialog({ numero, nome, inicial, fechar, pronto }: { numer
               <button key={r} type="button" className="chip" data-active={quando === paraCampo(d)} onClick={() => setQuando(paraCampo(d))}>{r}</button>
             ))}
           </div>
-          <input type="datetime-local" className="input" value={quando} min={paraCampo(new Date())} onChange={(e) => setQuando(e.target.value)} aria-label="Data e hora do envio" />
+          <DataPicker hora value={quando} min={paraCampo(new Date()).slice(0, 10)} onChange={setQuando} ariaLabel="Data e hora do envio" />
         </div>
         {valida && (
           <div className="agd-resumo" ref={resumoRef}>

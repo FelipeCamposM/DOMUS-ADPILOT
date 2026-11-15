@@ -10,6 +10,7 @@ import { toast } from "../shell/toast";
 import { apagarEtapa, ordenarEtapas, salvarEtapa } from "./actions";
 import { corEtapa } from "./etapas";
 
+import { Seletor } from "../shell/Seletor";
 type Linha = Omit<EtapaCrm, "ordem" | "chave" | "dica"> & { chave: string | null; dica: string; id: string };
 const ROTULO_TIPO: Record<TipoEtapa, string> = { ABERTO: "Em andamento", GANHO: "Fechou (ganho)", PERDIDO: "Perdeu" };
 
@@ -73,10 +74,9 @@ export function EditarFunil({ etapas, contagem, fechar }: { etapas: EtapaCrm[]; 
                 <div className="crm-ed-campos">
                   <div className="crm-ed-linha">
                     <input className="input" value={l.nome} maxLength={30} placeholder="Nome da coluna" onChange={(e) => mudar(l.id, { nome: e.target.value })} aria-label="Nome da coluna" autoFocus={!l.chave} />
-                    <select className="select" value={l.tipo} disabled={fixa} onChange={(e) => mudar(l.id, { tipo: e.target.value as TipoEtapa })} aria-label="Tipo"
-                      title={fixa ? "Coluna de entrada: recebe os leads novos" : "Fechou/Perdeu contam na conversão"}>
-                      {Object.entries(ROTULO_TIPO).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                    </select>
+                    <Seletor ariaLabel="Tipo" valor={l.tipo} disabled={fixa} onChange={(x) => mudar(l.id, { tipo: x as TipoEtapa })}
+                      title={fixa ? "Coluna de entrada: recebe os leads novos" : "Fechou/Perdeu contam na conversão"}
+                      opcoes={Object.entries(ROTULO_TIPO).map(([k, v]) => ({ valor: k, rotulo: v }))} />
                     {fixa ? <span className="crm-ed-fixa" title="Coluna de entrada: os leads novos chegam aqui"><Lock aria-hidden /></span>
                       : <button type="button" className="btn btn-ghost btn-xs" onClick={() => setLinhas((ls) => ls.filter((x) => x.id !== l.id))} aria-label={`Apagar ${l.nome}`}
                           title={l.chave && contagem[l.chave] ? `${contagem[l.chave]} lead(s) vão para “${entrada}”` : "Apagar coluna"}><Trash2 aria-hidden /></button>}

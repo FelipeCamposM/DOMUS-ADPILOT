@@ -173,13 +173,12 @@ body { background: #030205; }
 .page-head:has(a.eyebrow) a.eyebrow:hover { color: #fff; }
 
 /* controles dentro do hero: vidro; ação principal: pílula branca */
-:is(.page-head:has(.page-title), .vg-topo, .pp-topo, .crm-cab, .ia-vazio) :is(.chip, .btn-secondary, .btn-ghost, .select, .input-sm, .pp-abas, .crm-periodos) {
+:is(.page-head:has(.page-title), .vg-topo, .pp-topo, .crm-cab, .ia-vazio) :is(.chip, .btn-secondary, .btn-ghost, .select, .seletor, .input-sm, .pp-abas, .crm-periodos) {
   color: #fff; background: var(--hero-glass); border: 1px solid var(--hero-line);
   backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); box-shadow: inset 0 1px #ffffff1a;
 }
 :is(.page-head:has(.page-title), .vg-topo, .pp-topo, .crm-cab, .ia-vazio) :is(.chip, .btn-secondary, .btn-ghost):hover { background: #ffffff26; border-color: #ffffff66; }
 :is(.page-head:has(.page-title), .vg-topo, .pp-topo, .crm-cab, .ia-vazio) .chip[data-active="true"] { background: #fff; color: var(--p-700); border-color: #fff; }
-:is(.page-head:has(.page-title), .vg-topo, .pp-topo, .crm-cab, .ia-vazio) .select option { color: #fff; background: rgb(var(--c-bg-surface)); }
 :is(.page-head:has(.page-title), .vg-topo, .pp-topo, .crm-cab, .ia-vazio) .btn-primary, .empty .btn-primary, .btn-branco {
   color: var(--p-700); background: #fbf7ff; border: 1px solid #ffffffc2; text-shadow: none;
   box-shadow: 0 13px 30px #1c043c38;
@@ -217,7 +216,7 @@ body { background: #030205; }
 .btn-primary:hover:not(:disabled), .btn-secondary:hover:not(:disabled) { transform: translateY(-1px); }
 
 /* campos */
-.input, .input-sm, .select { border-radius: 12px; background: #08070c; border-color: #ffffff14; }
+.input, .input-sm, .select, .seletor { border-radius: 12px; background: #08070c; border-color: #ffffff14; }
 
 /* estado vazio */
 .empty .icon-tile { width: 56px; height: 56px; border-radius: 16px; color: var(--p-300); background: linear-gradient(180deg, #2a0b52, #170630); border: 1px solid rgb(var(--c-brand) / 0.45); box-shadow: 0 0 30px -8px rgb(var(--c-brand) / 0.8), inset 0 1px #ffffff1f; }

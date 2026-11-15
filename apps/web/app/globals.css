@@ -1320,7 +1320,7 @@ fieldset:disabled label.chave { opacity: 0.6; cursor: default; }
 .dp-dia:disabled { opacity: .3; cursor: not-allowed; }
 .dp-hora { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-top: 10px; border-top: 1px solid rgb(var(--c-border)); }
 .dp-hora > svg { width: 15px; height: 15px; color: rgb(var(--c-glow)); }
-.dp-hora .select { width: 64px; height: 32px; font-variant-numeric: tabular-nums; }
+.dp-hora .seletor { width: 64px; height: 32px; font-variant-numeric: tabular-nums; }
 .dp-atalhos { display: flex; flex-wrap: wrap; gap: 4px; width: 100%; }
 .dp-atalhos .chip { height: 26px; padding: 0 9px; font-size: 12px; font-variant-numeric: tabular-nums; }
 .dp-ok { align-self: flex-end; }
@@ -1455,9 +1455,8 @@ fieldset:disabled label.chave { opacity: 0.6; cursor: default; }
 .audio-barra { height: 4px; border-radius: 99px; background: rgb(var(--c-border)); overflow: hidden; cursor: pointer; }
 .audio-barra i { display: block; height: 100%; background: var(--gradient-btn); transition: width .2s linear; }
 .audio-tempo { min-width: 64px; text-align: right; }
-.audio-mover { position: relative; display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; cursor: pointer; color: rgb(var(--c-text-secondary)); }
+.audio-mover { position: relative; display: inline-grid; border: 0; padding: 0; background: none; font: inherit; place-items: center; width: 26px; height: 26px; border-radius: 8px; cursor: pointer; color: rgb(var(--c-text-secondary)); }
 .audio-mover:hover { background: rgb(var(--c-bg-elevated)); }
-.audio-mover select { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 @media (max-width: 640px) { .audio-item { grid-template-columns: 36px minmax(0, 1fr); } .audio-tempo { display: none; } }
 
 /* ── Capa do Reels ── */
@@ -1727,7 +1726,7 @@ fieldset:disabled label.chave { opacity: 0.6; cursor: default; }
 .crm-ed-campos { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .crm-ed-linha { display: flex; gap: 8px; align-items: center; }
 .crm-ed-linha .input { flex: 1; min-width: 0; height: 34px; }
-.crm-ed-linha .select { width: auto; height: 34px; font-size: 13px; }
+.crm-ed-linha .seletor { width: auto; height: 34px; font-size: 13px; }
 .crm-ed-dica { height: 30px; font-size: 12.5px; }
 .crm-ed-fixa { display: grid; place-items: center; width: 30px; color: rgb(var(--c-text-tertiary)); }
 .crm-ed-fixa svg { width: 14px; height: 14px; }
@@ -2198,8 +2197,6 @@ button.mdl-var:hover { background: rgb(var(--c-brand) / 0.22); border-color: rgb
 .ply[data-onda="real"] .ply-onda span[data-on="true"] { background: linear-gradient(180deg, rgb(var(--c-brand)), rgb(var(--c-glow)), rgb(var(--c-brand))); }
 .mic-sel { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; font-size: 12px; color: rgb(var(--c-text-secondary)); }
 .mic-sel svg { flex: none; width: 13px; height: 13px; }
-.mic-sel select { min-width: 0; max-width: 280px; height: 28px; padding: 0 8px; border-radius: 8px; font: inherit; font-size: 12px; color: inherit;
-  border: 1px solid rgb(var(--c-border)); background: rgb(var(--c-bg-inset)); text-overflow: ellipsis; }
 
 /* Studio · player de vídeo próprio */
 .vp { position: absolute; inset: 0; overflow: hidden; background: #000; outline: none; user-select: none; }

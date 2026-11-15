@@ -10,6 +10,8 @@ import { Escolha, Revelar } from "../motion/Escolha";
 import { toast } from "../shell/toast";
 import { Palco } from "./Palco";
 
+import { Seletor } from "../shell/Seletor";
+import { DataPicker } from "../shell/DataPicker";
 type Midia = "imagem" | "video";
 type Formato = "FEED" | "CARROSSEL" | "REELS";
 
@@ -116,9 +118,7 @@ export function NewPostForm({ contas, marcas }: { contas: { id: string; username
             camadas={formato === "CARROSSEL" ? 4 : 0} leque={formato === "CARROSSEL"} />
           <div className="field">
             <label className="label" htmlFor="post-conta">Perfil</label>
-            <select id="post-conta" className="input" value={contaId} onChange={(e) => trocarConta(e.target.value)}>
-              {contas.map((c) => <option key={c.id} value={c.id}>@{c.username}</option>)}
-            </select>
+            <Seletor id="post-conta" className="seletor-campo" ariaLabel="Conta" valor={contaId} onChange={trocarConta} opcoes={contas.map((c) => ({ valor: c.id, rotulo: `@${c.username}` }))} />
           </div>
           <div className="panel-title" style={{ marginTop: 2 }}>Marca (logo e cores da arte)</div>
           <Escolha valor={marcaId ?? "sem"} raio={999} variante="pilula" className="cluster" style={{ gap: 6 }}>
@@ -131,7 +131,7 @@ export function NewPostForm({ contas, marcas }: { contas: { id: string; username
           </Escolha>
           <div className="field">
             <label className="label" htmlFor="post-quando" style={{ display: "flex", gap: 6, alignItems: "center" }}><CalendarClock size={14} aria-hidden /> Quando publicar</label>
-            <input id="post-quando" className="input" type="datetime-local" value={quando} onChange={(e) => setQuando(e.target.value)} />
+            <DataPicker id="post-quando" hora value={quando} onChange={setQuando} ariaLabel="Quando publicar" />
           </div>
         </div>
         {erro && <p className="error-text" role="alert">{erro}</p>}

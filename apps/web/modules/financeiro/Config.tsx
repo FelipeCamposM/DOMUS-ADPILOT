@@ -6,6 +6,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { useState, useTransition } from "react";
 import { removerCategoria, removerConexao, removerEtiqueta, removerRegra, salvarCategoria, salvarConexao, salvarConta, salvarEtiqueta } from "./actions";
 
+import { Seletor } from "../shell/Seletor";
 export interface Regra { id: number; padrao: string; categoria: string | null; etiqueta: string | null; natureza: Natureza | null }
 
 type R = { ok: true } | { ok: false; error: string };
@@ -34,7 +35,7 @@ export function Conexoes({ conexoes }: { conexoes: Conexao[] }) {
       <form className="fin-form-linha" onSubmit={(e) => { e.preventDefault(); rodar(async () => { const r = await salvarConexao({ itemId, pessoa, apelido: apelido || undefined }); if (r.ok) { setItemId(""); setApelido(""); } return r; }, "Conectado. Sincronizando…"); }}>
         <input className="input-sm" required placeholder="Item ID (ex.: 3f2c…-…)" value={itemId} onChange={(e) => setItemId(e.target.value)} aria-label="Item ID da Pluggy" style={{ flex: "2 1 280px" }} />
         <input className="input-sm" placeholder="Apelido (opcional)" value={apelido} maxLength={60} onChange={(e) => setApelido(e.target.value)} aria-label="Apelido" />
-        <select className="select" value={pessoa} onChange={(e) => setPessoa(e.target.value as "PF" | "PJ")} aria-label="Pessoa"><option value="PF">Pessoa física</option><option value="PJ">Pessoa jurídica</option></select>
+        <Seletor ariaLabel="Pessoa" valor={pessoa} onChange={(x) => setPessoa(x as "PF" | "PJ")} opcoes={[{ valor: "PF", rotulo: "Pessoa física" }, { valor: "PJ", rotulo: "Pessoa jurídica" }]} />
         <button className="btn btn-primary btn-sm" disabled={indo}><Plus aria-hidden />Conectar</button>
       </form>
       {msg && <p className="caption subtle" role="status">{msg}</p>}
@@ -71,11 +72,11 @@ export function Contas({ contas, categorias }: { contas: Conta[]; categorias: Ca
               <td><b>{c.banco}</b><small>{c.tipo === "CREDIT" ? "Cartão" : "Conta"} · {c.nome}</small></td>
               <td><input className="input-sm" defaultValue={c.apelido ?? ""} maxLength={60} placeholder={c.nome} disabled={indo}
                 onBlur={(e) => { if ((e.target.value || null) !== c.apelido) salvar(c, { apelido: e.target.value || null }); }} aria-label="Apelido da conta" /></td>
-              <td><select className="select" value={c.pessoa} disabled={indo} onChange={(e) => salvar(c, { pessoa: e.target.value as "PF" | "PJ" })} aria-label="Pessoa"><option value="PF">PF</option><option value="PJ">PJ</option></select></td>
+              <td><Seletor ariaLabel="Pessoa" valor={c.pessoa} disabled={indo} onChange={(x) => salvar(c, { pessoa: x as "PF" | "PJ" })} opcoes={[{ valor: "PF", rotulo: "PF" }, { valor: "PJ", rotulo: "PJ" }]} /></td>
               <td>{c.tipo === "BANK" ? (
-                <select className="select" value={c.categoria_renda_id ?? ""} disabled={indo} onChange={(e) => salvar(c, { categoriaRendaId: e.target.value ? Number(e.target.value) : null })} aria-label="Categoria das entradas">
-                  <option value="">Automático</option>{rendas.map((r) => <option key={r.id} value={r.id}>{r.nome}</option>)}
-                </select>) : <span className="subtle">—</span>}</td>
+                <Seletor ariaLabel="Categoria das entradas" valor={c.categoria_renda_id == null ? "" : String(c.categoria_renda_id)} disabled={indo}
+                  onChange={(x) => salvar(c, { categoriaRendaId: x ? Number(x) : null })}
+                  opcoes={[{ valor: "", rotulo: "Automático" }, ...rendas.map((r) => ({ valor: String(r.id), rotulo: r.nome }))]} />) : <span className="subtle">—</span>}</td>
               <td className="tabular">{c.saldo != null ? brl(c.saldo) : "—"}</td>
               <td><input type="checkbox" checked={c.oculta} disabled={indo} onChange={(e) => salvar(c, { oculta: e.target.checked })} aria-label="Ocultar conta" /></td>
             </tr>
@@ -138,7 +139,7 @@ export function Categorias({ categorias }: { categorias: Categoria[] }) {
       </div>
       <form className="fin-form-linha" onSubmit={(e) => { e.preventDefault(); rodar(async () => { const r = await salvarCategoria({ ...nova, orcamento: null }); if (r.ok) setNova({ ...nova, nome: "" }); return r; }); }}>
         <input className="input-sm" required placeholder="Nova categoria" value={nova.nome} maxLength={40} onChange={(e) => setNova({ ...nova, nome: e.target.value })} aria-label="Nome da categoria" />
-        <select className="select" value={nova.tipo} onChange={(e) => setNova({ ...nova, tipo: e.target.value as "gasto" | "renda" })} aria-label="Tipo"><option value="gasto">Gasto</option><option value="renda">Renda</option></select>
+        <Seletor ariaLabel="Tipo" valor={nova.tipo} onChange={(x) => setNova({ ...nova, tipo: x as "gasto" | "renda" })} opcoes={[{ valor: "gasto", rotulo: "Gasto" }, { valor: "renda", rotulo: "Renda" }]} />
         <input type="color" className="fin-cor" value={nova.cor} onChange={(e) => setNova({ ...nova, cor: e.target.value })} aria-label="Cor" />
         <button className="btn btn-secondary btn-sm" disabled={indo}><Plus aria-hidden />Criar</button>
       </form>

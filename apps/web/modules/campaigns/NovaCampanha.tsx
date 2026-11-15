@@ -11,6 +11,7 @@ import { ContaSelect } from "./ContaSelect";
 import { criarRascunho } from "./rascunhos";
 
 
+import { Seletor } from "../shell/Seletor";
 /** Nova campanha de Pesquisa: a IA escreve a proposta a partir do pedido, ou começa um rascunho em branco. */
 export function NovaCampanha({ contas, marcas }: { contas: ContaGoogle[]; marcas: MarcaResumo[] }) {
   const router = useRouter();
@@ -49,10 +50,8 @@ export function NovaCampanha({ contas, marcas }: { contas: ContaGoogle[]; marcas
 
       <div className="field">
         <label className="label" htmlFor="marca">Marca anunciada (a IA usa o “sobre”, o tom e as regras dela)</label>
-        <select id="marca" className="select" value={f.marcaId} onChange={(e) => set("marcaId", e.target.value)} style={{ maxWidth: 320 }}>
-          {marcas.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
-          <option value="">Nenhuma (só o pedido e o site)</option>
-        </select>
+        <Seletor id="marca" className="seletor-campo" ariaLabel="Marca" valor={f.marcaId} onChange={(x) => set("marcaId", x)} style={{ maxWidth: 320 }}
+          opcoes={[...marcas.map((m) => ({ valor: m.id, rotulo: m.nome })), { valor: "", rotulo: "Nenhuma (só o pedido e o site)" }]} />
       </div>
 
       <Revelar aberto={modo === "ia"}>

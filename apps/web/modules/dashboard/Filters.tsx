@@ -3,6 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
 
+import { Seletor } from "../shell/Seletor";
 interface Props {
   contas: { id: string; name: string; provider: string }[];
   campanhas: { id: string; name: string; ad_account_id: string }[];
@@ -36,19 +37,12 @@ export function Filters({ contas, campanhas }: Props) {
           </button>
         ))}
       </div>
-      <select className="select" aria-label="Plataforma" value={provider} onChange={(e) => set("provider", e.target.value)}>
-        <option value="">Todas as plataformas</option>
-        <option value="META">Meta Ads</option>
-        <option value="GOOGLE">Google Ads</option>
-      </select>
-      <select className="select" aria-label="Conta" value={account} onChange={(e) => set("account", e.target.value)}>
-        <option value="">Todas as contas</option>
-        {contasF.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-      </select>
-      <select className="select" aria-label="Campanha" value={sp.get("campaign") ?? ""} onChange={(e) => set("campaign", e.target.value)} style={{ maxWidth: 260 }}>
-        <option value="">Todas as campanhas</option>
-        {campsF.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-      </select>
+      <Seletor ariaLabel="Plataforma" valor={provider} onChange={(x) => set("provider", x)}
+        opcoes={[{ valor: "", rotulo: "Todas as plataformas" }, { valor: "META", rotulo: "Meta Ads" }, { valor: "GOOGLE", rotulo: "Google Ads" }]} />
+      <Seletor ariaLabel="Conta" valor={account} onChange={(x) => set("account", x)}
+        opcoes={[{ valor: "", rotulo: "Todas as contas" }, ...contasF.map((c) => ({ valor: c.id, rotulo: c.name }))]} />
+      <Seletor ariaLabel="Campanha" valor={sp.get("campaign") ?? ""} onChange={(x) => set("campaign", x)} style={{ maxWidth: 260 }}
+        opcoes={[{ valor: "", rotulo: "Todas as campanhas" }, ...campsF.map((c) => ({ valor: c.id, rotulo: c.name }))]} />
     </div>
   );
 }

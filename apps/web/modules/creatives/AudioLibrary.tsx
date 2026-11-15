@@ -9,6 +9,7 @@ import { toast } from "../shell/toast";
 import { apagarCriativo, editarAudio, gerarAudioIA } from "./actions";
 import { enviarArquivo } from "./upload";
 
+import { Seletor } from "../shell/Seletor";
 export interface AudioItem { id: string; name: string; tags: string[]; license: string | null; duration_ms: number | null; origem: string | null; favorita: boolean; prompt: string | null }
 type Tipo = "MUSIC" | "SFX";
 
@@ -72,9 +73,8 @@ export function AudioLibrary({ tipo, itens, podeEditar, gerando }: { tipo: Tipo;
           <div className="cluster" style={{ gap: 8, alignItems: "flex-end" }}>
             <div className="field" style={{ minWidth: 160 }}>
               <label className="label" htmlFor={`g-tag-${tipo}`}>{tipo === "MUSIC" ? "Clima" : "Categoria"}</label>
-              <select id={`g-tag-${tipo}`} className="select" value={ger.tag} onChange={(e) => setGer({ ...ger, tag: e.target.value })}>
-                {tags.map((t) => <option key={t} value={t}>{rotulo(tipo, t)}</option>)}
-              </select>
+              <Seletor id={`g-tag-${tipo}`} className="seletor-campo" ariaLabel="Categoria" valor={ger.tag} onChange={(x) => setGer({ ...ger, tag: x })}
+                opcoes={tags.map((t) => ({ valor: t, rotulo: rotulo(tipo, t) }))} />
             </div>
             <div className="field" style={{ flex: 1, minWidth: 220 }}>
               <label className="label" htmlFor={`g-p-${tipo}`}>Como deve soar (opcional)</label>
@@ -84,9 +84,8 @@ export function AudioLibrary({ tipo, itens, podeEditar, gerando }: { tipo: Tipo;
             {tipo === "MUSIC" && (
               <div className="field" style={{ width: 110 }}>
                 <label className="label" htmlFor="g-dur">Duração</label>
-                <select id="g-dur" className="select" value={ger.duracao} onChange={(e) => setGer({ ...ger, duracao: Number(e.target.value) })}>
-                  {[30, 60, 90, 120].map((d) => <option key={d} value={d}>{d} s</option>)}
-                </select>
+                <Seletor id="g-dur" className="seletor-campo" ariaLabel="Duração" valor={String(ger.duracao)} onChange={(x) => setGer({ ...ger, duracao: Number(x) })}
+                  opcoes={[30, 60, 90, 120].map((d) => ({ valor: String(d), rotulo: `${d} s` }))} />
               </div>
             )}
             <button className="btn btn-primary btn-sm" disabled={pend} onClick={() => gerar(ger.tag, ger.prompt, ger.duracao)}><Sparkles aria-hidden /> Gerar</button>
@@ -133,12 +132,8 @@ export function AudioLibrary({ tipo, itens, podeEditar, gerando }: { tipo: Tipo;
                     {tipo === "MUSIC" && <button type="button" className="btn btn-ghost btn-xs" title={i.favorita ? "Favorita do clima (os vídeos usam esta)" : "Marcar como favorita do clima"} aria-pressed={i.favorita} onClick={() => acao(() => editarAudio(i.id, { favorita: !i.favorita }))}>
                       <Star aria-hidden style={i.favorita ? { fill: "#F5B70A", color: "#F5B70A" } : { opacity: 0.5 }} /></button>}
                     <button type="button" className="btn btn-ghost btn-xs" aria-label="Renomear" onClick={() => { setEditando(i.id); setNome(i.name); }}><Pencil aria-hidden /></button>
-                    <label className="audio-mover" title="Mover para outra categoria">
-                      <ChevronDown size={13} aria-hidden />
-                      <select aria-label="Mover para" value={i.tags[0] ?? ""} onChange={(e) => acao(() => editarAudio(i.id, { tags: [e.target.value] }), "Movido")}>
-                        {tags.map((t) => <option key={t} value={t}>{rotulo(tipo, t)}</option>)}
-                      </select>
-                    </label>
+                    <Seletor className="audio-mover" title="Mover para outra categoria" ariaLabel="Mover para" gatilho={<ChevronDown size={13} aria-hidden />}
+                      valor={i.tags[0] ?? ""} onChange={(x) => acao(() => editarAudio(i.id, { tags: [x] }), "Movido")} opcoes={tags.map((t) => ({ valor: t, rotulo: rotulo(tipo, t) }))} />
                     <button type="button" className="btn btn-ghost btn-xs" aria-label={`Apagar ${i.name}`} disabled={pend} onClick={async () => (await confirmar(`Apagar “${i.name}”?`)) && acao(() => apagarCriativo(i.id), "Apagado")}><Trash2 aria-hidden /></button>
                   </div>
                 )}
@@ -173,7 +168,7 @@ function Envio({ tipo, tags }: { tipo: Tipo; tags: readonly string[] }) {
     <details className="panel" style={{ padding: 16 }}>
       <summary className="panel-title" style={{ cursor: "pointer", display: "flex", gap: 8, alignItems: "center" }}><Upload size={15} aria-hidden /> Enviar {tipo === "MUSIC" ? "música licenciada" : "efeito sonoro"}</summary>
       <div className="cluster" style={{ gap: 8, alignItems: "flex-end", marginTop: 12 }}>
-        <select className="select" aria-label="Categoria" value={tag} onChange={(e) => setTag(e.target.value)}>{tags.map((t) => <option key={t} value={t}>{rotulo(tipo, t)}</option>)}</select>
+        <Seletor ariaLabel="Categoria" valor={tag} onChange={setTag} opcoes={tags.map((t) => ({ valor: t, rotulo: rotulo(tipo, t) }))} />
         <input className="input-sm" style={{ flex: 1, minWidth: 220 }} value={licenca} onChange={(e) => setLicenca(e.target.value)} maxLength={200} placeholder="Licença / origem (ex.: Epidemic Sound, autoral)" aria-label="Licença" />
         <input ref={input} type="file" accept="audio/*" multiple hidden onChange={(e) => void enviar(e.target.files)} />
         <button className="btn btn-secondary btn-sm" disabled={!!enviando || licenca.trim().length < 3} onClick={() => input.current?.click()}>

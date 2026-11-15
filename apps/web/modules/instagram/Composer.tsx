@@ -15,6 +15,7 @@ import { arquivo, FeedMock, GradeMock, type MidiaPreview, ReelsMock, StoryMock }
 import { ICONE_TIPO } from "./NovaPublicacao";
 import { CapaReels } from "./CapaReels";
 
+import { Seletor } from "../shell/Seletor";
 export interface ItemBiblioteca extends MidiaPreview { name: string; duration_ms: number | null }
 
 const doisDigitos = (n: number) => String(n).padStart(2, "0");
@@ -202,10 +203,8 @@ export function Composer({ post, conta, biblioteca, feed, marcas, podeEditar }: 
                   <div className="ig-ia-linha">
                     <Sparkles size={16} aria-hidden style={{ color: "rgb(var(--c-brand))", flexShrink: 0 }} />
                     {marcas.length > 0 && (
-                      <select className="select" value={marcaId} onChange={(e) => setMarcaId(e.target.value)} aria-label="Marca (tom de voz e regras da legenda)" title="Marca: a IA segue o tom e as regras dela" style={{ width: 130, height: 32 }}>
-                        {marcas.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
-                        <option value="">Sem marca</option>
-                      </select>
+                      <Seletor ariaLabel="Marca (tom de voz e regras da legenda)" title="Marca: a IA segue o tom e as regras dela" valor={marcaId} onChange={setMarcaId} style={{ width: 130 }}
+                        opcoes={[...marcas.map((m) => ({ valor: m.id, rotulo: m.nome })), { valor: "", rotulo: "Sem marca" }]} />
                     )}
                     <input className="input-sm" style={{ flex: 1 }} value={dica} onChange={(e) => setDica(e.target.value)} maxLength={1000}
                       placeholder="Opcional: o que destacar (ex.: teste grátis, tom descontraído, CTA para o link da bio)" onKeyDown={(e) => e.key === "Enter" && gerar()} />

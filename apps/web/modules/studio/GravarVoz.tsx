@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { enviarArquivo } from "../creatives/upload";
 import { toast } from "../shell/toast";
 
+import { Seletor } from "../shell/Seletor";
 export interface VozGravada { id: string | null; url: string; dur: number; pct: number; picos?: number[] }
 
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
@@ -204,10 +205,8 @@ function SeletorMic({ g }: { g: Gravador }) {
   return (
     <label className="mic-sel">
       <Mic aria-hidden />
-      <select value={g.mics.some((m) => m.id === g.mic) ? g.mic : ""} onChange={(e) => g.setMic(e.target.value)} aria-label="Microfone">
-        <option value="">Microfone padrão do sistema</option>
-        {g.mics.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
-      </select>
+      <Seletor ariaLabel="Microfone" valor={g.mics.some((m) => m.id === g.mic) ? g.mic : ""} onChange={g.setMic} style={{ height: 28, maxWidth: 280 }}
+        opcoes={[{ valor: "", rotulo: "Microfone padrão do sistema" }, ...g.mics.map((m) => ({ valor: m.id, rotulo: m.nome }))]} />
     </label>
   );
 }
