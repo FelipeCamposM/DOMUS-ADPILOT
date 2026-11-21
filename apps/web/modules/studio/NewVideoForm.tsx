@@ -31,9 +31,11 @@ const MUSICAS: [string, string][] = [["auto", "Automática"], ["none", "Sem mús
 
 export interface VozEl { id: string; nome: string; categoria: string; preview: string | null }
 
-export function NewVideoForm({ produto, musicas, marcas, vozesEl, favoritas: favIniciais, estilosSalvos = [] }: {
+export function NewVideoForm({ produto, musicas, marcas, vozesEl, favoritas: favIniciais, estilosSalvos = [], motion }: {
   produto: string; musicas: Record<string, number>; vozesEl: VozEl[]; favoritas: string[];
   marcas: MarcaResumo[]; estilosSalvos?: EstiloSalvo[];
+  /** aba Motion: animação Livre sem narração por padrão, em 2D (GSAP) ou 3D (Three.js) */
+  motion?: boolean;
 }) {
   const [anexos, setAnexos] = useState<AnexosValor>({ assets: [], links: [] });
   const router = useRouter();
@@ -41,8 +43,8 @@ export function NewVideoForm({ produto, musicas, marcas, vozesEl, favoritas: fav
   const [erro, setErro] = useState<string | null>(null);
   const [f, setF] = useState({
     produto, objetivo: "", descricao: "", publico: "", cta: "", estilo: "premium, moderno, tipografia forte", cores: "",
-    duracao: 15, formato: "9:16", voz: "pf_dora", vozNome: "", musica: "auto", efeitos: true, orientacao: "", estiloVisual: "hud" as Estilo, legendas: true,
-    estiloSalvo: null as string | null, cortarPausas: true,
+    duracao: 15, formato: "9:16", voz: motion ? "none" : "pf_dora", vozNome: "", musica: "auto", efeitos: true, orientacao: "", estiloVisual: (motion ? "livre" : "hud") as Estilo, legendas: true,
+    estiloSalvo: null as string | null, cortarPausas: true, tresD: !!motion,
   });
   const [minhaVoz, setMinhaVoz] = useState<VozGravada | null>(null);
   const propria = f.voz === "propria";
@@ -108,7 +110,16 @@ export function NewVideoForm({ produto, musicas, marcas, vozesEl, favoritas: fav
       <div className="stack studio-lateral" style={{ gap: 16 }}>
         <Identidade marcas={marcas} valor={marcaId} onChange={setMarcaId} />
         <div className="panel" data-enter style={{ padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
-          <div className="panel-title">Estilo visual</div>
+          <div className="panel-title">{motion ? "Animação" : "Estilo visual"}</div>
+          {motion ? (
+            <>
+              <Escolha valor={f.tresD ? "3d" : "2d"} raio={999} variante="pilula" className="cluster" style={{ gap: 4, padding: 3, borderRadius: 12, border: "1px solid rgb(var(--c-border))", background: "rgb(var(--c-bg-surface))", alignSelf: "flex-start" }}>
+                <button type="button" data-opt="2d" className="chip" data-active={!f.tresD} onClick={() => set("tresD", false)} style={{ height: 32, border: 0 }}>2D (GSAP)</button>
+                <button type="button" data-opt="3d" className="chip" data-active={f.tresD} onClick={() => set("tresD", true)} style={{ height: 32, border: 0 }}>3D (Three.js)</button>
+              </Escolha>
+              <p className="subtle caption">{f.tresD ? "Cena 3D de verdade (objetos, luz e câmera em movimento) com os textos por cima. A IA escreve do zero; descreva nas orientações o que quer ver." : "Animação 2D escrita do zero pela IA, com uma direção de arte nova a cada vídeo."}</p>
+            </>
+          ) : <>
           <EstiloPicker valor={f.estiloVisual} onChange={(v) => set("estiloVisual", v)} salvos={salvos} salvo={f.estiloSalvo} onSalvo={(id) => set("estiloSalvo", id)}
             onApagar={async (id) => {
               if (!(await confirmar("Apagar este estilo salvo? Os vídeos já feitos com ele não mudam."))) return;
@@ -118,6 +129,7 @@ export function NewVideoForm({ produto, musicas, marcas, vozesEl, favoritas: fav
               if (f.estiloSalvo === id) set("estiloSalvo", null);
             }} />
           <p className="subtle caption">{f.estiloSalvo ? "A IA repete a linguagem visual do vídeo que você salvou como estilo, com o conteúdo novo e no formato escolhido." : f.estiloVisual === "livre" ? "A IA escreve a animação do zero: mais variedade, resultado menos previsível." : "Cenas prontas e testadas (sem texto saindo da tela). A IA escolhe as cenas e escreve os textos; o roteiro passa por você antes."}</p>
+          </>}
           <button type="button" role="switch" aria-checked={f.legendas} className="chave" onClick={() => set("legendas", !f.legendas)} disabled={f.voz === "none"}>
             <span className="chave-trilho"><span className="chave-bola" /></span> Legenda da narração {f.voz === "none" ? "(sem voz)" : f.legendas ? "ligada" : "desligada"}
           </button>

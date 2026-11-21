@@ -90,7 +90,8 @@ ESTRUTURA OBRIGATÓRIA (HyperFrames):
 - .clip { position:absolute; inset:0 } — cada cena ocupa o quadro inteiro. Camadas com z-index, não com data-track-index.
 - Scripts, nesta ordem, no fim do <body>:
     <script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
-    <script src="assets/motion-kit.js"></script>
+    <script src="assets/motion-kit.js"></script>${b.tresD ? `
+    <script src="assets/three.min.js"></script>` : ""}
     <script>
       const tl = MK.init({ … , total: <duração total> });
       … cenas com os métodos MK.* e tl.fromTo(alvo, {…}, {…}, <tempo absoluto>) …
@@ -100,11 +101,11 @@ ESTRUTURA OBRIGATÓRIA (HyperFrames):
   Tudo com tempo absoluto em segundos. Propriedades GSAP livres para transform 3D (x, y, z, rotationX, rotationY, scale, opacity, filter).
   Timelines filhas não podem ser paused. Nada de CSS @keyframes/animation/transition: todo movimento vem do timeline (o render busca quadros).
 - PROIBIDO: Math.random, Date.now, new Date, fetch, XMLHttpRequest, WebSocket, import(), eval, iframe, imagens/vídeos externos,
-  qualquer <script src> além dos dois acima. Fontes: pode usar Google Fonts (<link> para fonts.googleapis.com) ou fontes do sistema.
+  qualquer <script src> além dos ${b.tresD ? "três" : "dois"} acima. Fontes: pode usar Google Fonts (<link> para fonts.googleapis.com) ou fontes do sistema.
   Formas, gradientes, ícones e ilustrações: CSS e SVG inline.
 
 ${KIT_DOC}
-
+${b.tresD ? REGRAS_3D(w, h) : ""}
 DIREÇÃO DE ARTE DESTE VÍDEO (obrigatória, e diferente dos vídeos anteriores):
 ${!direcao ? "  Mantenha a linguagem visual da composição atual."
   : ajuste ? `  Num ajuste, mantenha a linguagem da composição atual, A MENOS que o pedido peça outro estilo, mais originalidade ou
@@ -139,6 +140,34 @@ ${REGRAS_CONTEXTO}
   texto original sem repetir nem acrescentar letras (ex.: “SIAPLUS” → <span>SIA</span><span>PLUS</span>, nunca SIAP + PLUS).
   Confira a ortografia de toda palavra na tela antes de responder.`;
 }
+
+/** Motion graphics 3D: Three.js r159 (global THREE) num <canvas> de fundo, comandado pelo mesmo timeline GSAP. */
+const REGRAS_3D = (w: number, h: number) => `
+MOTION 3D (OBRIGATÓRIO NESTE VÍDEO): a cena principal é 3D de verdade em Three.js (r159, objeto global THREE, já carregado).
+- Um <canvas id="gl" width="${w}" height="${h}"> como PRIMEIRO filho do #root (position:absolute; inset:0; z-index:0), fora das cenas.
+  Textos, legendas e logo ficam em HTML por cima (z-index maior), nunca como texto 3D.
+- const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true }); renderer.setPixelRatio(1);
+  renderer.setSize(${w}, ${h}, false); renderer.outputColorSpace = THREE.SRGBColorSpace; câmera PerspectiveCamera com aspect ${w}/${h}.
+- O render é quadro a quadro: NADA de requestAnimationFrame, THREE.Clock, setTimeout ou loop próprio. Desenhe assim:
+    const render = () => renderer.render(scene, camera);
+    tl.to({}, { duration: <duração total>, onUpdate: render }, 0);   // redesenha a cada quadro buscado
+    render();
+- Todo movimento 3D é tween GSAP no timeline com tempo absoluto: tl.to(mesh.rotation, { y: …, duration, ease }, t),
+  tl.to(camera.position, {…}, t), tl.to(material, { opacity }, t), tl.to(light, { intensity }, t). Câmera que olha para um
+  ponto: atualize camera.lookAt(...) dentro do onUpdate antes do render.
+- Só geometria procedural (Box, Sphere, Torus, TorusKnot, Icosahedron, Cylinder, Plane, Extrude de Shape, BufferGeometry com
+  pontos calculados), MeshStandardMaterial/MeshPhysicalMaterial/MeshBasicMaterial, luzes (Ambient, Directional, Point, Spot,
+  Hemisphere) e Fog. Sem texturas, modelos ou HDR externos. Aleatório só com MK.rand() (semente fixa).
+- Mude o 3D por cena (objetos entrando, câmera viajando, materiais trocando de cor) para casar com o que é dito;
+  use as cores da identidade nos materiais e no fundo (scene.background ou o fundo do #root).
+- Desempenho: até ~60 mil triângulos e até 3 luzes com sombra desligada.
+`;
+
+/** Direção de arte do motion 3D (no lugar do sorteio do modo Livre). */
+export const DIRECAO_3D: Direcao = {
+  nome: "Motion 3D (Three.js)",
+  descricao: "cena 3D em WebGL com objetos sólidos e brilhantes, iluminação de estúdio, câmera em movimento suave e profundidade real; tipografia limpa em HTML por cima, ritmo de vídeo de lançamento de produto.",
+};
 
 /**
  * Direções de arte do modo Livre: cada vídeo sorteia uma que não foi usada nos últimos vídeos do workspace, para a IA

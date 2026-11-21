@@ -11,7 +11,7 @@ export function violacoes(html: string): string[] {
   ];
   for (const [re, msg] of proibidos) if (re.test(html)) erros.push(msg);
   for (const m of html.matchAll(/<script[^>]*\ssrc\s*=\s*["']([^"']+)["']/gi))
-    if (m[1] !== "assets/motion-kit.js" && m[1] !== "assets/cenas.js" && !/^https:\/\/cdn\.jsdelivr\.net\/npm\/gsap@3[\w.]*\/dist\/[\w.]+\.js$/.test(m[1]!)) erros.push(`Script não permitido: ${m[1]} (só o GSAP do jsdelivr, assets/motion-kit.js e assets/cenas.js)`);
+    if (m[1] !== "assets/motion-kit.js" && m[1] !== "assets/cenas.js" && m[1] !== "assets/three.min.js" && !/^https:\/\/cdn\.jsdelivr\.net\/npm\/gsap@3[\w.]*\/dist\/[\w.]+\.js$/.test(m[1]!)) erros.push(`Script não permitido: ${m[1]} (só o GSAP do jsdelivr, assets/motion-kit.js, assets/cenas.js e assets/three.min.js)`);
   for (const m of html.matchAll(/<link[^>]*\shref\s*=\s*["']([^"']+)["']/gi))
     if (!/^https:\/\/fonts\.(googleapis|gstatic)\.com(\/|$)/.test(m[1]!)) erros.push(`Link externo não permitido: ${m[1]} (só Google Fonts)`);
   for (const m of html.matchAll(/(?:src|href)\s*=\s*["'](https?:\/\/[^"']+)["']/gi))

@@ -11,7 +11,7 @@ export default async function NovoPage({ searchParams }: { searchParams: Promise
   const ctx = await requireCtx();
   if (!can(ctx, "editor")) redirect("/studio");
   const { tipo: t, item: itemId } = await searchParams;
-  const inicial = t === "imagem" ? "imagem" : t === "post" ? "post" : t === "edicao" ? "edicao" : "video";
+  const inicial = t === "imagem" ? "imagem" : t === "post" ? "post" : t === "edicao" ? "edicao" : t === "motion" ? "motion" : "video";
   const sql = db();
   const ws = ctx.workspace.id;
   const tags = await sql<{ tag: string; n: number }[]>`

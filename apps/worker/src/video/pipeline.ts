@@ -1,9 +1,10 @@
 import { apagarArquivo, briefSchema, VOZ_FALAS, VOZ_PROPRIA, db, FORMATOS, guardarArquivo, PAPEIS_COR, paletaSchema, r2Key, retimeScenes, tempoLeitura, type Brief, type Json, type Storyboard } from "@domus-ads/core";
-import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { join } from "node:path";
 import { DATA_DIR } from "../env";
 import { bloco, perguntarIA } from "../ai/ask";
-import { DIRECOES, lerStoryboard, promptAjuste, type Direcao, promptComposicao, promptCorrecao, promptRoteiro, SISTEMA_ROTEIRO, sistemaAjusteCenas, sistemaComposicao, violacoes } from "./compose";
+import { DIRECAO_3D, DIRECOES, lerStoryboard, promptAjuste, type Direcao, promptComposicao, promptCorrecao, promptRoteiro, SISTEMA_ROTEIRO, sistemaAjusteCenas, sistemaComposicao, violacoes } from "./compose";
 import { contextoCriativo } from "./contexto";
 import { arquivoMusica, arquivoSfx } from "./sfx";
 import { duracao, ffmpeg, hyperframes } from "./tools";
@@ -91,7 +92,8 @@ export async function runVideo(payload: VideoPayload, c: Ctx) {
       if (brief.estiloVisual === "livre") {
         const [salvoR] = brief.estiloSalvo ? await sql<{ nome: string; descricao: string }[]>`
           select nome, descricao from ads.estilos_video where id = ${brief.estiloSalvo} and workspace_id = ${p.workspace_id}` : [];
-        const d = salvoR ? { nome: `Estilo salvo: ${salvoR.nome}`, descricao: salvoR.descricao || "repete a linguagem visual do vídeo que você salvou" } : await escolherDirecao(p.workspace_id, p.id);
+        const d = salvoR ? { nome: `Estilo salvo: ${salvoR.nome}`, descricao: salvoR.descricao || "repete a linguagem visual do vídeo que você salvou" }
+          : brief.tresD ? DIRECAO_3D : await escolherDirecao(p.workspace_id, p.id);
         sb.direcao = { nome: d.nome.slice(0, 80), descricao: d.descricao.slice(0, 1500) };
       }
       // pausa para aprovação: voz, animação e render (o que gasta créditos) só depois que o usuário aprovar o roteiro
@@ -185,6 +187,7 @@ export async function runVideo(payload: VideoPayload, c: Ctx) {
     mkdirSync(join(pasta, "assets"), { recursive: true });
     writeFileSync(join(pasta, "assets", "motion-kit.js"), MOTION_KIT_JS, "utf8");
     writeFileSync(join(pasta, "assets", "cenas.js"), CENAS_JS, "utf8");
+    copyFileSync(createRequire(import.meta.url).resolve("three/build/three.min.js"), join(pasta, "assets", "three.min.js")); // motion 3D
     const deCenas = ajuste ? !!p.composition?.includes("assets/cenas.js") : modelo;
     // Livre: estilo salvo (repete a linguagem de um vídeo aprovado) ou uma direção de arte que o workspace não usou nos
     // últimos vídeos (a composição guarda qual foi)

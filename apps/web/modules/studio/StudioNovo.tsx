@@ -1,7 +1,7 @@
 "use client";
 
 import { gsap } from "gsap";
-import { Clapperboard, ImageIcon, Scissors, Send } from "lucide-react";
+import { Box, Clapperboard, ImageIcon, Scissors, Send } from "lucide-react";
 import { useLayoutEffect, useRef, useState, type ComponentProps } from "react";
 import { Escolha } from "../motion/Escolha";
 import { NewImageForm } from "./NewImageForm";
@@ -10,12 +10,13 @@ import { NewVideoForm } from "./NewVideoForm";
 import { NewEditForm } from "./edicao/NewEditForm";
 import { HeroFx } from "@/modules/shell/HeroFx";
 
-type Aba = "post" | "video" | "imagem" | "edicao";
-const URL_ABA: Record<Aba, string> = { post: "/studio/novo?tipo=post", imagem: "/studio/novo?tipo=imagem", video: "/studio/novo", edicao: "/studio/novo?tipo=edicao" };
+type Aba = "post" | "video" | "imagem" | "edicao" | "motion";
+const URL_ABA: Record<Aba, string> = { post: "/studio/novo?tipo=post", imagem: "/studio/novo?tipo=imagem", video: "/studio/novo", edicao: "/studio/novo?tipo=edicao", motion: "/studio/novo?tipo=motion" };
 const TITULO: Record<Aba, [string, string]> = {
   post: ["Novo post", "Para o Instagram: a IA escreve, você aprova (também pelo WhatsApp) e ele publica sozinho no horário."],
   imagem: ["Nova imagem", "Arte avulsa para anúncio ou teste A/B: você aprova os conceitos e baixa o PNG."],
   video: ["Novo vídeo", "Vídeo narrado para anúncio ou Reels: você aprova o roteiro e baixa o MP4."],
+  motion: ["Motion graphics", "Animação 2D (GSAP) ou 3D (Three.js) criada pela IA: você aprova o roteiro e baixa o MP4, pronto para TikTok e Reels."],
   edicao: ["Editar meu vídeo", "Envie o seu vídeo: a IA corta as pausas, legenda palavra por palavra e coloca animações 3D por cima."],
 };
 
@@ -26,7 +27,7 @@ const TITULO: Record<Aba, [string, string]> = {
 export function StudioNovo({ inicial, video, imagem, post, edicao }: { inicial: Aba; video: ComponentProps<typeof NewVideoForm>; imagem: ComponentProps<typeof NewImageForm>; post: ComponentProps<typeof NewPostForm>; edicao: ComponentProps<typeof NewEditForm> }) {
   const [aba, setAba] = useState<Aba>(inicial);
   const [visivel, setVisivel] = useState<Aba>(inicial);
-  const caixas = { post: useRef<HTMLDivElement>(null), video: useRef<HTMLDivElement>(null), imagem: useRef<HTMLDivElement>(null), edicao: useRef<HTMLDivElement>(null) };
+  const caixas = { post: useRef<HTMLDivElement>(null), video: useRef<HTMLDivElement>(null), imagem: useRef<HTMLDivElement>(null), edicao: useRef<HTMLDivElement>(null), motion: useRef<HTMLDivElement>(null) };
   const titulo = useRef<HTMLHeadingElement>(null);
   const montou = useRef(false);
 
@@ -62,7 +63,7 @@ export function StudioNovo({ inicial, video, imagem, post, edicao }: { inicial: 
           <p className="page-sub" data-enter>{TITULO[visivel][1]}</p>
         </div>
         <Escolha valor={aba} raio={999} variante="pilula" className="cluster" style={{ gap: 4, padding: 3, borderRadius: 12, border: "1px solid rgb(var(--c-border))", background: "rgb(var(--c-bg-surface))" }}>
-          {([["post", "Post", Send], ["imagem", "Imagem avulsa", ImageIcon], ["video", "Vídeo avulso", Clapperboard], ["edicao", "Editar meu vídeo", Scissors]] as const).map(([v, l, I]) => (
+          {([["post", "Post", Send], ["imagem", "Imagem avulsa", ImageIcon], ["video", "Vídeo avulso", Clapperboard], ["motion", "Motion", Box], ["edicao", "Editar meu vídeo", Scissors]] as const).map(([v, l, I]) => (
             <button key={v} data-opt={v} type="button" role="tab" aria-selected={aba === v} className="chip" data-active={aba === v} onClick={() => trocar(v)} style={{ height: 32, border: 0 }}>
               <I aria-hidden /> {l}
             </button>
@@ -72,6 +73,7 @@ export function StudioNovo({ inicial, video, imagem, post, edicao }: { inicial: 
       <div ref={caixas.post} className="studio-aba" hidden={visivel !== "post"}><NewPostForm {...post} /></div>
       <div ref={caixas.video} className="studio-aba" hidden={visivel !== "video"}><NewVideoForm {...video} /></div>
       <div ref={caixas.imagem} className="studio-aba" hidden={visivel !== "imagem"}><NewImageForm {...imagem} /></div>
+      <div ref={caixas.motion} className="studio-aba" hidden={visivel !== "motion"}><NewVideoForm {...video} motion /></div>
       <div ref={caixas.edicao} className="studio-aba" hidden={visivel !== "edicao"}><NewEditForm {...edicao} /></div>
     </>
   );

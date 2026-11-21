@@ -79,10 +79,13 @@ export const briefSchema = z.object({
   efeitos: z.coerce.boolean().default(true),
   estiloVisual: z.enum(Object.keys(ESTILOS) as [EstiloVisual, ...EstiloVisual[]], { message: "Estilo inválido" }).default("hud"),
   legendas: z.coerce.boolean().default(true),
+  // motion graphics em 3D: a IA monta a cena em Three.js (WebGL) dentro da composição; sempre no modo Livre
+  tresD: z.coerce.boolean().default(false),
   identidade: z.enum(IDENTIDADES).default("workspace"),
   // estilo salvo (modo Livre): a IA repete a linguagem visual de um vídeo aprovado
   estiloSalvo: z.string().uuid("Estilo inválido").nullable().default(null),
-}).refine((b) => b.voz === VOZ_PROPRIA || temObjetivo(b), MSG_OBJETIVO) // a própria fala já diz do que se trata
+}).refine((b) => !b.tresD || b.estiloVisual === "livre", { message: "Motion 3D usa o estilo Livre", path: ["estiloVisual"] })
+  .refine((b) => b.voz === VOZ_PROPRIA || temObjetivo(b), MSG_OBJETIVO) // a própria fala já diz do que se trata
   .refine((b) => (b.voz === VOZ_PROPRIA) === !!b.audioProprio, { message: "Grave ou envie o áudio com a sua voz", path: ["audioProprio"] });
 export type Brief = z.infer<typeof briefSchema>;
 
