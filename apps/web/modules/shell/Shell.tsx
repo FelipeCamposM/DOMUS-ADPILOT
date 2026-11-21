@@ -1,7 +1,8 @@
 "use client";
 
 import { usePulso } from "./usePulso";
-import { LogOut, MessageCircle, Search } from "lucide-react";
+import { LogOut, Search } from "lucide-react";
+import { WhatsappIcon } from "../connections/Logos";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
@@ -72,6 +73,7 @@ export function Shell(p: ShellProps) {
           </button>
 
           <div className="tb-dir" style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+            <div className="tb-grupo">
             <UsoIA contas={p.contasIA} pref={p.iaPref} podeEditar={p.admin} aberto={menu === "ia"} onToggle={() => setMenu(menu === "ia" ? null : "ia")} onClose={fechar} />
             <Link href="/settings#worker" className="chip tb-worker" suppressHydrationWarning title={p.worker.lastSeen ? `Último sinal ${ago(p.worker.lastSeen)}` : "O worker nunca se conectou"}>
               <span className={`dot ${p.worker.online ? "on" : "err"}`} aria-hidden />
@@ -79,20 +81,19 @@ export function Shell(p: ShellProps) {
             </Link>
             {p.whatsapp.estado && (() => {
               const on = p.whatsapp.estado.state === "open";
-              const conteudo = <><span className={`dot ${on ? "on" : "err"}`} aria-hidden /><MessageCircle aria-hidden /> <span className="tb-rot">{on ? "WhatsApp" : "WhatsApp desconectado"}</span></>;
+              const conteudo = <><span className="tb-zap" data-on={on}><WhatsappIcon aria-hidden /></span><span className="tb-rot">{on ? "WhatsApp" : "WhatsApp desconectado"}</span></>;
               const titulo = on ? `WhatsApp conectado${p.whatsapp.estado.numero ? ` · ${p.whatsapp.estado.numero}` : ""}` : "Clique para conectar com QR code";
               return p.admin
                 ? <button className="chip" data-alerta={!on} onClick={() => setZap(true)} title={titulo}>{conteudo}</button>
                 : <Link href="/settings#whatsapp" className="chip" title={titulo}>{conteudo}</Link>;
             })()}
+            </div>
 
             <Notificacoes n={p.notificacoes} aberto={menu === "bell"} onToggle={() => setMenu(menu === "bell" ? null : "bell")} onClose={fechar} />
 
             <div style={{ position: "relative" }}>
-              <button className="chip" onClick={() => setMenu(menu === "user" ? null : "user")} aria-label="Conta">
-                <span style={{ width: 22, height: 22, borderRadius: 99, display: "grid", placeItems: "center", background: "rgb(var(--c-bg-elevated))", fontWeight: 700, fontSize: 11 }}>
-                  {p.user.email[0]?.toUpperCase()}
-                </span>
+              <button className="tb-avatar" onClick={() => setMenu(menu === "user" ? null : "user")} aria-label="Conta" title={p.user.email}>
+                {p.user.email[0]?.toUpperCase()}
               </button>
               <Popover open={menu === "user"} onClose={fechar} align="right">
                 <div style={{ padding: "8px 10px" }} className="subtle">{p.user.email}</div>

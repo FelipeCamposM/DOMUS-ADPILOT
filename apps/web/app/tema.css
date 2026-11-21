@@ -483,3 +483,26 @@ body { background: #030205; }
   .em-msgs, .em-leitor-topo, .em-responder { padding-inline: 12px; }
 }
 .notif-item[data-tipo="email"] .notif-ic { color: rgb(var(--c-error)); background: rgb(var(--c-error) / 0.14); }
+
+/* ── topo: status (IA, worker, WhatsApp) num grupo só, avatar com gradiente, menu de IA com rolagem ── */
+.tb-grupo { display: flex; align-items: center; gap: 2px; height: 44px; padding: 3px; border-radius: 999px; background: #ffffff06; border: 1px solid #ffffff14; box-shadow: inset 0 1px #ffffff0a; }
+.tb-grupo > * { position: relative; }
+.tb-grupo > * + *::before { content: ""; position: absolute; left: -1px; top: 10px; bottom: 10px; width: 1px; background: #ffffff14; }
+.topbar .tb-grupo .chip { height: 36px; border-color: transparent; background: transparent; padding-inline: 12px; }
+.topbar .tb-grupo .chip:hover { background: #ffffff0d; border-color: transparent; }
+.tb-zap { position: relative; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 7px; color: #fff; background: #25d366; box-shadow: 0 4px 12px -4px #25d366aa; }
+.tb-zap > svg { width: 14px !important; height: 14px !important; stroke-width: 2.2; }
+.tb-zap[data-on="false"] { background: #3a3640; box-shadow: none; color: #ffffffa0; }
+.tb-zap[data-on="false"]::after { content: ""; position: absolute; right: -3px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: rgb(var(--c-error)); box-shadow: 0 0 0 2px #0d0b13; }
+.tb-avatar { width: 40px; height: 40px; flex: none; border-radius: 50%; border: 0; cursor: pointer; display: grid; place-items: center; font: 700 14px var(--font-sans); color: #fff;
+  background: linear-gradient(140deg, var(--p-400, #a78bfa), var(--p-700, #5b21b6)); box-shadow: 0 0 0 2px #ffffff14, 0 8px 22px -10px rgb(var(--c-brand)); transition: transform .25s var(--ease-cm), box-shadow .25s; }
+.tb-avatar:hover { transform: scale(1.05); box-shadow: 0 0 0 2px rgb(var(--c-brand) / 0.6), 0 10px 26px -10px rgb(var(--c-brand)); }
+.menu.ia-menu { max-height: calc(100dvh - 90px); overflow-y: auto; overscroll-behavior: contain; }
+/* logo das orbes: placa clara por cima do líquido (o laranja do Claude não some no laranja) */
+.orbe-logo > svg { background: #fffffff0; color: #111; box-shadow: 0 8px 20px -8px #000c, inset 0 -2px #0000001a; }
+@media (max-width: 900px) {
+  .tb-grupo { height: auto; padding: 0; border: 0; background: none; box-shadow: none; gap: 6px; }
+  .tb-grupo > * + *::before { display: none; }
+  .topbar .tb-grupo .chip { height: 40px; background: #ffffff07; border-color: #ffffff17; }
+  .tb-avatar { width: 40px; height: 40px; }
+}
