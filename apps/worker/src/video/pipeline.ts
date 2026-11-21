@@ -1,7 +1,7 @@
 import { apagarArquivo, briefSchema, VOZ_FALAS, VOZ_PROPRIA, db, FORMATOS, guardarArquivo, PAPEIS_COR, paletaSchema, r2Key, retimeScenes, tempoLeitura, type Brief, type Json, type Storyboard } from "@domus-ads/core";
 import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { DATA_DIR } from "../env";
 import { bloco, perguntarIA } from "../ai/ask";
 import { DIRECAO_3D, DIRECOES, lerStoryboard, promptAjuste, type Direcao, promptComposicao, promptCorrecao, promptRoteiro, SISTEMA_ROTEIRO, sistemaAjusteCenas, sistemaComposicao, violacoes } from "./compose";
@@ -187,7 +187,7 @@ export async function runVideo(payload: VideoPayload, c: Ctx) {
     mkdirSync(join(pasta, "assets"), { recursive: true });
     writeFileSync(join(pasta, "assets", "motion-kit.js"), MOTION_KIT_JS, "utf8");
     writeFileSync(join(pasta, "assets", "cenas.js"), CENAS_JS, "utf8");
-    copyFileSync(createRequire(import.meta.url).resolve("three/build/three.min.js"), join(pasta, "assets", "three.min.js")); // motion 3D
+    copyFileSync(join(dirname(createRequire(import.meta.url).resolve("three")), "three.min.js"), join(pasta, "assets", "three.min.js")); // motion 3D
     const deCenas = ajuste ? !!p.composition?.includes("assets/cenas.js") : modelo;
     // Livre: estilo salvo (repete a linguagem de um vídeo aprovado) ou uma direção de arte que o workspace não usou nos
     // últimos vídeos (a composição guarda qual foi)

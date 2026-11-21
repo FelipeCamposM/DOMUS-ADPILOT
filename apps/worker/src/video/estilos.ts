@@ -47,7 +47,7 @@ async function renderizarPrevia(chave: string, c: Ctx) {
   rmSync(pasta, { recursive: true, force: true });
   mkdirSync(join(pasta, "assets"), { recursive: true });
   const tresD = e.familia === "3d";
-  if (tresD) copyFileSync(createRequire(import.meta.url).resolve("three/build/three.min.js"), join(pasta, "assets", "three.min.js"));
+  if (tresD) copyFileSync(join(dirname(createRequire(import.meta.url).resolve("three")), "three.min.js"), join(pasta, "assets", "three.min.js"));
   const ia = (s: string, p: string) => perguntarIA({ workspaceId: null, sistema: s, prompt: p, cwd: pasta, signal: c.signal, log: c.log });
   const sis = sistema(tresD);
   await c.log(`Criando a amostra de “${e.nome}”…`);
