@@ -1,18 +1,20 @@
 "use client";
 
-import { ArrowRight, AudioLines, Scissors, UserRound, Loader2, MessageSquareText, Mic, MicOff, Music2, Play, Sparkles, Star, Volume2, VolumeX } from "lucide-react";
+import { ArrowRight, AudioLines, FileText, Scissors, UserRound, Loader2, Mic, MicOff, Music2, Play, Sparkles, Star, Volume2, VolumeX, Wand2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import type { CardEstilo } from "@/lib/estilos";
 import { Escolha, Revelar } from "../motion/Escolha";
 import { toast } from "../shell/toast";
 import { EstiloPicker, type Estilo, type EstiloSalvo } from "./EstiloPicker";
 import { Palco } from "./Palco";
 import { apagarEstilo, criarVideo, favoritarVoz } from "./actions";
 import { confirmar } from "../shell/confirmar";
-import { Anexos, paraEnvio, type AnexosValor, anexosDoEstilo, type EstiloEscolhido } from "./Anexos";
+import { Anexos, paraEnvio, type AnexosValor } from "./Anexos";
 import type { MarcaResumo } from "@/lib/marcas";
 import { comMarca, faltando, Identidade } from "./Identidade";
 import { GravarVoz, type VozGravada } from "./GravarVoz";
+import { anexosComEstilo, Campo, Dobra, FaixaEstilos, orientacaoComEstilo, Passo } from "./Cria";
 
 const FORMATOS = [
   { v: "9:16", l: "Vertical", d: "Reels, Stories, Shorts", w: 18, h: 32 },
@@ -31,21 +33,24 @@ const MUSICAS: [string, string][] = [["auto", "Automática"], ["none", "Sem mús
 
 export interface VozEl { id: string; nome: string; categoria: string; preview: string | null }
 
-export function NewVideoForm({ produto, musicas, marcas, vozesEl, favoritas: favIniciais, estilosSalvos = [], motion, estilo }: {
+export function NewVideoForm({ produto, musicas, marcas, vozesEl, favoritas: favIniciais, estilosSalvos = [], motion, estilos = [], estiloInicial = null }: {
   produto: string; musicas: Record<string, number>; vozesEl: VozEl[]; favoritas: string[];
   marcas: MarcaResumo[]; estilosSalvos?: EstiloSalvo[];
   /** aba Motion: animação Livre sem narração por padrão, em 2D (GSAP) ou 3D (Three.js) */
   motion?: boolean;
-  estilo?: EstiloEscolhido | null;
+  /** biblioteca (Studio → Estilos) e o estilo que veio escolhido de lá (?estilo=) */
+  estilos?: CardEstilo[]; estiloInicial?: string | null;
 }) {
-  const [anexos, setAnexos] = useState<AnexosValor>(() => anexosDoEstilo(estilo));
+  const inicial = estilos.find((e) => e.id === estiloInicial) ?? null;
+  const [estilo, setEstilo] = useState<CardEstilo | null>(inicial);
+  const [anexos, setAnexos] = useState<AnexosValor>(() => anexosComEstilo({ assets: [], links: [] }, null, inicial));
   const router = useRouter();
   const [pend, start] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
   const [f, setF] = useState({
     produto, objetivo: "", descricao: "", publico: "", cta: "", estilo: "premium, moderno, tipografia forte", cores: "",
-    duracao: 15, formato: "9:16", voz: motion ? "none" : "pf_dora", vozNome: "", musica: "auto", efeitos: true, orientacao: estilo?.texto ?? "", estiloVisual: (motion || estilo ? "livre" : "hud") as Estilo, legendas: true,
-    estiloSalvo: null as string | null, cortarPausas: true, tresD: !!motion && (estilo?.tresD ?? !estilo),
+    duracao: 15, formato: "9:16", voz: motion ? "none" : "pf_dora", vozNome: "", musica: "auto", efeitos: true, orientacao: "", estiloVisual: (motion || inicial ? "livre" : "hud") as Estilo, legendas: true,
+    estiloSalvo: null as string | null, cortarPausas: true, tresD: !!motion && (inicial ? inicial.familia === "3d" : true),
   });
   const [minhaVoz, setMinhaVoz] = useState<VozGravada | null>(null);
   const propria = f.voz === "propria";
@@ -68,96 +73,88 @@ export function NewVideoForm({ produto, musicas, marcas, vozesEl, favoritas: fav
   const [ouvindo, setOuvindo] = useState<HTMLAudioElement | null>(null);
   const ouvir = (url: string) => { ouvindo?.pause(); const a = new Audio(url); void a.play(); setOuvindo(a); };
 
+  // estilo da biblioteca: a IA escreve do zero seguindo a direção de arte (sem cenas prontas); 3D liga o Three.js
+  const escolherEstilo = (e: CardEstilo | null) => {
+    setAnexos((v) => anexosComEstilo(v, estilo, e));
+    setEstilo(e);
+    if (e) setF((x) => ({ ...x, estiloVisual: "livre", estiloSalvo: null, tresD: motion ? e.familia === "3d" : x.tresD }));
+  };
+
   const enviar = () => start(async () => {
     setErro(null);
     // voz própria: a duração é a da fala (a do briefing só precisa ser válida)
     const voz = propria && lerDepois ? { voz: "falas", lerRoteiro: true, audioProprio: null } : { audioProprio: gravada ? minhaVoz?.id ?? null : null };
-    const r = await criarVideo({ ...comMarca({ ...f, ...voz }, marcaId), anexos: paraEnvio(anexos) });
+    const r = await criarVideo({ ...comMarca({ ...f, ...voz, orientacao: orientacaoComEstilo(estilo, f.orientacao) }, marcaId), anexos: paraEnvio(anexos) });
     if (!r.ok) return setErro(r.error);
     toast.ok("Na fila: primeiro vem o roteiro para você aprovar");
     router.push(`/studio/${r.data}`);
   });
 
-  return (
-    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.25fr) minmax(0, 1fr)", gap: 16, alignItems: "start" }} className="studio-form">
-      <div className="panel" data-enter style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
-        <div className="panel-title">Briefing</div>
-        <div className="kpis" style={{ gridTemplateColumns: "1fr 1fr" }}>
-          <Campo id="produto" label="Produto" valor={f.produto} on={(v) => set("produto", v)} max={120} />
-          <Campo id="cta" label="Chamada para ação (CTA)" valor={f.cta} on={(v) => set("cta", v)} max={120} ph="Ex.: Teste grátis por 24 horas" />
-        </div>
-        <div className="field">
-          <label className="label" htmlFor="orientacao" style={{ display: "flex", gap: 6, alignItems: "center" }}><MessageSquareText size={14} aria-hidden /> Orientações para a IA (do que se trata, livre)</label>
-          <textarea id="orientacao" className="input" rows={5} style={{ height: "auto", paddingBlock: 12, resize: "vertical" }} maxLength={4000}
-            placeholder="Ex.: Vídeo mostrando o professor que perde horas no SIAP e descobre que a plataforma faz tudo em minutos. Comece com a dor, mostre a tela do sistema (anexei o print) e termine com o teste grátis. Ritmo rápido, estilo tech, nada de exageros."
-            value={f.orientacao} onChange={(e) => set("orientacao", e.target.value)} />
-          <span className="subtle caption" style={{ textAlign: "right" }}>{f.orientacao.length}/4000 · a IA segue isto com prioridade, sem inventar fatos</span>
-        </div>
-        <Campo id="objetivo" label="Objetivo do vídeo (opcional se as orientações explicarem)" valor={f.objetivo} on={(v) => set("objetivo", v)} max={300} ph="Ex.: vender o SIAPLUS para professores da rede estadual de Goiás" />
-        <div className="field">
-          <label className="label" htmlFor="descricao">Descrição e argumentos (o que a IA pode afirmar)</label>
-          <textarea id="descricao" className="input" rows={4} style={{ height: "auto", paddingBlock: 12, resize: "vertical" }} maxLength={2000}
-            placeholder="Benefícios, diferenciais, oferta… A IA usa só fatos daqui: não inventa preço, prazo ou estatística."
-            value={f.descricao} onChange={(e) => set("descricao", e.target.value)} />
-        </div>
-        <div className="kpis" style={{ gridTemplateColumns: "1fr 1fr" }}>
-          <Campo id="publico" label="Público" valor={f.publico} on={(v) => set("publico", v)} max={300} ph="Ex.: professores de 25 a 50 anos" />
-          <Campo id="cores" label="Cores / identidade" valor={f.cores} on={(v) => set("cores", v)} max={200} ph="Ex.: fundo escuro, verde #D1FE17" />
-        </div>
-        <Campo id="estilo" label="Estilo" valor={f.estilo} on={(v) => set("estilo", v)} max={300} />
-      </div>
-      <div className="studio-anexos"><Anexos valor={anexos} onChange={setAnexos} marca={marcas.find((m) => m.id === marcaId) ?? null} /></div>
+  const nomeVoz = propria ? "sua voz" : f.voz === "none" ? "sem voz" : f.voz.startsWith("el:") ? f.vozNome || "ElevenLabs" : VOZES.find((x) => x.v === f.voz)?.l ?? "";
+  const nomeMusica = MUSICAS.find(([v]) => v === f.musica)?.[1] ?? "";
+  const fmt = FORMATOS.find((x) => x.v === f.formato)!;
 
-      <div className="stack studio-lateral" style={{ gap: 16 }}>
-        <Identidade marcas={marcas} valor={marcaId} onChange={setMarcaId} />
-        <div className="panel" data-enter style={{ padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
-          <div className="panel-title">{motion ? "Animação" : "Estilo visual"}</div>
-          {motion ? (
-            <>
-              <Escolha valor={f.tresD ? "3d" : "2d"} raio={999} variante="pilula" className="cluster" style={{ gap: 4, padding: 3, borderRadius: 12, border: "1px solid rgb(var(--c-border))", background: "rgb(var(--c-bg-surface))", alignSelf: "flex-start" }}>
-                <button type="button" data-opt="2d" className="chip" data-active={!f.tresD} onClick={() => set("tresD", false)} style={{ height: 32, border: 0 }}>2D (GSAP)</button>
-                <button type="button" data-opt="3d" className="chip" data-active={f.tresD} onClick={() => set("tresD", true)} style={{ height: 32, border: 0 }}>3D (Three.js)</button>
-              </Escolha>
-              <p className="subtle caption">{f.tresD ? "Cena 3D de verdade (objetos, luz e câmera em movimento) com os textos por cima. A IA escreve do zero; descreva nas orientações o que quer ver." : "Animação 2D escrita do zero pela IA, com uma direção de arte nova a cada vídeo."}</p>
-            </>
-          ) : <>
-          <EstiloPicker valor={f.estiloVisual} onChange={(v) => set("estiloVisual", v)} salvos={salvos} salvo={f.estiloSalvo} onSalvo={(id) => set("estiloSalvo", id)}
-            onApagar={async (id) => {
-              if (!(await confirmar("Apagar este estilo salvo? Os vídeos já feitos com ele não mudam."))) return;
-              const r = await apagarEstilo(id);
-              if (!r.ok) return toast.err(r.error);
-              setSalvos((x) => x.filter((e) => e.id !== id));
-              if (f.estiloSalvo === id) set("estiloSalvo", null);
-            }} />
-          <p className="subtle caption">{f.estiloSalvo ? "A IA repete a linguagem visual do vídeo que você salvou como estilo, com o conteúdo novo e no formato escolhido." : f.estiloVisual === "livre" ? "A IA escreve a animação do zero: mais variedade, resultado menos previsível." : "Cenas prontas e testadas (sem texto saindo da tela). A IA escolhe as cenas e escreve os textos; o roteiro passa por você antes."}</p>
-          </>}
-          <button type="button" role="switch" aria-checked={f.legendas} className="chave" onClick={() => set("legendas", !f.legendas)} disabled={f.voz === "none"}>
-            <span className="chave-trilho"><span className="chave-bola" /></span> Legenda da narração {f.voz === "none" ? "(sem voz)" : f.legendas ? "ligada" : "desligada"}
-          </button>
-        </div>
-        <div className="panel" data-enter style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
-          <Palco w={FORMATOS.find((x) => x.v === f.formato)!.w} h={FORMATOS.find((x) => x.v === f.formato)!.h} numero={gravada ? Math.round(minhaVoz?.dur ?? 0) : f.duracao} unidade="s"
-            legenda={`${f.formato} · ${propria ? "sua voz" : f.voz === "none" ? "sem voz" : f.voz.startsWith("el:") ? f.vozNome || "ElevenLabs" : VOZES.find((x) => x.v === f.voz)?.l ?? ""}`} />
-          <div className="panel-title">Formato</div>
-          <Escolha valor={f.formato} className="kpis" style={{ gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
-            {FORMATOS.map((x) => (
-              <button key={x.v} data-opt={x.v} type="button" className="panel spotlight" aria-pressed={f.formato === x.v} onClick={() => set("formato", x.v)}
-                style={{ padding: "12px 6px", display: "grid", justifyItems: "center", gap: 8, cursor: "pointer" }}>
-                <span aria-hidden style={{ width: x.w, height: x.h, borderRadius: 4, border: "2px solid currentColor", color: f.formato === x.v ? "rgb(var(--c-glow))" : "rgb(var(--c-text-tertiary))", boxShadow: f.formato === x.v ? "0 0 14px rgb(var(--c-brand) / 0.7)" : "none", transition: "color .3s, box-shadow .4s" }} />
-                <b style={{ fontSize: 12.5 }}>{x.v}</b>
-                <span className="subtle" style={{ fontSize: 10.5, textAlign: "center", lineHeight: 1.3 }}>{x.d}</span>
-              </button>
-            ))}
+  return (
+    <div className="cria">
+      <div className="cria-faixa"><FaixaEstilos estilos={estilos} familias={motion ? (f.tresD ? ["3d", "2d"] : ["2d", "3d"]) : ["video", "2d", "3d"]} valor={estilo} onChange={escolherEstilo} /></div>
+
+      <div className="cria-main">
+        <Passo n={2} titulo="Descreva a ideia">
+          <textarea id="orientacao" className="input cria-ideia" rows={6} maxLength={3200} aria-label="Ideia do vídeo"
+            placeholder={motion
+              ? "Ex.: Logo da Domus se montando em peças 3D que giram e encaixam; depois a frase “Sites que vendem” e o site no fim. Ritmo rápido, câmera orbitando."
+              : "Ex.: Professor que perde horas no SIAP descobre que a plataforma faz tudo em minutos. Comece com a dor, mostre a tela do sistema (anexei o print) e termine com o teste grátis."}
+            value={f.orientacao} onChange={(e) => set("orientacao", e.target.value)} />
+          <div className="cria-linha">
+            <Campo id="produto" label="Produto ou marca" valor={f.produto} on={(v) => set("produto", v)} max={120} />
+            <Campo id="cta" label="Chamada para ação" valor={f.cta} on={(v) => set("cta", v)} max={120} ph="Ex.: Teste grátis por 24 horas" />
+          </div>
+        </Passo>
+
+        <Passo n={3} titulo="Logo, prints ou referências" extra={<span className="subtle caption tabular">{anexos.assets.length + anexos.links.length}/12</span>}>
+          <Anexos embutido valor={anexos} onChange={setAnexos} marca={marcas.find((m) => m.id === marcaId) ?? null} />
+        </Passo>
+
+        <Dobra titulo="Mais detalhes para a IA" resumo="objetivo, argumentos, público, cores" icone={<FileText aria-hidden />}>
+          <Campo id="objetivo" label="Objetivo do vídeo" valor={f.objetivo} on={(v) => set("objetivo", v)} max={300} ph="Ex.: vender o SIAPLUS para professores da rede estadual de Goiás" />
+          <div className="field">
+            <label className="label" htmlFor="descricao">Argumentos (o que a IA pode afirmar)</label>
+            <textarea id="descricao" className="input" rows={3} style={{ height: "auto", paddingBlock: 12, resize: "vertical" }} maxLength={2000}
+              placeholder="Benefícios, diferenciais, oferta… A IA usa só fatos daqui: não inventa preço, prazo ou estatística."
+              value={f.descricao} onChange={(e) => set("descricao", e.target.value)} />
+          </div>
+          <div className="cria-linha">
+            <Campo id="publico" label="Público" valor={f.publico} on={(v) => set("publico", v)} max={300} ph="Ex.: professores de 25 a 50 anos" />
+            <Campo id="cores" label="Cores" valor={f.cores} on={(v) => set("cores", v)} max={200} ph="vazio = cores da marca" />
+          </div>
+          {!estilo && <Campo id="estilo" label="Tom visual" valor={f.estilo} on={(v) => set("estilo", v)} max={300} />}
+        </Dobra>
+      </div>
+
+      <aside className="cria-lado">
+        <section className="panel cria-bloco">
+          <Palco w={fmt.w} h={fmt.h} numero={gravada ? Math.round(minhaVoz?.dur ?? 0) : f.duracao} unidade="s" legenda={`${f.formato} · ${nomeVoz}`} />
+          {motion && (
+            <Escolha valor={f.tresD ? "3d" : "2d"} raio={999} variante="pilula" className="cluster cria-seg">
+              <button type="button" data-opt="2d" className="chip" data-active={!f.tresD} onClick={() => set("tresD", false)}>2D (GSAP)</button>
+              <button type="button" data-opt="3d" className="chip" data-active={f.tresD} onClick={() => set("tresD", true)}>3D (Three.js)</button>
+            </Escolha>
+          )}
+          <div className="cria-rotulo">Formato</div>
+          <Escolha valor={f.formato} raio={999} variante="pilula" className="cluster cria-chips">
+            {FORMATOS.map((x) => <button key={x.v} data-opt={x.v} type="button" className="chip" data-active={f.formato === x.v} onClick={() => set("formato", x.v)} title={x.d}>{x.v}</button>)}
           </Escolha>
           {gravada ? <p className="subtle caption">Duração: a da sua fala, já sem as pausas.</p> : <>
-            <div className="panel-title" style={{ marginTop: 4 }}>Duração</div>
-            <Escolha valor={f.duracao} raio={999} variante="pilula" className="cluster" style={{ gap: 6 }}>
+            <div className="cria-rotulo">Duração</div>
+            <Escolha valor={f.duracao} raio={999} variante="pilula" className="cluster cria-chips">
               {DURACOES.map((d) => <button key={d} data-opt={d} type="button" className="chip" data-active={f.duracao === d} onClick={() => set("duracao", d)}>{d} s</button>)}
             </Escolha>
           </>}
-        </div>
+        </section>
 
-        <div className="panel" data-enter style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
+        <Identidade marcas={marcas} valor={marcaId} onChange={setMarcaId} />
+
+        <Dobra titulo="Narração e música" resumo={`${nomeVoz} · ${nomeMusica}`} icone={<Mic aria-hidden />}>
           <button type="button" className="panel spotlight" aria-pressed={propria} onClick={() => set("voz", propria ? "pf_dora" : "propria")}
             style={{ padding: "12px 14px", textAlign: "left", cursor: "pointer", display: "flex", gap: 12, alignItems: "center", borderColor: propria ? "rgb(var(--c-brand) / 0.7)" : undefined }}>
             <UserRound size={18} aria-hidden />
@@ -170,74 +167,80 @@ export function NewVideoForm({ produto, musicas, marcas, vozesEl, favoritas: fav
                 <button type="button" role="radio" aria-checked={!lerDepois} onClick={() => setLerDepois(false)}>Já tenho a gravação</button>
               </div>
               {lerDepois
-                ? <p className="subtle caption">A IA escreve o roteiro com a narração de cada cena. Na aprovação você grava lendo (fala por fala ou tudo de uma vez) e o AdPilot corta os silêncios, tira o chiado e iguala o volume antes de gerar o vídeo.</p>
+                ? <p className="subtle caption">Na aprovação você grava lendo o roteiro; o AdPilot corta silêncios, tira o chiado e iguala o volume.</p>
                 : <GravarVoz valor={minhaVoz} onChange={setMinhaVoz} />}
               <button type="button" role="switch" aria-checked={f.cortarPausas} className="chave" onClick={() => set("cortarPausas", !f.cortarPausas)}>
-                <span className="chave-trilho"><span className="chave-bola" /></span><Scissors aria-hidden /> Cortar pausas e respiros {f.cortarPausas ? "ligado" : "desligado"}
+                <span className="chave-trilho"><span className="chave-bola" /></span><Scissors aria-hidden /> Cortar pausas e respiros
               </button>
-              {!lerDepois && <p className="subtle caption">Você aprova o roteiro (cenas, textos na tela e a legenda da sua fala) antes do render.</p>}
             </div>
           </Revelar>
           {!propria && <>
-          <div className="panel-title" style={{ display: "flex", gap: 8, alignItems: "center" }}><Mic size={15} aria-hidden /> Voz local (sem custo)</div>
-          <Escolha valor={f.voz} className="kpis" style={{ gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            {VOZES.map((x) => (
-              <button key={x.v} data-opt={x.v} type="button" className="panel" aria-pressed={f.voz === x.v} onClick={() => set("voz", x.v)}
-                style={{ padding: "10px 12px", textAlign: "left", cursor: "pointer", display: "flex", gap: 10, alignItems: "center" }}>
-                {x.v === "none" ? <MicOff size={16} aria-hidden /> : <Mic size={16} aria-hidden />}
-                <span><b style={{ fontWeight: 600 }}>{x.l}</b><br /><span className="subtle" style={{ fontSize: 11 }}>{x.d}</span></span>
-              </button>
-            ))}
-          </Escolha>
-          {vozesEl.length > 0 && <>
-            <div className="panel-title" style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}><AudioLines size={15} aria-hidden /> ElevenLabs</div>
-            <Escolha valor={f.voz} raio={999} variante="pilula" className="cluster" style={{ gap: 6, maxHeight: 168, overflowY: "auto" }}>
-              {vozesOrdem.map((x) => (
-                <span key={x.id} data-opt={`el:${x.id}`} className="chip" data-active={f.voz === `el:${x.id}`} style={{ paddingLeft: 4, paddingRight: x.preview ? 4 : undefined }}>
-                  <button type="button" className="btn btn-ghost btn-xs" style={{ height: 22, padding: "0 4px" }} onClick={() => void favoritar(x.id)}
-                    aria-pressed={favoritas.includes(x.id)} aria-label={`${favoritas.includes(x.id) ? "Desfavoritar" : "Favoritar"} ${x.nome}`} title={favoritas.includes(x.id) ? "Favorita: aparece primeiro" : "Favoritar"}>
-                    <Star aria-hidden style={favoritas.includes(x.id) ? { fill: "#F5B70A", color: "#F5B70A" } : { opacity: 0.45 }} />
-                  </button>
-                  <button type="button" onClick={() => setF((o) => ({ ...o, voz: `el:${x.id}`, vozNome: x.nome.slice(0, 80) }))} style={{ all: "unset", cursor: "pointer" }}
-                    title={x.categoria === "cloned" ? "Voz clonada" : x.categoria}>{x.nome}</button>
-                  {x.preview && <button type="button" className="btn btn-ghost btn-xs" style={{ height: 22, padding: "0 6px" }} onClick={() => ouvir(x.preview!)} aria-label={`Ouvir ${x.nome}`}><Play aria-hidden /></button>}
-                </span>
+            <div className="cria-rotulo"><Mic aria-hidden /> Voz local (sem custo)</div>
+            <Escolha valor={f.voz} raio={999} variante="pilula" className="cluster cria-chips">
+              {VOZES.map((x) => (
+                <button key={x.v} data-opt={x.v} type="button" className="chip" data-active={f.voz === x.v} onClick={() => set("voz", x.v)} title={x.d}>
+                  {x.v === "none" ? <MicOff aria-hidden /> : null}{x.l}
+                </button>
               ))}
             </Escolha>
+            {vozesEl.length > 0 && <>
+              <div className="cria-rotulo"><AudioLines aria-hidden /> ElevenLabs</div>
+              <Escolha valor={f.voz} raio={999} variante="pilula" className="cluster" style={{ gap: 6, maxHeight: 150, overflowY: "auto" }}>
+                {vozesOrdem.map((x) => (
+                  <span key={x.id} data-opt={`el:${x.id}`} className="chip" data-active={f.voz === `el:${x.id}`} style={{ paddingLeft: 4, paddingRight: x.preview ? 4 : undefined }}>
+                    <button type="button" className="btn btn-ghost btn-xs" style={{ height: 22, padding: "0 4px" }} onClick={() => void favoritar(x.id)}
+                      aria-pressed={favoritas.includes(x.id)} aria-label={`${favoritas.includes(x.id) ? "Desfavoritar" : "Favoritar"} ${x.nome}`}>
+                      <Star aria-hidden style={favoritas.includes(x.id) ? { fill: "#F5B70A", color: "#F5B70A" } : { opacity: 0.45 }} />
+                    </button>
+                    <button type="button" onClick={() => setF((o) => ({ ...o, voz: `el:${x.id}`, vozNome: x.nome.slice(0, 80) }))} style={{ all: "unset", cursor: "pointer" }}
+                      title={x.categoria === "cloned" ? "Voz clonada" : x.categoria}>{x.nome}</button>
+                    {x.preview && <button type="button" className="btn btn-ghost btn-xs" style={{ height: 22, padding: "0 6px" }} onClick={() => ouvir(x.preview!)} aria-label={`Ouvir ${x.nome}`}><Play aria-hidden /></button>}
+                  </span>
+                ))}
+              </Escolha>
+            </>}
           </>}
-          </>}
-          <div className="panel-title" style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}><Music2 size={15} aria-hidden /> Música</div>
-          <Escolha valor={f.musica} raio={999} variante="pilula" className="cluster" style={{ gap: 6 }}>
+          <button type="button" role="switch" aria-checked={f.legendas} className="chave" onClick={() => set("legendas", !f.legendas)} disabled={f.voz === "none"}>
+            <span className="chave-trilho"><span className="chave-bola" /></span> Legenda da narração
+          </button>
+          <div className="cria-rotulo"><Music2 aria-hidden /> Música</div>
+          <Escolha valor={f.musica} raio={999} variante="pilula" className="cluster cria-chips">
             {MUSICAS.map(([v, l]) => (
               <button key={v} data-opt={v} type="button" className="chip" data-active={f.musica === v} onClick={() => set("musica", v)}
-                title={v === "auto" ? "A IA escolhe o clima" : v !== "none" && !musicas[v] ? "Sem música da biblioteca nesta tag: uma trilha original é composta para o vídeo" : undefined}>
+                title={v === "auto" ? "A IA escolhe o clima" : v !== "none" && !musicas[v] ? "Sem música da biblioteca nesta tag: uma trilha original é composta" : undefined}>
                 {l}{!!musicas[v] && <span className="subtle" style={{ fontSize: 10.5 }}>{musicas[v]}</span>}
               </button>
             ))}
           </Escolha>
-          <Revelar aberto={f.musica !== "none"}><p className="subtle small">Usa uma música da biblioteca com este clima; se não houver, compõe uma trilha original no ritmo do vídeo.</p></Revelar>
           <button type="button" role="switch" aria-checked={f.efeitos} className="chave" onClick={() => set("efeitos", !f.efeitos)}>
-            <span className="chave-trilho"><span className="chave-bola" /></span>
-            {f.efeitos ? <Volume2 aria-hidden /> : <VolumeX aria-hidden />} Efeitos sonoros {f.efeitos ? "ligados" : "desligados"}
+            <span className="chave-trilho"><span className="chave-bola" /></span>{f.efeitos ? <Volume2 aria-hidden /> : <VolumeX aria-hidden />} Efeitos sonoros
           </button>
+        </Dobra>
+
+        {!motion && !estilo && (
+          <Dobra titulo="Cenas prontas" resumo={f.estiloSalvo ? "estilo salvo" : f.estiloVisual === "livre" ? "IA escreve do zero" : f.estiloVisual.toUpperCase()} icone={<Wand2 aria-hidden />}>
+            <EstiloPicker valor={f.estiloVisual} onChange={(v) => set("estiloVisual", v)} salvos={salvos} salvo={f.estiloSalvo} onSalvo={(id) => set("estiloSalvo", id)}
+              onApagar={async (id) => {
+                if (!(await confirmar("Apagar este estilo salvo? Os vídeos já feitos com ele não mudam."))) return;
+                const r = await apagarEstilo(id);
+                if (!r.ok) return toast.err(r.error);
+                setSalvos((x) => x.filter((e) => e.id !== id));
+                if (f.estiloSalvo === id) set("estiloSalvo", null);
+              }} />
+            <p className="subtle caption">Cenas testadas (texto nunca sai da tela) ou um vídeo seu salvo como estilo. Escolher um estilo da biblioteca acima substitui isto.</p>
+          </Dobra>
+        )}
+
+        <div className="cria-acao">
+          {erro && <p className="error-text" role="alert">{erro}</p>}
+          <button className="btn btn-primary btn-lg" onClick={enviar} disabled={pend || !!falta} title={falta ?? undefined}>
+            {pend ? <Loader2 className="animate-spin" aria-hidden /> : <><Sparkles aria-hidden /> Criar roteiro <ArrowRight className="seta" aria-hidden /></>}
+          </button>
+          <p className="subtle caption" role="status" style={falta ? { color: "rgb(var(--c-warning))" } : undefined}>
+            {falta ? `Para liberar: ${falta.toLowerCase()}` : "Você aprova o roteiro antes; depois, 3 a 8 min no worker."}
+          </p>
         </div>
-
-        {erro && <p className="error-text" role="alert">{erro}</p>}
-        <button className="btn btn-primary btn-lg" onClick={enviar} disabled={pend || !!falta} title={falta ?? undefined} data-enter>
-          {pend ? <Loader2 className="animate-spin" aria-hidden /> : <><Sparkles aria-hidden /> Criar roteiro <ArrowRight className="seta" aria-hidden /></>}
-        </button>
-        {falta && <p className="subtle caption" role="status" style={{ textAlign: "center", color: "rgb(var(--c-warning))" }}>Para liberar: {falta.toLowerCase()}</p>}
-        <p className="subtle caption" style={{ textAlign: "center" }}>Primeiro você aprova o roteiro; depois, de 3 a 8 minutos no PC do worker.</p>
-      </div>
-    </div>
-  );
-}
-
-function Campo({ id, label, valor, on, max, ph }: { id: string; label: string; valor: string; on: (v: string) => void; max: number; ph?: string }) {
-  return (
-    <div className="field">
-      <label className="label" htmlFor={id}>{label}</label>
-      <input id={id} className="input" value={valor} onChange={(e) => on(e.target.value)} maxLength={max} placeholder={ph} />
+      </aside>
     </div>
   );
 }

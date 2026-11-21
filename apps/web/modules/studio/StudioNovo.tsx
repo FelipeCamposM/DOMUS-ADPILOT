@@ -9,9 +9,8 @@ import { NewPostForm } from "./NewPostForm";
 import { NewVideoForm } from "./NewVideoForm";
 import { NewEditForm } from "./edicao/NewEditForm";
 import { HeroFx } from "@/modules/shell/HeroFx";
-import Link from "next/link";
-import { Palette } from "lucide-react";
-import type { EstiloEscolhido } from "./Anexos";
+import { textoDoEstilo } from "@domus-ads/core/estilos";
+import type { CardEstilo } from "@/lib/estilos";
 
 type Aba = "post" | "video" | "imagem" | "edicao" | "motion";
 const URL_ABA: Record<Aba, string> = { post: "/studio/novo?tipo=post", imagem: "/studio/novo?tipo=imagem", video: "/studio/novo", edicao: "/studio/novo?tipo=edicao", motion: "/studio/novo?tipo=motion" };
@@ -27,8 +26,11 @@ const TITULO: Record<Aba, [string, string]> = {
  * "Novo" do Studio com as duas abas montadas: trocar não recarrega a página nem perde o que foi digitado.
  * A aba que sai some rápido; a que entra sobe painel a painel. A URL acompanha (?tipo=imagem) sem navegação.
  */
-export function StudioNovo({ inicial, video, imagem, post, edicao, estilo }: { estilo?: EstiloEscolhido | null; inicial: Aba; video: ComponentProps<typeof NewVideoForm>; imagem: ComponentProps<typeof NewImageForm>; post: ComponentProps<typeof NewPostForm>; edicao: ComponentProps<typeof NewEditForm> }) {
+export function StudioNovo({ inicial, video, imagem, post, edicao, estilos, estiloInicial }: { estilos: CardEstilo[]; estiloInicial: string | null; inicial: Aba; video: ComponentProps<typeof NewVideoForm>; imagem: ComponentProps<typeof NewImageForm>; post: ComponentProps<typeof NewPostForm>; edicao: ComponentProps<typeof NewEditForm> }) {
   const [aba, setAba] = useState<Aba>(inicial);
+  // post: o estilo escolhido na biblioteca entra nos detalhes (o post tem campo curto)
+  const ep = inicial === "post" ? estilos.find((e) => e.id === estiloInicial) : null;
+  const estiloPost = ep ? { nome: ep.nome, texto: textoDoEstilo({ nome: ep.nome, prompt: ep.resumo }), refs: [] } : null;
   const [visivel, setVisivel] = useState<Aba>(inicial);
   const caixas = { post: useRef<HTMLDivElement>(null), video: useRef<HTMLDivElement>(null), imagem: useRef<HTMLDivElement>(null), edicao: useRef<HTMLDivElement>(null), motion: useRef<HTMLDivElement>(null) };
   const titulo = useRef<HTMLHeadingElement>(null);
@@ -40,7 +42,7 @@ export function StudioNovo({ inicial, video, imagem, post, edicao, estilo }: { e
     history.replaceState(null, "", URL_ABA[nova]);
     const sai = caixas[visivel].current;
     if (!sai || matchMedia("(prefers-reduced-motion: reduce)").matches) return setVisivel(nova);
-    gsap.to(sai.querySelectorAll(":scope > * > .panel, :scope > * > .stack > *, :scope > * > .studio-anexos"), {
+    gsap.to(sai.querySelectorAll(":scope > * > *"), {
       opacity: 0, y: -10, filter: "blur(4px)", duration: 0.22, ease: "power2.in", stagger: 0.02, onComplete: () => setVisivel(nova),
     });
   };
@@ -50,7 +52,7 @@ export function StudioNovo({ inicial, video, imagem, post, edicao, estilo }: { e
     const entra = caixas[visivel].current;
     if (!montou.current) { montou.current = true; return; } // a 1ª entrada é a da página (Motion)
     if (!entra || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const alvos = entra.querySelectorAll(":scope > * > .panel, :scope > * > .stack > *, :scope > * > .studio-anexos");
+    const alvos = entra.querySelectorAll(":scope > * > *");
     gsap.fromTo(alvos, { opacity: 0, y: 18, filter: "blur(6px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.6, ease: "expo.out", stagger: 0.05, clearProps: "opacity,transform,filter" });
     if (titulo.current) gsap.fromTo(titulo.current, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.5, ease: "expo.out", clearProps: "opacity,transform" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -73,15 +75,10 @@ export function StudioNovo({ inicial, video, imagem, post, edicao, estilo }: { e
           ))}
         </Escolha>
       </div>
-      <div className="studio-passos" data-enter>
-        <Link href="/studio/estilos" className="studio-passo" data-feito={!!estilo}><b>1</b><span>{estilo ? <>Estilo <strong>{estilo.nome}</strong> · trocar</> : <>Escolha um estilo <em>(opcional)</em></>}</span><Palette aria-hidden /></Link>
-        <span className="studio-passo"><b>2</b><span>Descreva a ideia</span></span>
-        <span className="studio-passo"><b>3</b><span>Logo ou referência</span></span>
-      </div>
-      <div ref={caixas.post} className="studio-aba" hidden={visivel !== "post"}><NewPostForm {...post} estilo={estilo} /></div>
-      <div ref={caixas.video} className="studio-aba" hidden={visivel !== "video"}><NewVideoForm {...video} estilo={inicial === "video" ? estilo : null} /></div>
-      <div ref={caixas.imagem} className="studio-aba" hidden={visivel !== "imagem"}><NewImageForm {...imagem} estilo={estilo} /></div>
-      <div ref={caixas.motion} className="studio-aba" hidden={visivel !== "motion"}><NewVideoForm {...video} motion estilo={inicial === "motion" ? estilo : null} /></div>
+      <div ref={caixas.post} className="studio-aba" hidden={visivel !== "post"}><NewPostForm {...post} estilo={estiloPost} /></div>
+      <div ref={caixas.video} className="studio-aba" hidden={visivel !== "video"}><NewVideoForm {...video} estilos={estilos} estiloInicial={inicial === "video" ? estiloInicial : null} /></div>
+      <div ref={caixas.imagem} className="studio-aba" hidden={visivel !== "imagem"}><NewImageForm {...imagem} estilos={estilos} estiloInicial={inicial === "imagem" ? estiloInicial : null} /></div>
+      <div ref={caixas.motion} className="studio-aba" hidden={visivel !== "motion"}><NewVideoForm {...video} motion estilos={estilos} estiloInicial={inicial === "motion" ? estiloInicial : null} /></div>
       <div ref={caixas.edicao} className="studio-aba" hidden={visivel !== "edicao"}><NewEditForm {...edicao} /></div>
     </>
   );

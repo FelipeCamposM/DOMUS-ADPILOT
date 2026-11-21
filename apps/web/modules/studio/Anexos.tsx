@@ -15,7 +15,6 @@ export interface LinkItem { url: string; nota: string }
 export interface AnexosValor { assets: AnexoItem[]; links: LinkItem[] }
 /** Estilo escolhido na biblioteca (Studio → Estilos): a direção de arte vai nas orientações e as referências como inspiração. */
 export interface EstiloEscolhido { nome: string; texto: string; formato?: string; tresD?: boolean; refs: AnexoItem[] }
-export const anexosDoEstilo = (e?: EstiloEscolhido | null): AnexosValor => ({ assets: e?.refs ?? [], links: [] });
 
 const MAX = 12;
 const ACEITOS = /^(image\/(png|jpeg|webp|gif|svg\+xml)|video\/(mp4|webm|quicktime))$/;
@@ -28,7 +27,7 @@ interface Envio { key: string; name: string; url: string; video: boolean; size: 
  * Entrada: clicar, arrastar para o quadro ou para QUALQUER lugar da página (abre uma área de soltar em tela cheia),
  * ou colar (Ctrl+V) uma imagem. Os envios correm em paralelo, com prévia local e progresso real.
  */
-export function Anexos({ valor, onChange, marca }: { valor: AnexosValor; onChange: (v: AnexosValor) => void; marca: MarcaResumo | null }) {
+export function Anexos({ valor, onChange, marca, embutido }: { valor: AnexosValor; onChange: (v: AnexosValor) => void; marca: MarcaResumo | null; /** dentro de outro bloco: sem painel, título e aviso da marca */ embutido?: boolean }) {
   const raiz = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const atual = useRef(valor);
@@ -143,7 +142,7 @@ export function Anexos({ valor, onChange, marca }: { valor: AnexosValor; onChang
   const usados = valor.assets.length + enviando.length;
 
   return (
-    <div ref={raiz} className="panel" data-enter style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14, position: "relative" }}>
+    <div ref={raiz} className={embutido ? undefined : "panel"} data-enter={embutido ? undefined : true} style={{ padding: embutido ? 0 : 20, display: "flex", flexDirection: "column", gap: 14, position: "relative" }}>
       {arrastando && typeof document !== "undefined" && createPortal(
         <div className="solta-tela" aria-hidden>
           <div className="solta-alvo">
@@ -153,7 +152,7 @@ export function Anexos({ valor, onChange, marca }: { valor: AnexosValor; onChang
             <span className="subtle small">Imagens, vídeos ou links · {Math.max(0, MAX - usados)} vaga(s) de {MAX}</span>
           </div>
         </div>, document.body)}
-      <div className="panel-title" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+      {!embutido && <><div className="panel-title" style={{ display: "flex", gap: 8, alignItems: "center" }}>
         <Paperclip size={15} aria-hidden /> Arquivos, inspirações e links
         <span className="subtle caption tabular" style={{ marginLeft: "auto", fontWeight: 500 }}>{usados}/{MAX}</span>
       </div>
@@ -170,7 +169,7 @@ export function Anexos({ valor, onChange, marca }: { valor: AnexosValor; onChang
         ) : (
           <span className="small" style={{ flex: 1 }}>Sem marca: a identidade sai das referências (links e imagens). <Link href="/marcas" style={{ textDecoration: "underline" }}>Gerenciar marcas</Link></span>
         )}
-      </div>
+      </div></>}
 
       <input ref={input} type="file" hidden multiple accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml,video/mp4,video/webm,video/quicktime" onChange={(e) => void enviar(e.target.files)} />
       <button key={recusou} type="button" onClick={() => input.current?.click()} className={`solta-quadro${recusou ? " treme" : ""}`} data-arrastando={arrastando} disabled={usados >= MAX}>

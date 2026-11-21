@@ -111,7 +111,7 @@ export function Estilos({ estilos, podeEditar, admin }: { estilos: CardEstilo[];
 }
 
 /** Amostra: vídeo renderizado (toca ao passar o mouse), 1ª referência do estilo, ou um cartaz com o nome. */
-function Previa({ e }: { e: CardEstilo }) {
+export function Previa({ e }: { e: CardEstilo }) {
   const v = useRef<HTMLVideoElement>(null);
   if (e.previa) return (
     <video ref={v} src={`${e.previa}#t=1.5`} muted loop playsInline preload="metadata"
