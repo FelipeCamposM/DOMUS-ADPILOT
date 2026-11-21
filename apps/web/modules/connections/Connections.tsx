@@ -8,7 +8,9 @@ import { ago } from "@/lib/format";
 import { Dialog } from "../shell/Dialog";
 import { toast } from "../shell/toast";
 import { conectarInstagram, conectarMeta, removerConexao, sincronizarConexao } from "./actions";
-import { GoogleAdsLogo, InstagramLogo, LogoPlataforma, MetaLogo } from "./Logos";
+import { desconectarEmail } from "../emails/actions";
+import { confirmar } from "../shell/confirmar";
+import { GmailLogo, GoogleAdsLogo, InstagramLogo, LogoPlataforma, MetaLogo } from "./Logos";
 
 export interface Conexao {
   id: string; provider: string; label: string; status: string; last_error: string | null; last_synced_at: string | null; created_at: string;
@@ -16,7 +18,8 @@ export interface Conexao {
   contas: { id: string; name: string; external_id: string; currency: string; timezone: string | null; status: string; campanhas: number; ativas: number }[];
   perfis: { id: string; username: string; nome: string | null; foto: string | null; seguidores: number | null; publicacoes: number | null }[];
 }
-type Aviso = { tipo: "erro"; codigo: string; msg: string | null } | { tipo: "ok"; contas: number } | null;
+type Aviso = { tipo: "erro"; codigo: string; msg: string | null } | { tipo: "ok"; contas: number } | { tipo: "gmail"; email: string } | null;
+export interface Gmail { id: string; email: string; nome: string | null; foto: string | null; status: string; conectado_em: string }
 
 const ERROS: Record<string, string> = {
   "google-env": "O Google Ads não está configurado no servidor (veja o MANUAL.md).",
@@ -24,6 +27,12 @@ const ERROS: Record<string, string> = {
   "google-permissao": "Você precisa ser admin do workspace para conectar contas.",
   "google-token": "O Google não devolveu o token de acesso. Tente de novo.",
   "google-api": "O Google Ads recusou o acesso.",
+  "gmail-permissao": "Só o administrador da plataforma conecta e-mails.",
+  "gmail-env": "Faltam GOOGLE_ADS_CLIENT_ID e GOOGLE_ADS_CLIENT_SECRET no servidor.",
+  "gmail-state": "A conexão demorou ou veio de outra aba. Tente de novo.",
+  "gmail-token": "O Google não devolveu a autorização. Tente de novo.",
+  "gmail-escopo": "Na tela do Google, deixe marcado o acesso ao Gmail (ler, escrever e enviar e-mails).",
+  "gmail-perfil": "Não consegui ler o e-mail da conta Google.",
 };
 const NOME = { META: "Meta Ads", GOOGLE: "Google Ads", INSTAGRAM: "Instagram" } as Record<string, string>;
 const num = (n: number | null) => (n == null ? "-" : new Intl.NumberFormat("pt-BR", { notation: n >= 10_000 ? "compact" : "standard" }).format(n));
@@ -31,11 +40,13 @@ const idConta = (p: string, id: string) => (p === "GOOGLE" ? id.replace(/(\d{3})
 const fuso = (tz: string | null) => (tz ? tz.split("/").pop()!.replace(/_/g, " ") : null);
 const data = (iso: string) => new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
 
-export function Connections({ conexoes, podeAdmin, podeEditar, googleConfigurado, aviso }: {
+export function Connections({ conexoes, podeAdmin, podeEditar, googleConfigurado, aviso, gmails }: {
   conexoes: Conexao[]; podeAdmin: boolean; podeEditar: boolean; googleConfigurado: boolean; aviso: Aviso;
+  /** contas Gmail (só o admin da plataforma recebe; null = não mostra) */
+  gmails: Gmail[] | null;
 }) {
   const router = useRouter();
-  const [modal, setModal] = useState<"meta" | "google" | "instagram" | null>(null);
+  const [modal, setModal] = useState<"meta" | "google" | "instagram" | "gmail" | null>(null);
   const [remover, setRemover] = useState<Conexao | null>(null);
   const [falha, setFalha] = useState<{ titulo: string; msg: string } | null>(null);
   const lido = useRef(false);
@@ -45,7 +56,8 @@ export function Connections({ conexoes, podeAdmin, podeEditar, googleConfigurado
     if (!aviso || lido.current) return;
     lido.current = true;
     if (aviso.tipo === "ok") toast.ok(`Google Ads conectado: ${aviso.contas} conta(s). Sincronizando…`);
-    else setFalha({ titulo: "Não foi possível conectar o Google Ads", msg: `${ERROS[aviso.codigo] ?? "Erro ao conectar."}${aviso.msg ? `\n\n${aviso.msg}` : ""}` });
+    else if (aviso.tipo === "gmail") toast.ok(`Gmail conectado: ${aviso.email}`);
+    else setFalha({ titulo: aviso.codigo.startsWith("gmail") ? "Não foi possível conectar o Gmail" : "Não foi possível conectar o Google Ads", msg: `${ERROS[aviso.codigo] ?? "Erro ao conectar."}${aviso.msg ? `\n\n${aviso.msg}` : ""}` });
     router.replace("/connections", { scroll: false });
   }, [aviso, router]);
 
@@ -69,6 +81,8 @@ export function Connections({ conexoes, podeAdmin, podeEditar, googleConfigurado
             itens={["Contas da MCC entram sozinhas", "Criar campanhas de Pesquisa"]} conectadas={por("GOOGLE")} onClick={() => setModal("google")} />
           <PlataformaCard logo={<InstagramLogo size={30} />} nome="Instagram" desc="Conta Profissional ligada a uma Página do Facebook, pelo token do usuário do sistema."
             itens={["Posts, carrosséis, Reels e stories", "Agendar e ver o feed"]} conectadas={por("INSTAGRAM")} onClick={() => setModal("instagram")} />
+          {gmails && <PlataformaCard logo={<GmailLogo size={30} />} nome="Gmail" desc="Suas caixas de e-mail dentro do AdPilot (CRM → E-mails). Pode conectar mais de uma."
+            itens={["Ler, buscar e responder", "Aviso no sino se a autorização cair"]} conectadas={gmails.length} onClick={() => setModal("gmail")} />}
         </section>
       )}
 
@@ -85,6 +99,14 @@ export function Connections({ conexoes, podeAdmin, podeEditar, googleConfigurado
         </section>
       )}
 
+      {!!gmails?.length && (
+        <section className="stack" style={{ gap: 14 }}>
+          <div className="cn-secao">E-mails <span className="subtle">({gmails.length})</span></div>
+          {gmails.map((g) => <GmailCard key={g.id} g={g} />)}
+        </section>
+      )}
+      <GmailDialog open={modal === "gmail"} onClose={() => setModal(null)} configurado={googleConfigurado} />
+
       <TokenDialog plataforma="META" open={modal === "meta"} onClose={() => setModal(null)} />
       <TokenDialog plataforma="INSTAGRAM" open={modal === "instagram"} onClose={() => setModal(null)} />
       <GoogleDialog open={modal === "google"} onClose={() => setModal(null)} configurado={googleConfigurado} />
@@ -93,7 +115,7 @@ export function Connections({ conexoes, podeAdmin, podeEditar, googleConfigurado
         <div className="cn-falha"><AlertTriangle aria-hidden /><p style={{ whiteSpace: "pre-wrap" }}>{falha?.msg}</p></div>
         <div className="cluster" style={{ justifyContent: "flex-end" }}>
           <button className="btn btn-ghost btn-sm" onClick={() => setFalha(null)}>Fechar</button>
-          <button className="btn btn-primary btn-sm" onClick={() => { setFalha(null); setModal("google"); }}>Tentar de novo</button>
+          <button className="btn btn-primary btn-sm" onClick={() => { setFalha(null); setModal(aviso?.tipo === "erro" && aviso.codigo.startsWith("gmail") ? "gmail" : "google"); }}>Tentar de novo</button>
         </div>
       </Dialog>
     </>
@@ -203,6 +225,76 @@ function ConexaoCard({ k, podeAdmin, podeEditar, onRemover, onReconectar }: { k:
         ))}
       </div>
     </article>
+  );
+}
+
+function GmailCard({ g }: { g: Gmail }) {
+  const router = useRouter();
+  const expirada = g.status === "EXPIRADA";
+  const reconectar = `/api/connections/gmail/start?email=${encodeURIComponent(g.email)}`;
+  return (
+    <article className="panel cn-con" data-erro={expirada} data-enter>
+      <header className="cn-con-head">
+        <span className="cn-plat-logo sm"><GmailLogo size={24} /></span>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div className="cn-con-titulo">
+            <b style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{g.email}</b>
+            {expirada ? <span className="cn-pill err"><AlertTriangle size={11} aria-hidden /> Autorização expirada</span> : <span className="cn-pill ok"><span className="cn-dot" /> Ativa</span>}
+          </div>
+          <div className="cn-con-sub">
+            <span>Gmail</span>
+            {g.nome && <span className="cn-quem">{g.foto ? <img className="cn-quem-foto" src={g.foto} alt="" referrerPolicy="no-referrer" /> : <UserRound size={12} aria-hidden />}{g.nome}</span>}
+            <span suppressHydrationWarning>conectado em {data(g.conectado_em)}</span>
+          </div>
+        </div>
+        <div className="cluster" style={{ gap: 6, flexWrap: "nowrap" }}>
+          {!expirada && <Link href={`/crm/emails?conta=${g.id}`} className="btn btn-secondary btn-xs">Abrir caixa</Link>}
+          <a href={reconectar} className={expirada ? "btn btn-primary btn-xs" : "btn btn-ghost btn-xs"} title="Autoriza de novo no Google"><RefreshCw aria-hidden /> Reconectar</a>
+          <button className="btn btn-ghost btn-xs cn-del" aria-label={`Desconectar ${g.email}`} title="Desconectar" onClick={async () => {
+            if (!(await confirmar(`Desconectar ${g.email} do AdPilot? Os e-mails continuam no Gmail.`))) return;
+            const r = await desconectarEmail(g.id);
+            if (!r.ok) return toast.err(r.error);
+            toast.ok("Gmail desconectado");
+            router.refresh();
+          }}><Trash2 aria-hidden /></button>
+        </div>
+      </header>
+    </article>
+  );
+}
+
+function GmailDialog({ open, onClose, configurado }: { open: boolean; onClose: () => void; configurado: boolean }) {
+  const [enviando, setEnviando] = useState(false);
+  const [origem, setOrigem] = useState("");
+  useEffect(() => setOrigem(location.origin), []);
+  const retorno = `${origem}/api/connections/gmail/callback`;
+  return (
+    <Dialog open={open} onClose={onClose} title="Conectar Gmail">
+      <div className="cn-modal-hero"><span className="cn-plat-logo"><GmailLogo size={30} /></span><div><b>Gmail</b><span className="subtle small">Login com a conta Google do e-mail</span></div></div>
+      {configurado ? (
+        <form action="/api/connections/gmail/start" method="get" className="stack" onSubmit={() => setEnviando(true)}>
+          <ol className="cn-passos">
+            <li>Escolha a conta do Gmail (para conectar outra depois, é só voltar aqui).</li>
+            <li>Se aparecer “O Google não verificou este app”: <b>Avançado</b> → <b>Acessar DOMUS AdPilot</b>.</li>
+            <li>Deixe <b>marcado</b> o acesso para ler, escrever e enviar e-mails e clique em Continuar.</li>
+          </ol>
+          <div className="field">
+            <span className="label">Endereço de retorno (tem que estar no cliente OAuth do Google Cloud)</span>
+            <button type="button" className="input mono" style={{ textAlign: "left", fontSize: 12, height: "auto", paddingBlock: 10, overflowWrap: "anywhere" }} title="Copiar"
+              onClick={() => { void navigator.clipboard.writeText(retorno); toast.ok("Endereço copiado"); }}>{retorno}</button>
+          </div>
+          <p className="cn-seguro"><ShieldCheck size={14} aria-hidden /> Guardamos só o token de atualização, cifrado. Os e-mails não são copiados: a tela lê direto do Gmail.</p>
+          <div className="cluster" style={{ justifyContent: "flex-end" }}>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={onClose}>Cancelar</button>
+            <button className="cn-google-btn" type="submit" disabled={enviando}>
+              {enviando ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <GLogo />} Continuar com Google
+            </button>
+          </div>
+        </form>
+      ) : (
+        <div className="cn-falha"><AlertTriangle aria-hidden /><p>O login do Google ainda não está configurado no servidor (<code>GOOGLE_ADS_CLIENT_ID</code> e <code>GOOGLE_ADS_CLIENT_SECRET</code>).</p></div>
+      )}
+    </Dialog>
   );
 }
 

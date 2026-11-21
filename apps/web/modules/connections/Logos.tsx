@@ -89,3 +89,15 @@ export function SearchConsoleLogo({ size = 28 }: { size?: number }) {
     </svg>
   );
 }
+
+export function GmailLogo({ size = 28 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 48 36" width={size} height={size * 0.75} aria-hidden>
+      <path fill="#4285F4" d="M3.3 36h7.6V17.6L0 9.4v23.3C0 34.5 1.5 36 3.3 36z" />
+      <path fill="#34A853" d="M37.1 36h7.6c1.8 0 3.3-1.5 3.3-3.3V9.4l-10.9 8.2z" />
+      <path fill="#FBBC04" d="M37.1 3.4v14.2L48 9.4V5c0-4.1-4.7-6.4-8-3.9z" />
+      <path fill="#EA4335" d="M10.9 17.6V3.4L24 13.2l13.1-9.8v14.2L24 27.4z" />
+      <path fill="#C5221F" d="M0 5v4.4l10.9 8.2V3.4L8 1.1C4.7-1.4 0 .9 0 5z" />
+    </svg>
+  );
+}

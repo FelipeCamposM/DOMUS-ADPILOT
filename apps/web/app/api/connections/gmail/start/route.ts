@@ -6,8 +6,8 @@ import { ESCOPOS_GMAIL } from "@/lib/gmail";
 /** Conectar (ou reconectar) um Gmail: state num cookie httpOnly e consentimento do Google com acesso offline. */
 export async function GET(req: NextRequest) {
   const ctx = await requireCtx();
-  if (!isPlatformAdmin(ctx)) return NextResponse.redirect(new URL("/crm/emails?erro=permissao", req.url));
-  if (!process.env.GOOGLE_ADS_CLIENT_ID || !process.env.GOOGLE_ADS_CLIENT_SECRET) return NextResponse.redirect(new URL("/crm/emails?erro=env", req.url));
+  if (!isPlatformAdmin(ctx)) return NextResponse.redirect(new URL("/connections?erro=gmail-permissao", req.url));
+  if (!process.env.GOOGLE_ADS_CLIENT_ID || !process.env.GOOGLE_ADS_CLIENT_SECRET) return NextResponse.redirect(new URL("/connections?erro=gmail-env", req.url));
   const state = randomBytes(24).toString("hex");
   const dica = req.nextUrl.searchParams.get("email");
   const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");

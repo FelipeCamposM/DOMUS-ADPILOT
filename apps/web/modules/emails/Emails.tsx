@@ -1,14 +1,13 @@
 "use client";
 
-import { ArrowLeft, Inbox, Loader2, Mail, Plus, RefreshCw, Search, Send, X } from "lucide-react";
+import { ArrowLeft, Inbox, Loader2, Mail, Plus, RefreshCw, Search, Send } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { ago } from "@/lib/format";
 import type { Mensagem, Resumo } from "@/lib/gmail";
-import { confirmar } from "../shell/confirmar";
 import { toast } from "../shell/toast";
-import { desconectarEmail, responderEmail } from "./actions";
+import { responderEmail } from "./actions";
 
 type Conta = { id: string; email: string; nome: string | null; foto: string | null; status: string };
 
@@ -25,9 +24,8 @@ function CorpoHtml({ html }: { html: string }) {
 }
 
 /** CRM → E-mails: contas Gmail conectadas (várias), caixa de entrada, leitura e resposta. Lido direto do Gmail. */
-export function Emails({ contas, conta, q, conversas, thread, aberta, falha, aviso, conectada }: {
-  contas: Conta[]; conta: string | null; q: string; conversas: Resumo[]; thread: string | null; aberta: Mensagem[] | null;
-  falha: string | null; aviso: string | null; conectada: string | null;
+export function Emails({ contas, conta, q, conversas, thread, aberta, falha }: {
+  contas: Conta[]; conta: string | null; q: string; conversas: Resumo[]; thread: string | null; aberta: Mensagem[] | null; falha: string | null;
 }) {
   const router = useRouter();
   const [texto, setTexto] = useState("");
@@ -41,11 +39,6 @@ export function Emails({ contas, conta, q, conversas, thread, aberta, falha, avi
   };
   const navegar = (h: string) => ir(() => router.push(h));
 
-  useEffect(() => {
-    if (aviso) toast.err(aviso);
-    if (conectada) toast.ok(`Gmail conectado: ${conectada}`);
-    if (aviso || conectada) history.replaceState(null, "", "/crm/emails");
-  }, [aviso, conectada]);
   useEffect(() => setTexto(""), [thread]);
 
   const enviar = () => start(async () => {
@@ -63,9 +56,9 @@ export function Emails({ contas, conta, q, conversas, thread, aberta, falha, avi
         <div>
           <div className="eyebrow" data-enter>CRM</div>
           <h1 className="page-title" data-enter>E-mails</h1>
-          <p className="page-sub" data-enter>Suas caixas do Gmail dentro do AdPilot: ler, buscar e responder.</p>
+          <p className="page-sub" data-enter>Suas caixas do Gmail dentro do AdPilot: ler, buscar e responder. As contas são conectadas em Conexões.</p>
         </div>
-        <a href="/api/connections/gmail/start" className="btn btn-primary btn-sm"><Plus aria-hidden /> Conectar Gmail</a>
+        <Link href="/connections" className="btn btn-secondary btn-sm"><Plus aria-hidden /> Contas em Conexões</Link>
       </div>
 
       {!contas.length ? (
@@ -73,7 +66,7 @@ export function Emails({ contas, conta, q, conversas, thread, aberta, falha, avi
           <Mail aria-hidden />
           <b>Nenhum Gmail conectado</b>
           <span className="muted small">Conecte uma ou mais contas. Os e-mails continuam no Gmail; o AdPilot só lê e responde por você.</span>
-          <a href="/api/connections/gmail/start" className="btn btn-secondary btn-sm">Conectar Gmail</a>
+          <Link href="/connections" className="btn btn-secondary btn-sm">Conectar em Conexões</Link>
         </div>
       ) : (
         <>
@@ -85,12 +78,6 @@ export function Emails({ contas, conta, q, conversas, thread, aberta, falha, avi
                   <span>{c.email}</span>
                 </Link>
                 {c.status === "EXPIRADA" && <a href={`/api/connections/gmail/start?email=${encodeURIComponent(c.email)}`} className="em-reconectar"><RefreshCw size={12} aria-hidden /> Reconectar</a>}
-                <button type="button" className="em-x" aria-label={`Desconectar ${c.email}`} onClick={async () => {
-                  if (!(await confirmar(`Desconectar ${c.email} do AdPilot? Os e-mails continuam no Gmail.`))) return;
-                  const r = await desconectarEmail(c.id);
-                  if (!r.ok) return toast.err(r.error);
-                  router.push("/crm/emails");
-                }}><X size={13} aria-hidden /></button>
               </span>
             ))}
           </div>
