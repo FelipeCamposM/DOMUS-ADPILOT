@@ -13,6 +13,9 @@ import type { MarcaResumo } from "@/lib/marcas";
 export interface AnexoItem { creativeId: string; uso: "incluir" | "inspiracao"; nota: string; name: string; type: string; preview?: string }
 export interface LinkItem { url: string; nota: string }
 export interface AnexosValor { assets: AnexoItem[]; links: LinkItem[] }
+/** Estilo escolhido na biblioteca (Studio → Estilos): a direção de arte vai nas orientações e as referências como inspiração. */
+export interface EstiloEscolhido { nome: string; texto: string; formato?: string; tresD?: boolean; refs: AnexoItem[] }
+export const anexosDoEstilo = (e?: EstiloEscolhido | null): AnexosValor => ({ assets: e?.refs ?? [], links: [] });
 
 const MAX = 12;
 const ACEITOS = /^(image\/(png|jpeg|webp|gif|svg\+xml)|video\/(mp4|webm|quicktime))$/;

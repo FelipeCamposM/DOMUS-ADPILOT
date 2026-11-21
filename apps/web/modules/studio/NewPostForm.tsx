@@ -1,5 +1,6 @@
 "use client";
 
+import type { EstiloEscolhido } from "./Anexos";
 import { ArrowRight, CalendarClock, Clapperboard, GalleryHorizontal, Image as ImageIco, Loader2, PenLine, Sparkles, Square } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -31,7 +32,7 @@ const ETAPAS = [
 ];
 
 /** Novo post do Instagram: escolhe imagem ou vídeo, diz o assunto e o horário; a IA escreve e, aprovado, a plataforma gera e publica. */
-export function NewPostForm({ contas, marcas }: { contas: { id: string; username: string }[]; marcas: MarcaResumo[] }) {
+export function NewPostForm({ contas, marcas, estilo }: { contas: { id: string; username: string }[]; marcas: MarcaResumo[]; estilo?: EstiloEscolhido | null }) {
   const router = useRouter();
   const [pend, start] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
@@ -41,7 +42,7 @@ export function NewPostForm({ contas, marcas }: { contas: { id: string; username
   const daConta = (id: string) => { const u = contas.find((c) => c.id === id)?.username.toLowerCase() ?? ""; return marcas.find((m) => u.includes(m.nome.toLowerCase().replace(/\s+/g, "")))?.id; };
   const [marcaId, setMarcaId] = useState<string | null>(daConta(contas[0]?.id ?? "") ?? marcas[0]?.id ?? null);
   const [tema, setTema] = useState("");
-  const [detalhes, setDetalhes] = useState("");
+  const [detalhes, setDetalhes] = useState(estilo ? estilo.texto.slice(0, 320) : "");
   const [quando, setQuando] = useState("");
   useEffect(() => setQuando(proximoHorario()), []); // hora local só existe no navegador
 

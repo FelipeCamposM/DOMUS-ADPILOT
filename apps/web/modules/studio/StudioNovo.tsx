@@ -9,6 +9,9 @@ import { NewPostForm } from "./NewPostForm";
 import { NewVideoForm } from "./NewVideoForm";
 import { NewEditForm } from "./edicao/NewEditForm";
 import { HeroFx } from "@/modules/shell/HeroFx";
+import Link from "next/link";
+import { Palette } from "lucide-react";
+import type { EstiloEscolhido } from "./Anexos";
 
 type Aba = "post" | "video" | "imagem" | "edicao" | "motion";
 const URL_ABA: Record<Aba, string> = { post: "/studio/novo?tipo=post", imagem: "/studio/novo?tipo=imagem", video: "/studio/novo", edicao: "/studio/novo?tipo=edicao", motion: "/studio/novo?tipo=motion" };
@@ -24,7 +27,7 @@ const TITULO: Record<Aba, [string, string]> = {
  * "Novo" do Studio com as duas abas montadas: trocar não recarrega a página nem perde o que foi digitado.
  * A aba que sai some rápido; a que entra sobe painel a painel. A URL acompanha (?tipo=imagem) sem navegação.
  */
-export function StudioNovo({ inicial, video, imagem, post, edicao }: { inicial: Aba; video: ComponentProps<typeof NewVideoForm>; imagem: ComponentProps<typeof NewImageForm>; post: ComponentProps<typeof NewPostForm>; edicao: ComponentProps<typeof NewEditForm> }) {
+export function StudioNovo({ inicial, video, imagem, post, edicao, estilo }: { estilo?: EstiloEscolhido | null; inicial: Aba; video: ComponentProps<typeof NewVideoForm>; imagem: ComponentProps<typeof NewImageForm>; post: ComponentProps<typeof NewPostForm>; edicao: ComponentProps<typeof NewEditForm> }) {
   const [aba, setAba] = useState<Aba>(inicial);
   const [visivel, setVisivel] = useState<Aba>(inicial);
   const caixas = { post: useRef<HTMLDivElement>(null), video: useRef<HTMLDivElement>(null), imagem: useRef<HTMLDivElement>(null), edicao: useRef<HTMLDivElement>(null), motion: useRef<HTMLDivElement>(null) };
@@ -70,10 +73,15 @@ export function StudioNovo({ inicial, video, imagem, post, edicao }: { inicial: 
           ))}
         </Escolha>
       </div>
-      <div ref={caixas.post} className="studio-aba" hidden={visivel !== "post"}><NewPostForm {...post} /></div>
-      <div ref={caixas.video} className="studio-aba" hidden={visivel !== "video"}><NewVideoForm {...video} /></div>
-      <div ref={caixas.imagem} className="studio-aba" hidden={visivel !== "imagem"}><NewImageForm {...imagem} /></div>
-      <div ref={caixas.motion} className="studio-aba" hidden={visivel !== "motion"}><NewVideoForm {...video} motion /></div>
+      <div className="studio-passos" data-enter>
+        <Link href="/studio/estilos" className="studio-passo" data-feito={!!estilo}><b>1</b><span>{estilo ? <>Estilo <strong>{estilo.nome}</strong> · trocar</> : <>Escolha um estilo <em>(opcional)</em></>}</span><Palette aria-hidden /></Link>
+        <span className="studio-passo"><b>2</b><span>Descreva a ideia</span></span>
+        <span className="studio-passo"><b>3</b><span>Logo ou referência</span></span>
+      </div>
+      <div ref={caixas.post} className="studio-aba" hidden={visivel !== "post"}><NewPostForm {...post} estilo={estilo} /></div>
+      <div ref={caixas.video} className="studio-aba" hidden={visivel !== "video"}><NewVideoForm {...video} estilo={inicial === "video" ? estilo : null} /></div>
+      <div ref={caixas.imagem} className="studio-aba" hidden={visivel !== "imagem"}><NewImageForm {...imagem} estilo={estilo} /></div>
+      <div ref={caixas.motion} className="studio-aba" hidden={visivel !== "motion"}><NewVideoForm {...video} motion estilo={inicial === "motion" ? estilo : null} /></div>
       <div ref={caixas.edicao} className="studio-aba" hidden={visivel !== "edicao"}><NewEditForm {...edicao} /></div>
     </>
   );

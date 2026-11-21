@@ -8,7 +8,7 @@ import { toast } from "../shell/toast";
 import { EstiloPicker, type Estilo } from "./EstiloPicker";
 import { Palco } from "./Palco";
 import { criarImagem } from "./actions";
-import { Anexos, paraEnvio, type AnexosValor } from "./Anexos";
+import { Anexos, paraEnvio, type AnexosValor, anexosDoEstilo, type EstiloEscolhido } from "./Anexos";
 import type { MarcaResumo } from "@/lib/marcas";
 import { comMarca, faltando, Identidade } from "./Identidade";
 
@@ -20,14 +20,14 @@ const FORMATOS = [
 ] as const;
 const MAX_SLIDES = 20; // limite atual do Instagram
 
-export function NewImageForm({ produto, marcas }: {
-  produto: string; marcas: MarcaResumo[];
+export function NewImageForm({ produto, marcas, estilo }: {
+  produto: string; marcas: MarcaResumo[]; estilo?: EstiloEscolhido | null;
 }) {
   const router = useRouter();
   const [pend, start] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
-  const [anexos, setAnexos] = useState<AnexosValor>({ assets: [], links: [] });
-  const [f, setF] = useState({ produto, objetivo: "", descricao: "", publico: "", cta: "", cores: "", estilo: "premium, moderno, tipografia forte", texto: "", formato: "1:1", variacoes: 3, orientacao: "", tipo: "avulsa" as "avulsa" | "carrossel", slides: 5, estiloVisual: "livre" as Estilo });
+  const [anexos, setAnexos] = useState<AnexosValor>(() => anexosDoEstilo(estilo));
+  const [f, setF] = useState({ produto, objetivo: "", descricao: "", publico: "", cta: "", cores: "", estilo: "premium, moderno, tipografia forte", texto: "", formato: estilo?.formato ?? "1:1", variacoes: 3, orientacao: estilo?.texto ?? "", tipo: "avulsa" as "avulsa" | "carrossel", slides: 5, estiloVisual: "livre" as Estilo });
   const [marcaId, setMarcaId] = useState<string | null>(marcas[0]?.id ?? null);
   const falta = faltando(f);
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((x) => ({ ...x, [k]: v }));

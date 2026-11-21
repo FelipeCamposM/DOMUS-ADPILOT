@@ -9,7 +9,7 @@ import { EstiloPicker, type Estilo, type EstiloSalvo } from "./EstiloPicker";
 import { Palco } from "./Palco";
 import { apagarEstilo, criarVideo, favoritarVoz } from "./actions";
 import { confirmar } from "../shell/confirmar";
-import { Anexos, paraEnvio, type AnexosValor } from "./Anexos";
+import { Anexos, paraEnvio, type AnexosValor, anexosDoEstilo, type EstiloEscolhido } from "./Anexos";
 import type { MarcaResumo } from "@/lib/marcas";
 import { comMarca, faltando, Identidade } from "./Identidade";
 import { GravarVoz, type VozGravada } from "./GravarVoz";
@@ -31,20 +31,21 @@ const MUSICAS: [string, string][] = [["auto", "Automática"], ["none", "Sem mús
 
 export interface VozEl { id: string; nome: string; categoria: string; preview: string | null }
 
-export function NewVideoForm({ produto, musicas, marcas, vozesEl, favoritas: favIniciais, estilosSalvos = [], motion }: {
+export function NewVideoForm({ produto, musicas, marcas, vozesEl, favoritas: favIniciais, estilosSalvos = [], motion, estilo }: {
   produto: string; musicas: Record<string, number>; vozesEl: VozEl[]; favoritas: string[];
   marcas: MarcaResumo[]; estilosSalvos?: EstiloSalvo[];
   /** aba Motion: animação Livre sem narração por padrão, em 2D (GSAP) ou 3D (Three.js) */
   motion?: boolean;
+  estilo?: EstiloEscolhido | null;
 }) {
-  const [anexos, setAnexos] = useState<AnexosValor>({ assets: [], links: [] });
+  const [anexos, setAnexos] = useState<AnexosValor>(() => anexosDoEstilo(estilo));
   const router = useRouter();
   const [pend, start] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
   const [f, setF] = useState({
     produto, objetivo: "", descricao: "", publico: "", cta: "", estilo: "premium, moderno, tipografia forte", cores: "",
-    duracao: 15, formato: "9:16", voz: motion ? "none" : "pf_dora", vozNome: "", musica: "auto", efeitos: true, orientacao: "", estiloVisual: (motion ? "livre" : "hud") as Estilo, legendas: true,
-    estiloSalvo: null as string | null, cortarPausas: true, tresD: !!motion,
+    duracao: 15, formato: "9:16", voz: motion ? "none" : "pf_dora", vozNome: "", musica: "auto", efeitos: true, orientacao: estilo?.texto ?? "", estiloVisual: (motion || estilo ? "livre" : "hud") as Estilo, legendas: true,
+    estiloSalvo: null as string | null, cortarPausas: true, tresD: !!motion && (estilo?.tresD ?? !estilo),
   });
   const [minhaVoz, setMinhaVoz] = useState<VozGravada | null>(null);
   const propria = f.voz === "propria";

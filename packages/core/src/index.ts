@@ -24,3 +24,4 @@ export * from "./sistemas";
 export * from "./mensagens";
 export * from "./contatos";
 export * from "./google-analytics";
+export * from "./estilos";

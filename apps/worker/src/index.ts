@@ -1,5 +1,6 @@
 import { CONCURRENCY, SYNC_INTERVAL_MIN, WORKER_ID } from "./env"; // primeiro: carrega o .env
 import { claimJob, completeJob, db, enqueueJob, failJob, jobDeSync, jobLog, migrate, recoverJobs, syncConnection, syncInstagram, tiposLivres, type Job, type JobType } from "@domus-ads/core";
+import { runEstilos, type EstilosPayload } from "./video/estilos";
 import { createServer } from "node:net";
 import { hostname } from "node:os";
 import { runChatTurn } from "./ai/chat";
@@ -28,7 +29,7 @@ import { acaoWhatsapp, avisar, enviarDaFila, estadoWhatsapp, gravarQr, ouvirWhat
  * FOR UPDATE SKIP LOCKED e grava progresso/resultado no banco; a web só lê. A web nunca manda comando de shell:
  * cada tipo de job tem um handler fixo aqui (allowlist).
  */
-const TIPOS: readonly JobType[] = ["SYNC_META", "SYNC_GOOGLE", "AI_CHAT", "AI_LOGIN", "AI_DETECT", "WORKER_STARTUP", "GENERATE_VIDEO", "GENERATE_IMAGE", "AI_CAMPAIGN", "RESTORE_MEDIA", "SYNC_INSTAGRAM", "PUBLISH_INSTAGRAM", "AI_INSTAGRAM_CAPTION", "AI_USAGE", "WHATSAPP", "AI_CALENDARIO", "GENERATE_AUDIO", "AI_SISTEMA", "WHATSAPP_ENVIAR", "MARCA_CONHECIMENTO", "PROSPECTAR_LEADS", "AI_LEADS", "AI_AJUSTAR_MENSAGEM", "FIN_SYNC", "AI_FINANCEIRO"];
+const TIPOS: readonly JobType[] = ["SYNC_META", "SYNC_GOOGLE", "AI_CHAT", "AI_LOGIN", "AI_DETECT", "WORKER_STARTUP", "GENERATE_VIDEO", "GENERATE_IMAGE", "AI_CAMPAIGN", "RESTORE_MEDIA", "SYNC_INSTAGRAM", "PUBLISH_INSTAGRAM", "AI_INSTAGRAM_CAPTION", "AI_USAGE", "WHATSAPP", "AI_CALENDARIO", "GENERATE_AUDIO", "AI_SISTEMA", "WHATSAPP_ENVIAR", "MARCA_CONHECIMENTO", "PROSPECTAR_LEADS", "AI_LEADS", "AI_AJUSTAR_MENSAGEM", "FIN_SYNC", "AI_FINANCEIRO", "ESTILOS"];
 const sql = db();
 const ativos = new Map<string, AbortController>();
 /** uma busca no Google Maps por vez: duas juntas no mesmo IP chamam o bloqueio */
@@ -105,6 +106,9 @@ async function executar(job: Job) {
     } else if (job.type === "WHATSAPP_ENVIAR") {
       // mensagem escrita na tela Mensagens
       result = await enviarDaFila(String(job.payload.id));
+    } else if (job.type === "ESTILOS") {
+      // Studio → Estilos: prévia de um estilo pronto ou cópia das referências para o Drive
+      result = await runEstilos(job.payload as unknown as EstilosPayload, { signal: ctl.signal, log });
     } else if (job.type === "RESTORE_MEDIA") {
       result = await restaurar(String(job.payload.creativeId));
     } else if (job.type === "WORKER_STARTUP") {

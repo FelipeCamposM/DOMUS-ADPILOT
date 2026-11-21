@@ -4,13 +4,17 @@ import { can, requireCtx } from "@/lib/ctx";
 import { contasInstagram } from "@/lib/instagram";
 import { marcasDoWorkspace, resumo } from "@/lib/marcas";
 import { StudioNovo } from "@/modules/studio/StudioNovo";
+import { estiloPronto, textoDoEstilo, type Familia } from "@domus-ads/core/estilos";
+import type { EstiloEscolhido } from "@/modules/studio/Anexos";
+
+const FORMATO: Partial<Record<Familia, string>> = { stories: "9:16", banner: "1.91:1", post: "4:5" };
 
 export const metadata = { title: "Novo criativo" };
 
-export default async function NovoPage({ searchParams }: { searchParams: Promise<{ tipo?: string; item?: string }> }) {
+export default async function NovoPage({ searchParams }: { searchParams: Promise<{ tipo?: string; item?: string; estilo?: string }> }) {
   const ctx = await requireCtx();
   if (!can(ctx, "editor")) redirect("/studio");
-  const { tipo: t, item: itemId } = await searchParams;
+  const { tipo: t, item: itemId, estilo: estiloId } = await searchParams;
   const inicial = t === "imagem" ? "imagem" : t === "post" ? "post" : t === "edicao" ? "edicao" : t === "motion" ? "motion" : "video";
   const sql = db();
   const ws = ctx.workspace.id;
@@ -31,9 +35,24 @@ export default async function NovoPage({ searchParams }: { searchParams: Promise
   const [item] = itemId && /^[0-9a-f-]{36}$/i.test(itemId) ? await sql<{ id: string; tema: string; data_hora: Date }[]>`
     select id, tema, data_hora from ads.calendario_itens where id = ${itemId} and workspace_id = ${ws} and formato = 'REELS'` : [];
 
+  // "Usar" na biblioteca de estilos: pronto (chave) ou do workspace (uuid, com as referências como inspiração)
+  let estilo: EstiloEscolhido | null = null;
+  const pronto = estiloId ? estiloPronto(estiloId) : null;
+  if (pronto) estilo = { nome: pronto.nome, texto: textoDoEstilo(pronto), formato: FORMATO[pronto.familia], tresD: pronto.familia === "3d", refs: [] };
+  else if (estiloId && /^[0-9a-f-]{36}$/i.test(estiloId)) {
+    const [e] = await sql<{ nome: string; prompt: string; familia: Familia; referencias: string[] }[]>`
+      select nome, prompt, familia, referencias from ads.estilos where id = ${estiloId} and workspace_id = ${ws}`;
+    if (e) {
+      const refs = await sql<{ id: string; name: string; type: string }[]>`
+        select id, name, type from ads.creatives where id = any(${e.referencias}::uuid[]) and workspace_id = ${ws} and status = 'READY'`;
+      estilo = { nome: e.nome, texto: textoDoEstilo(e), formato: FORMATO[e.familia], tresD: e.familia === "3d",
+        refs: refs.map((r) => ({ creativeId: r.id, name: r.name, type: r.type, uso: "inspiracao" as const, nota: `Referência do estilo “${e.nome}”` })) };
+    }
+  }
+
   return (
     <div className="page">
-      <StudioNovo inicial={inicial} post={{ contas: contas.map((c) => ({ id: c.id, username: c.username })), marcas }}
+      <StudioNovo inicial={inicial} estilo={estilo} post={{ contas: contas.map((c) => ({ id: c.id, username: c.username })), marcas }}
         video={{ produto, musicas: Object.fromEntries(tags.map((t) => [t.tag, t.n])), marcas, vozesEl, favoritas: eu?.vozes_favoritas ?? [], estilosSalvos }}
         imagem={{ produto, marcas }}
         edicao={{ marcas, item: item ? { id: item.id, tema: item.tema, quando: item.data_hora.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" }) } : null }} />
