@@ -10,11 +10,11 @@ import { toast } from "./toast";
 import { ago } from "@/lib/format";
 import type { UsoContaIA } from "@/lib/queries";
 import { ClaudeLogo, OpenAILogo } from "../connections/Logos";
+import { COR_IA as COR, contasEmUso, limitadaIA as limitada, OrbesIA } from "./OrbesIA";
 import { Popover } from "./Popover";
 import { Seletor, type OpcaoSeletor } from "./Seletor";
 
 type Janela = { pct: number; resets_at: string | null };
-const COR = { claude: "#D97757", codex: "#10A37F" } as const;
 const hora = (iso: string) => new Date(iso).toLocaleString("pt-BR", { weekday: "short", hour: "2-digit", minute: "2-digit" });
 // ponytail: lista fixa (modelos de out/2026); trocar aqui quando sair modelo novo
 const MODELOS: Record<"claude" | "codex", OpcaoSeletor[]> = {
@@ -70,12 +70,7 @@ export function UsoIA({ contas, pref: prefServidor, podeEditar, aberto, onToggle
       router.refresh();
     } finally { setLendo(false); }
   };
-  const limitada = (c: UsoContaIA) => !!c.limited_until && new Date(c.limited_until) > new Date();
-  const ativas = contas.filter((c) => c.status === "ACTIVE");
-  // a conta fixada (se livre) vem primeiro: é ela que a IA usa
-  const livres = ativas.filter((c) => !limitada(c)).sort((a, b) => Number(b.id === pref.conta) - Number(a.id === pref.conta));
-  // um número por provedor: o da conta que a IA usa agora (a 1ª livre na ordem de prioridade; contas já vêm ordenadas)
-  const emUso = (["claude", "codex"] as const).map((pv) => ({ pv, c: livres.find((c) => c.provider === pv) ?? null, tem: ativas.some((c) => c.provider === pv) })).filter((x) => x.tem);
+  const { ativas, livres, emUso } = contasEmUso(contas, pref.conta);
   const pctDe = (c: UsoContaIA | null) => c?.usage?.five_hour?.pct;
   const pior = Math.max(...emUso.map((x) => (x.c ? pctDe(x.c) ?? 0 : 100)), 0);
   const estado = !livres.length ? "cheio" : pior >= 80 ? "alto" : "ok";
@@ -105,6 +100,8 @@ export function UsoIA({ contas, pref: prefServidor, podeEditar, aberto, onToggle
             <RefreshCw size={14} className={lendo ? "animate-spin" : undefined} aria-hidden />
           </button>
         </div>
+
+        <OrbesIA contas={contas} fixada={pref.conta} compacto />
 
         {podeEditar && contas.length > 0 && (
           <div className="ia-escolha" aria-busy={salvando}>

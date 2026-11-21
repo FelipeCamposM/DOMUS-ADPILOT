@@ -1,11 +1,12 @@
-import { db } from "@domus-ads/core";
+import { db, iaPreferencias } from "@domus-ads/core";
 import type { EtapaCrm } from "@domus-ads/core/mensagens";
 import { Bot, Cable, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 import { isPlatformAdmin, requireCtx } from "@/lib/ctx";
 import { derive, money, pct } from "@/lib/format";
-import { campanhas, kpis, opcoesFiltro, parseFiltro, serie } from "@/lib/queries";
+import { campanhas, kpis, opcoesFiltro, parseFiltro, serie, usoContasIA } from "@/lib/queries";
+import { OrbesIA } from "@/modules/shell/OrbesIA";
 import { ProviderTag, StatusTag } from "@/modules/campaigns/Tags";
 import { Filters } from "@/modules/dashboard/Filters";
 import { Kpis } from "@/modules/dashboard/Kpis";
@@ -89,8 +90,8 @@ export default async function Overview({ searchParams }: { searchParams: Promise
   const f = parseFiltro(await searchParams);
   const ws = ctx.workspace.id;
   // tudo de uma vez (se não houver conta, as de anúncios voltam vazias rápido)
-  const [opcoes, { atual, anterior }, pontos, todas, dadosCrm, dadosConteudo] = await Promise.all([
-    opcoesFiltro(ws), kpis(ws, f), serie(ws, f), campanhas(ws, f), admin ? crm() : null, conteudo(ws),
+  const [opcoes, { atual, anterior }, pontos, todas, dadosCrm, dadosConteudo, contasIA, iaPref] = await Promise.all([
+    opcoesFiltro(ws), kpis(ws, f), serie(ws, f), campanhas(ws, f), admin ? crm() : null, conteudo(ws), usoContasIA(), iaPreferencias(),
   ]);
   const top = todas.slice(0, 6);
   const temAds = opcoes.contas.length > 0;
@@ -100,6 +101,13 @@ export default async function Overview({ searchParams }: { searchParams: Promise
     <div className="page" style={{ maxWidth: 1480 }}>
       <Pulso nome={ctx.workspace.name} crm={dadosCrm} conteudo={dadosConteudo}
         ads={temAds ? { gasto7, moeda: todas[0]?.currency ?? "BRL", campanhas: todas.filter((c) => c.status === "ACTIVE").length } : null} />
+
+      {contasIA.some((c) => c.status === "ACTIVE") && (
+        <section className="panel orbes-painel" data-enter>
+          <div className="eyebrow">Uso dos assistentes</div>
+          <OrbesIA contas={contasIA} fixada={iaPref.conta} />
+        </section>
+      )}
 
       {temAds ? (
         <section className="stack" style={{ gap: 16 }}>
