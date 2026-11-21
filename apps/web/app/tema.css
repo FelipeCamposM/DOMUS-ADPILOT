@@ -378,3 +378,13 @@ body { background: #030205; }
   input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select { font-size: 16px !important; }
 }
 @media (max-width: 900px) and (prefers-reduced-motion: reduce) { .sidebar, .sb-fundo { transition: none !important; } }
+
+/* ── celular: conversa do WhatsApp (topo enxuto, campo de texto em linha própria) ── */
+@media (max-width: 900px) {
+  .wa-conversa .wa-topo { gap: 6px; padding: 0 8px; }
+  .wa-topo-num { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .wa-topo .wa-editar { font-size: 0; gap: 0; padding-inline: 8px; }
+  .wa-compor, .wa-conversa .wa-compor { padding: 8px 10px; }
+  .wa-compor-linha { flex-wrap: wrap; justify-content: space-between; }
+  .wa-compor-linha > textarea { order: -1; flex: 1 0 100%; }
+}

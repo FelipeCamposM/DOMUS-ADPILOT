@@ -323,7 +323,7 @@ function Conversa({ c, titulo, aviso, modelos, biblioteca, voltar, abrir, editar
         <Avatar aviso={aviso} nome={c.contato?.nome} />
         <span style={{ display: "flex", flexDirection: "column", minWidth: 0, flex: 1 }}>
           <b style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{titulo}</b>
-          <small className="subtle">{formatarNumero(c.numero)}{c.contato && !c.contato.salvo ? " · nome do WhatsApp" : ""}</small>
+          <small className="subtle wa-topo-num">{formatarNumero(c.numero)}{c.contato && !c.contato.salvo ? " · nome do WhatsApp" : ""}</small>
         </span>
         {!aviso && c.contato && (
           <EtapaSeletor etapas={etapas} valor={c.contato.etapa} onChange={(k) => mudarEtapa(k ?? "")} nenhum="Não é lead" pendente={pend} />
@@ -335,7 +335,7 @@ function Conversa({ c, titulo, aviso, modelos, biblioteca, voltar, abrir, editar
               const r = await ocultarConversa(c.numero);
               if (!r.ok) toast.err(r.error); else { toast.ok("Conversa removida"); router.refresh(); }
             }}><Archive aria-hidden /></button>)}
-        {!aviso && <button className="btn btn-ghost btn-xs" onClick={editarContato}>{salvo && c.contato?.salvo ? <><Pencil aria-hidden /> Editar contato</> : <><User aria-hidden /> Salvar contato</>}</button>}
+        {!aviso && <button className="btn btn-ghost btn-xs wa-editar" onClick={editarContato} aria-label={salvo && c.contato?.salvo ? "Editar contato" : "Salvar contato"}>{salvo && c.contato?.salvo ? <><Pencil aria-hidden /> Editar contato</> : <><User aria-hidden /> Salvar contato</>}</button>}
       </header>
 
       {c.contato?.etapa && c.contato.lead_em && <FaixaLead c={c.contato} />}
