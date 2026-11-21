@@ -1337,7 +1337,7 @@ fieldset:disabled label.chave { opacity: 0.6; cursor: default; }
 .page-sub a { color: rgb(var(--c-brand)); text-decoration: underline; text-underline-offset: 3px; }
 
 /* Studio: o que criar */
-.studio-criar { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.studio-criar { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: 12px; }
 .studio-criar-card {
   position: relative; display: flex; align-items: flex-start; gap: 14px; padding: 18px; border-radius: 18px; text-decoration: none; color: inherit;
   background: rgb(var(--c-bg-surface)); border: 1px solid rgb(var(--c-border));
@@ -1354,7 +1354,6 @@ fieldset:disabled label.chave { opacity: 0.6; cursor: default; }
 .studio-criar-seta { flex: none; margin-top: 2px; color: rgb(var(--c-text-tertiary)); transition: transform var(--dur-base) var(--ease-out), color var(--dur-base); }
 .studio-criar-card:hover .studio-criar-seta { transform: translateX(3px); color: rgb(var(--c-brand)); }
 .studio-barra { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 6px; }
-@media (max-width: 1300px) { .studio-criar { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 900px) { .studio-criar { grid-template-columns: 1fr; } }
 
 /* Novo post */

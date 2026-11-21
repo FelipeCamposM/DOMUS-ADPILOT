@@ -1,4 +1,4 @@
-import { ArrowRight, Clapperboard, ImageIcon, Scissors, Send } from "lucide-react";
+import { ArrowRight, Box, Clapperboard, ImageIcon, Scissors, Send } from "lucide-react";
 import Link from "next/link";
 import { can, requireCtx } from "@/lib/ctx";
 import { ago } from "@/lib/format";
@@ -15,6 +15,7 @@ const CRIAR = [
   { href: "/studio/novo?tipo=post", icone: Send, titulo: "Novo post", sub: "Instagram · imagem ou vídeo", desc: "A IA escreve arte, legenda e hashtags. Você aprova no WhatsApp e ele publica sozinho no horário.", destaque: true },
   { href: "/studio/novo?tipo=imagem", icone: ImageIcon, titulo: "Imagem avulsa", sub: "Anúncio · teste A/B · carrossel", desc: "Conceitos para você aprovar e PNGs prontos para baixar ou usar em campanhas." },
   { href: "/studio/novo", icone: Clapperboard, titulo: "Vídeo avulso", sub: "Anúncio · Reels · Stories", desc: "Roteiro, narração, música e animação. Você aprova o roteiro e recebe o MP4." },
+  { href: "/studio/novo?tipo=motion", icone: Box, titulo: "Motion graphics", sub: "2D (GSAP) · 3D (Three.js) · TikTok", desc: "Animação criada do zero pela IA, em 2D ou 3D de verdade. Você aprova o roteiro e baixa o MP4 vertical." },
   { href: "/studio/novo?tipo=edicao", icone: Scissors, titulo: "Editar meu vídeo", sub: "Legenda · cortes · animações 3D", desc: "Envie o seu vídeo: a IA corta as pausas, legenda palavra por palavra e anima por cima." },
 ] as const;
 
