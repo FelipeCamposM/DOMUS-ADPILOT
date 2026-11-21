@@ -1,7 +1,7 @@
 "use client";
 
 import { gsap } from "gsap";
-import { Activity, Bot, Boxes, Briefcase, Cable, CalendarDays, Clapperboard, FolderOpen, Globe, Images, LayoutDashboard, Megaphone, Palette, Radar, ScrollText, Settings, Settings2, SlidersHorizontal, Sparkles, TrendingUp, Wallet } from "lucide-react";
+import { Activity, Bot, Boxes, Briefcase, Cable, CalendarDays, Clapperboard, FolderOpen, Globe, Images, LayoutDashboard, Mail, Megaphone, Palette, Radar, ScrollText, Settings, Settings2, SlidersHorizontal, Sparkles, TrendingUp, Wallet } from "lucide-react";
 import Link from "next/link";
 import { InstagramIcon, WhatsappIcon } from "../connections/Logos";
 import { usePathname } from "next/navigation";
@@ -18,6 +18,7 @@ export const NAV = [
   { href: "/conteudos", label: "Conteúdos", icon: CalendarDays, group: "Criação" },
   { href: "/crm", label: "Mensagens", icon: WhatsappIcon, group: "CRM" },
   { href: "/crm/leads", label: "Leads", icon: Sparkles, group: "CRM" },
+  { href: "/crm/emails", label: "E-mails", icon: Mail, group: "CRM" },
   { href: "/crm/prospeccao", label: "Prospecção", icon: Radar, group: "CRM" },
   { href: "/crm/sites", label: "Sites", icon: Globe, group: "CRM" },
   { href: "/crm/config", label: "Configurações", icon: Settings2, group: "CRM" },

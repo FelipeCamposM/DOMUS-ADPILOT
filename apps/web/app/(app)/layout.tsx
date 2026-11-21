@@ -1,4 +1,6 @@
 import { iaPreferencias } from "@domus-ads/core";
+import { after } from "next/server";
+import { verificarContasEmail } from "@/lib/gmail";
 import { isPlatformAdmin, requireCtx } from "@/lib/ctx";
 import { notificacoes, opcoesFiltro, usoContasIA, workerOnline } from "@/lib/queries";
 import { Shell } from "@/modules/shell/Shell";
@@ -11,6 +13,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const [n, { campanhas }, w, contasIA, iaPref] = await Promise.all([
     notificacoes(ctx.workspace.id, ctx.user.id, admin), opcoesFiltro(ctx.workspace.id), workerOnline(), usoContasIA(), iaPreferencias(),
   ]);
+  // Gmail: confere (1x por hora, depois da resposta) se a autorização ainda vale; expirada aparece no sino
+  if (admin) after(() => verificarContasEmail().catch(() => null));
   return (
     <Shell
       user={ctx.user}
@@ -22,6 +26,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         falhas: n.falhas.map((f) => ({ ...f, finished_at: f.finished_at.toISOString() })),
         leads: n.leads.map((l) => ({ ...l, lead_em: l.lead_em.toISOString() })),
         lidasEm: n.lidasEm?.toISOString() ?? null,
+        emails: n.emails.map((e) => ({ ...e, em: e.em.toISOString() })),
       }}
       worker={{ online: w.online, lastSeen: w.lastSeen?.toISOString() ?? null }}
       whatsapp={{

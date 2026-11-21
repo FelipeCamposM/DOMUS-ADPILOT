@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Bell, Bot, CheckCheck, Sparkles } from "lucide-react";
+import { AlertTriangle, Bell, Bot, CheckCheck, Mail, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
@@ -15,9 +15,10 @@ export interface DadosNotificacoes {
   falhas: { id: string; type: string; error: string | null; finished_at: string }[];
   leads: { numero: string; nome: string; site: string | null; origem: string | null; lead_em: string }[];
   lidasEm: string | null;
+  emails: { id: string; email: string; em: string }[];
 }
 
-type Item = { id: string; tipo: "lead" | "acao" | "falha"; href: string; titulo: string; sub: string; em: string };
+type Item = { id: string; tipo: "lead" | "acao" | "falha" | "email"; href: string; titulo: string; sub: string; em: string };
 
 /** Sininho: leads novos, aprovações da IA e falhas, com "não lida" desde a última vez que marcou tudo como lido. */
 export function Notificacoes({ n, aberto, onToggle, onClose }: { n: DadosNotificacoes; aberto: boolean; onToggle: () => void; onClose: () => void }) {
@@ -29,6 +30,7 @@ export function Notificacoes({ n, aberto, onToggle, onClose }: { n: DadosNotific
   const itens: Item[] = [
     ...n.leads.map((l) => ({ id: `l${l.numero}${l.lead_em}`, tipo: "lead" as const, href: `/crm?c=${l.numero}`, titulo: `Novo lead: ${l.nome}`, sub: l.origem ?? (l.site ? `site ${l.site}` : "formulário"), em: l.lead_em })),
     ...n.acoes.map((a) => ({ id: `a${a.id}`, tipo: "acao" as const, href: a.conversation_id ? `/ai/${a.conversation_id}` : "/ai", titulo: `Aprovar: ${a.summary}`, sub: "IA aguardando você", em: a.created_at })),
+    ...n.emails.map((e) => ({ id: `e${e.id}`, tipo: "email" as const, href: `/crm/emails?conta=${e.id}`, titulo: `Gmail expirou: ${e.email}`, sub: "Clique para reconectar", em: e.em })),
     ...n.falhas.map((f) => ({ id: `f${f.id}`, tipo: "falha" as const, href: "/jobs", titulo: `Job ${f.type} falhou`, sub: f.error?.slice(0, 80) ?? "", em: f.finished_at })),
   ].sort((a, b) => b.em.localeCompare(a.em));
   const nova = (i: Item) => !lidas || i.em > lidas;
@@ -70,7 +72,7 @@ export function Notificacoes({ n, aberto, onToggle, onClose }: { n: DadosNotific
           </header>
           <div className="notif-lista" ref={lista}>
             {itens.map((i) => {
-              const Ic = i.tipo === "lead" ? Sparkles : i.tipo === "acao" ? Bot : AlertTriangle;
+              const Ic = i.tipo === "lead" ? Sparkles : i.tipo === "acao" ? Bot : i.tipo === "email" ? Mail : AlertTriangle;
               return (
                 <Link key={i.id} href={i.href} className="notif-item" data-tipo={i.tipo} data-nova={nova(i)} onClick={onClose}>
                   <span className="notif-ic"><Ic aria-hidden /></span>
