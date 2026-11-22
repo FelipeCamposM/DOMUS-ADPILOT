@@ -3,7 +3,7 @@
 import { gsap } from "gsap";
 import { Activity, Bot, Boxes, Briefcase, Cable, CalendarDays, Clapperboard, FolderOpen, Globe, Images, LayoutDashboard, Mail, Megaphone, Palette, Radar, ScrollText, Settings, Settings2, SlidersHorizontal, Sparkles, TrendingUp, Wallet } from "lucide-react";
 import Link from "next/link";
-import { InstagramIcon, WhatsappIcon } from "../connections/Logos";
+import { InstagramIcon, TikTokIcon, WhatsappIcon } from "../connections/Logos";
 import { usePathname } from "next/navigation";
 import { useLayoutEffect, useRef } from "react";
 
@@ -15,6 +15,7 @@ export const NAV = [
   { href: "/creatives", label: "Criativos", icon: Images, group: "Criação" },
   { href: "/arquivos", label: "Arquivos", icon: FolderOpen, group: "Criação" },
   { href: "/instagram", label: "Instagram", icon: InstagramIcon, group: "Criação" },
+  { href: "/tiktok", label: "TikTok", icon: TikTokIcon, group: "Criação" },
   { href: "/conteudos", label: "Conteúdos", icon: CalendarDays, group: "Criação" },
   { href: "/crm", label: "Mensagens", icon: WhatsappIcon, group: "CRM" },
   { href: "/crm/leads", label: "Leads", icon: Sparkles, group: "CRM" },

@@ -1,8 +1,9 @@
 import "server-only";
 import { db, decrypt, encrypt } from "@domus-ads/core";
 
-/** Login Kit (perfil) + Content Posting API (envio para a caixa de entrada do TikTok; a pessoa publica no app). */
-export const ESCOPOS_TIKTOK = "user.info.basic,video.upload";
+/** Login Kit (perfil), Display API (estatísticas e vídeos) e Content Posting API (envio para a caixa de entrada; a pessoa publica no app).
+ * TIKTOK_SCOPES troca a lista: o app de produção só pode pedir escopos já aprovados, senão o login falha. */
+export const ESCOPOS_TIKTOK = process.env.TIKTOK_SCOPES || "user.info.basic,user.info.profile,user.info.stats,video.list,video.upload";
 const API = "https://open.tiktokapis.com/v2";
 
 export const tiktokConfigurado = () => !!(process.env.TIKTOK_CLIENT_KEY && process.env.TIKTOK_CLIENT_SECRET);
@@ -67,4 +68,33 @@ export async function enviarVideoTikTok(conexao: { id: string; credentials_enc: 
     if (!up.ok) throw new Error(`Falha ao enviar o vídeo ao TikTok (parte ${i + 1}/${n}, HTTP ${up.status})`);
   }
   return j.data.publish_id ?? null;
+}
+
+export interface PerfilTT {
+  display_name?: string; username?: string; avatar_url?: string; bio_description?: string; profile_deep_link?: string; is_verified?: boolean;
+  follower_count?: number; following_count?: number; likes_count?: number; video_count?: number;
+}
+export interface VideoTT {
+  id: string; title?: string; video_description?: string; cover_image_url?: string; share_url?: string; create_time?: number; duration?: number;
+  view_count?: number; like_count?: number; comment_count?: number; share_count?: number;
+}
+
+async function api<T>(token: string, caminho: string, init?: RequestInit): Promise<T> {
+  const r = await fetch(`${API}${caminho}`, { ...init, headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...init?.headers }, cache: "no-store" });
+  const j = (await r.json().catch(() => ({}))) as { data?: T; error?: { code?: string; message?: string } };
+  if (!r.ok || (j.error?.code && j.error.code !== "ok")) throw new Error(j.error?.message || j.error?.code || `HTTP ${r.status}`);
+  return j.data as T;
+}
+
+/** Perfil + estatísticas + últimos vídeos públicos (Display API), ao vivo. */
+export async function painelTikTok(conexao: { id: string; credentials_enc: string }) {
+  const token = await acessoTikTok(conexao.id, conexao.credentials_enc);
+  const campos = "display_name,username,avatar_url,bio_description,profile_deep_link,is_verified,follower_count,following_count,likes_count,video_count";
+  const [u, v] = await Promise.all([
+    api<{ user: PerfilTT }>(token, `/user/info/?fields=${campos}`),
+    api<{ videos: VideoTT[] }>(token, "/video/list/?fields=id,title,video_description,cover_image_url,share_url,create_time,duration,view_count,like_count,comment_count,share_count", {
+      method: "POST", body: JSON.stringify({ max_count: 20 }),
+    }),
+  ]);
+  return { perfil: u.user, videos: v.videos ?? [] };
 }

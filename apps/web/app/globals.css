@@ -3134,3 +3134,10 @@ li[data-estado="feito"] .pp-aviso-txt b { color: rgb(var(--c-text-secondary)); }
   .tb-dir { gap: 6px !important; min-width: 0; }
   .topbar .chip { padding-inline: 10px; }
 }
+
+/* TikTok: perfil e grade de vídeos (reaproveita o layout do Instagram) */
+.tt-avatar { width: 150px; height: 150px; border-radius: 50%; object-fit: cover; display: grid; place-items: center; background: rgb(var(--c-bg-inset)); }
+.tt-grade { grid-template-columns: repeat(4, 1fr); }
+.tt-celula { aspect-ratio: 9 / 16; }
+.tt-views { position: absolute; left: 8px; bottom: 8px; display: inline-flex; align-items: center; gap: 4px; color: #fff; font-weight: 700; font-size: 13px; text-shadow: 0 1px 3px rgb(0 0 0 / 0.7); }
+@media (max-width: 700px) { .tt-grade { grid-template-columns: repeat(3, 1fr); } .tt-avatar { width: 86px; height: 86px; } }

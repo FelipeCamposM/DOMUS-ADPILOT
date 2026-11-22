@@ -48,6 +48,11 @@ export const InstagramIcon = createLucideIcon("instagram", [
   ["line", { x1: "17.5", y1: "6.5", x2: "17.51", y2: "6.5", key: "p" }],
 ]);
 
+/** Glifo de linha do TikTok no padrão lucide (menu lateral). */
+export const TikTokIcon = createLucideIcon("tiktok", [
+  ["path", { d: "M16 3a4.5 4.5 0 0 0 4.5 4.5M16 3v11.5a4.5 4.5 0 1 1-4.5-4.5", key: "n" }],
+]);
+
 /** TikTok: a nota musical com as sombras ciano e rosa sobre placa preta. */
 export function TikTokLogo({ size = 28 }: { size?: number }) {
   const nota = "M16.6 5.8a3.9 3.9 0 0 1-.9-2.3h-2.8v11a2.3 2.3 0 1 1-1.6-2.2V9.5a5.1 5.1 0 1 0 4.4 5V9a6.6 6.6 0 0 0 3.8 1.2V7.4a3.9 3.9 0 0 1-2.9-1.6Z";
