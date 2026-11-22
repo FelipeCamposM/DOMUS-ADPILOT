@@ -36,7 +36,7 @@ export async function sincronizarTudo() {
     const sql = db();
     const conexoes = await sql<{ id: string; provider: string }[]>`
       select k.id, k.provider from ads.ad_connections k
-      where k.workspace_id = ${ctx.workspace.id} and k.status <> 'REVOKED'
+      where k.workspace_id = ${ctx.workspace.id} and k.status <> 'REVOKED' and k.provider <> 'TIKTOK'
         and not exists (select 1 from ads.jobs j where j.status in ('PENDING', 'RUNNING') and j.payload->>'connectionId' = k.id::text)`;
     for (const k of conexoes) {
       await enqueueJob(sql, { workspaceId: ctx.workspace.id, type: jobDeSync(k.provider), payload: { connectionId: k.id }, createdBy: ctx.user.id });

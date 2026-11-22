@@ -172,7 +172,7 @@ async function publicarAgendados() {
 async function agendarSyncs() {
   const devidas = await sql<{ id: string; workspace_id: string; provider: string }[]>`
     select k.id, k.workspace_id, k.provider from ads.ad_connections k
-    where k.status = 'ACTIVE' and (k.last_synced_at is null or k.last_synced_at < now() - make_interval(mins => ${SYNC_INTERVAL_MIN}))
+    where k.status = 'ACTIVE' and k.provider <> 'TIKTOK' and (k.last_synced_at is null or k.last_synced_at < now() - make_interval(mins => ${SYNC_INTERVAL_MIN}))
       and not exists (select 1 from ads.jobs j where j.payload->>'connectionId' = k.id::text
         and (j.status in ('PENDING','RUNNING') or (j.status = 'FAILED' and j.finished_at > now() - interval '30 minutes')))`;
   for (const k of devidas) {

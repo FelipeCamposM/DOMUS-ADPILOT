@@ -1,6 +1,7 @@
 import { db } from "@domus-ads/core";
 import { can, isPlatformAdmin, requireCtx } from "@/lib/ctx";
 import { contasEmail } from "@/lib/gmail";
+import { tiktokConfigurado } from "@/lib/tiktok";
 import { Connections, type Conexao } from "@/modules/connections/Connections";
 import { HeroFx } from "@/modules/shell/HeroFx";
 
@@ -42,7 +43,8 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
         podeAdmin={can(ctx, "admin")}
         podeEditar={can(ctx, "editor")}
         googleConfigurado={!!(process.env.GOOGLE_ADS_CLIENT_ID && process.env.GOOGLE_ADS_CLIENT_SECRET)}
-        aviso={sp.erro ? { tipo: "erro", codigo: sp.erro, msg: sp.msg ?? null } : sp.ok === "google" ? { tipo: "ok", contas: Number(sp.contas ?? 0) } : sp.ok === "gmail" ? { tipo: "gmail", email: sp.email ?? "" } : null}
+        tiktokConfigurado={tiktokConfigurado()}
+        aviso={sp.erro ? { tipo: "erro", codigo: sp.erro, msg: sp.msg ?? null } : sp.ok === "google" ? { tipo: "ok", contas: Number(sp.contas ?? 0) } : sp.ok === "gmail" ? { tipo: "gmail", email: sp.email ?? "" } : sp.ok === "tiktok" ? { tipo: "tiktok", nome: sp.nome ?? "" } : null}
         gmails={gmails?.map((g) => ({ id: g.id, email: g.email, nome: g.nome, foto: g.foto, status: g.status, conectado_em: g.conectado_em.toISOString() })) ?? null}
       />
     </div>

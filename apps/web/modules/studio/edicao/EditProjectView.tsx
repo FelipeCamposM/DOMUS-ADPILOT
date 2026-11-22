@@ -6,6 +6,7 @@ import { Captions, Check, ClipboardCheck, Download, Eye, EyeOff, Film, Loader2, 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { BotaoPublicar } from "../../instagram/BotaoPublicar";
+import { BotaoTikTok } from "../BotaoTikTok";
 import { confirmar } from "../../shell/confirmar";
 import { toast } from "../../shell/toast";
 import { ajustarComIA, apagarVideo, aprovarEdicao, cancelarVideo } from "../actions";
@@ -101,6 +102,7 @@ export function EditProjectView({ p, podeEditar }: { p: EdicaoView; podeEditar: 
             {p.creative && !revisao && (
               <div className="cluster" style={{ gap: 6 }}>
                 <BotaoPublicar tipo="REELS" midias={[p.creative.id]} rotulo="Publicar Reels" />
+                {podeEditar && <BotaoTikTok creativeId={p.creative.id} />}
                 <a className="btn btn-secondary btn-xs" href={`/api/creatives/${p.creative.id}/file?download=1`}><Download aria-hidden /> Baixar MP4</a>
               </div>
             )}

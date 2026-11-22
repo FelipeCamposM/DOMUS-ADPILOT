@@ -10,7 +10,7 @@ import { toast } from "../shell/toast";
 import { conectarInstagram, conectarMeta, removerConexao, sincronizarConexao } from "./actions";
 import { desconectarEmail } from "../emails/actions";
 import { confirmar } from "../shell/confirmar";
-import { GmailLogo, GoogleAdsLogo, InstagramLogo, LogoPlataforma, MetaLogo } from "./Logos";
+import { GmailLogo, GoogleAdsLogo, InstagramLogo, LogoPlataforma, MetaLogo, TikTokLogo } from "./Logos";
 
 export interface Conexao {
   id: string; provider: string; label: string; status: string; last_error: string | null; last_synced_at: string | null; created_at: string;
@@ -18,7 +18,7 @@ export interface Conexao {
   contas: { id: string; name: string; external_id: string; currency: string; timezone: string | null; status: string; campanhas: number; ativas: number }[];
   perfis: { id: string; username: string; nome: string | null; foto: string | null; seguidores: number | null; publicacoes: number | null }[];
 }
-type Aviso = { tipo: "erro"; codigo: string; msg: string | null } | { tipo: "ok"; contas: number } | { tipo: "gmail"; email: string } | null;
+type Aviso = { tipo: "erro"; codigo: string; msg: string | null } | { tipo: "ok"; contas: number } | { tipo: "gmail"; email: string } | { tipo: "tiktok"; nome: string } | null;
 export interface Gmail { id: string; email: string; nome: string | null; foto: string | null; status: string; conectado_em: string }
 
 const ERROS: Record<string, string> = {
@@ -33,20 +33,29 @@ const ERROS: Record<string, string> = {
   "gmail-token": "O Google não devolveu a autorização. Tente de novo.",
   "gmail-escopo": "Na tela do Google, deixe marcado o acesso ao Gmail (ler, escrever e enviar e-mails).",
   "gmail-perfil": "Não consegui ler o e-mail da conta Google.",
+  "tiktok-env": "Faltam TIKTOK_CLIENT_KEY e TIKTOK_CLIENT_SECRET no servidor.",
+  "tiktok-state": "A autorização do TikTok expirou ou veio de outra aba. Tente de novo.",
+  "tiktok-permissao": "Você precisa ser admin do workspace para conectar contas.",
+  "tiktok-negado": "A autorização foi cancelada na tela do TikTok.",
+  "tiktok-token": "O TikTok não devolveu a autorização.",
+  "tiktok-escopo": "Na tela do TikTok, deixe marcada a permissão de enviar vídeos.",
 };
-const NOME = { META: "Meta Ads", GOOGLE: "Google Ads", INSTAGRAM: "Instagram" } as Record<string, string>;
+const NOME = { META: "Meta Ads", GOOGLE: "Google Ads", INSTAGRAM: "Instagram", TIKTOK: "TikTok" } as Record<string, string>;
 const num = (n: number | null) => (n == null ? "-" : new Intl.NumberFormat("pt-BR", { notation: n >= 10_000 ? "compact" : "standard" }).format(n));
 const idConta = (p: string, id: string) => (p === "GOOGLE" ? id.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3") : id.replace(/^act_/, ""));
 const fuso = (tz: string | null) => (tz ? tz.split("/").pop()!.replace(/_/g, " ") : null);
 const data = (iso: string) => new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
 
-export function Connections({ conexoes, podeAdmin, podeEditar, googleConfigurado, aviso, gmails }: {
-  conexoes: Conexao[]; podeAdmin: boolean; podeEditar: boolean; googleConfigurado: boolean; aviso: Aviso;
+export function Connections({ conexoes: todas, podeAdmin, podeEditar, googleConfigurado, tiktokConfigurado, aviso, gmails }: {
+  conexoes: Conexao[]; podeAdmin: boolean; podeEditar: boolean; googleConfigurado: boolean; tiktokConfigurado: boolean; aviso: Aviso;
   /** contas Gmail (só o admin da plataforma recebe; null = não mostra) */
   gmails: Gmail[] | null;
 }) {
   const router = useRouter();
-  const [modal, setModal] = useState<"meta" | "google" | "instagram" | "gmail" | null>(null);
+  // TikTok não sincroniza contas de anúncio: card próprio
+  const tiktoks = todas.filter((k) => k.provider === "TIKTOK");
+  const conexoes = todas.filter((k) => k.provider !== "TIKTOK");
+  const [modal, setModal] = useState<"meta" | "google" | "instagram" | "gmail" | "tiktok" | null>(null);
   const [remover, setRemover] = useState<Conexao | null>(null);
   const [falha, setFalha] = useState<{ titulo: string; msg: string } | null>(null);
   const lido = useRef(false);
@@ -57,7 +66,8 @@ export function Connections({ conexoes, podeAdmin, podeEditar, googleConfigurado
     lido.current = true;
     if (aviso.tipo === "ok") toast.ok(`Google Ads conectado: ${aviso.contas} conta(s). Sincronizando…`);
     else if (aviso.tipo === "gmail") toast.ok(`Gmail conectado: ${aviso.email}`);
-    else setFalha({ titulo: aviso.codigo.startsWith("gmail") ? "Não foi possível conectar o Gmail" : "Não foi possível conectar o Google Ads", msg: `${ERROS[aviso.codigo] ?? "Erro ao conectar."}${aviso.msg ? `\n\n${aviso.msg}` : ""}` });
+    else if (aviso.tipo === "tiktok") toast.ok(`TikTok conectado: ${aviso.nome}`);
+    else setFalha({ titulo: aviso.codigo.startsWith("tiktok") ? "Não foi possível conectar o TikTok" : aviso.codigo.startsWith("gmail") ? "Não foi possível conectar o Gmail" : "Não foi possível conectar o Google Ads", msg: `${ERROS[aviso.codigo] ?? "Erro ao conectar."}${aviso.msg ? `\n\n${aviso.msg}` : ""}` });
     router.replace("/connections", { scroll: false });
   }, [aviso, router]);
 
@@ -81,6 +91,8 @@ export function Connections({ conexoes, podeAdmin, podeEditar, googleConfigurado
             itens={["Contas da MCC entram sozinhas", "Criar campanhas de Pesquisa"]} conectadas={por("GOOGLE")} onClick={() => setModal("google")} />
           <PlataformaCard logo={<InstagramLogo size={30} />} nome="Instagram" desc="Conta Profissional ligada a uma Página do Facebook, pelo token do usuário do sistema."
             itens={["Posts, carrosséis, Reels e stories", "Agendar e ver o feed"]} conectadas={por("INSTAGRAM")} onClick={() => setModal("instagram")} />
+          <PlataformaCard logo={<TikTokLogo size={30} />} nome="TikTok" desc="Login com a conta do TikTok. Os vídeos do Studio vão para a sua caixa de entrada no app."
+            itens={["Enviar vídeos do Studio", "Você publica pelo app"]} conectadas={tiktoks.length} onClick={() => setModal("tiktok")} />
           {gmails && <PlataformaCard logo={<GmailLogo size={30} />} nome="Gmail" desc="Suas caixas de e-mail dentro do AdPilot (CRM → E-mails). Pode conectar mais de uma."
             itens={["Ler, buscar e responder", "Aviso no sino se a autorização cair"]} conectadas={gmails.length} onClick={() => setModal("gmail")} />}
         </section>
@@ -99,6 +111,14 @@ export function Connections({ conexoes, podeAdmin, podeEditar, googleConfigurado
         </section>
       )}
 
+      {tiktoks.length > 0 && (
+        <section className="stack" style={{ gap: 14 }}>
+          <div className="cn-secao">TikTok <span className="subtle">({tiktoks.length})</span></div>
+          {tiktoks.map((k) => <TikTokCard key={k.id} k={k} podeAdmin={podeAdmin} onRemover={() => setRemover(k)} />)}
+        </section>
+      )}
+      <TikTokDialog open={modal === "tiktok"} onClose={() => setModal(null)} configurado={tiktokConfigurado} />
+
       {!!gmails?.length && (
         <section className="stack" style={{ gap: 14 }}>
           <div className="cn-secao">E-mails <span className="subtle">({gmails.length})</span></div>
@@ -115,7 +135,7 @@ export function Connections({ conexoes, podeAdmin, podeEditar, googleConfigurado
         <div className="cn-falha"><AlertTriangle aria-hidden /><p style={{ whiteSpace: "pre-wrap" }}>{falha?.msg}</p></div>
         <div className="cluster" style={{ justifyContent: "flex-end" }}>
           <button className="btn btn-ghost btn-sm" onClick={() => setFalha(null)}>Fechar</button>
-          <button className="btn btn-primary btn-sm" onClick={() => { setFalha(null); setModal(aviso?.tipo === "erro" && aviso.codigo.startsWith("gmail") ? "gmail" : "google"); }}>Tentar de novo</button>
+          <button className="btn btn-primary btn-sm" onClick={() => { setFalha(null); setModal(aviso?.tipo === "erro" && aviso.codigo.startsWith("tiktok") ? "tiktok" : aviso?.tipo === "erro" && aviso.codigo.startsWith("gmail") ? "gmail" : "google"); }}>Tentar de novo</button>
         </div>
       </Dialog>
     </>
@@ -225,6 +245,50 @@ function ConexaoCard({ k, podeAdmin, podeEditar, onRemover, onReconectar }: { k:
         ))}
       </div>
     </article>
+  );
+}
+
+function TikTokCard({ k, podeAdmin, onRemover }: { k: Conexao; podeAdmin: boolean; onRemover: () => void }) {
+  const erro = k.status !== "ACTIVE" || !!k.last_error;
+  return (
+    <article className="panel cn-con" data-erro={erro} data-enter>
+      <header className="cn-con-head">
+        <span className="cn-plat-logo sm"><TikTokLogo size={24} /></span>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div className="cn-con-titulo">
+            <b>{k.label}</b>
+            {erro ? <span className="cn-pill err"><AlertTriangle size={11} aria-hidden /> Com erro</span> : <span className="cn-pill ok"><span className="cn-dot" /> Ativa</span>}
+          </div>
+          <div className="cn-con-sub">
+            <span>TikTok · conectada em <span suppressHydrationWarning>{data(k.created_at)}</span></span>
+            {k.perfil.nome && <span className="cn-quem"><Avatar k={k} />{k.perfil.nome}</span>}
+          </div>
+        </div>
+        <div className="cluster" style={{ gap: 6, flexWrap: "nowrap" }}>
+          {podeAdmin && <a className="btn btn-ghost btn-xs" href="/api/connections/tiktok/start">Reconectar</a>}
+          {podeAdmin && <button className="btn btn-ghost btn-xs cn-del" onClick={onRemover} aria-label={`Remover ${k.label}`} title="Remover conexão"><Trash2 aria-hidden /></button>}
+        </div>
+      </header>
+      {k.last_error && <div className="cn-erro"><AlertTriangle size={15} aria-hidden /><span>{k.last_error}</span></div>}
+      <p className="subtle small">No Studio, abra um vídeo pronto e use <b>Enviar ao TikTok</b>.</p>
+    </article>
+  );
+}
+
+function TikTokDialog({ open, onClose, configurado }: { open: boolean; onClose: () => void; configurado: boolean }) {
+  return (
+    <Dialog open={open} onClose={onClose} title="Conectar TikTok">
+      <div className="cn-modal-hero"><span className="cn-plat-logo"><TikTokLogo size={28} /></span><div><b>TikTok</b><span className="subtle small">Login Kit + envio de vídeos</span></div></div>
+      <p className="small">Você entra na sua conta do TikTok e autoriza o AdPilot a ler seu nome e foto e a enviar vídeos para a sua caixa de entrada. Nada é publicado sozinho: você revisa e publica pelo app do TikTok.</p>
+      {configurado ? (
+        <div className="cluster" style={{ justifyContent: "flex-end" }}>
+          <button className="btn btn-ghost btn-sm" onClick={onClose}>Cancelar</button>
+          <a className="btn btn-primary btn-sm" href="/api/connections/tiktok/start">Entrar com TikTok <ArrowRight aria-hidden /></a>
+        </div>
+      ) : (
+        <div className="cn-falha"><AlertTriangle aria-hidden /><p>O TikTok ainda não está configurado no servidor (<code>TIKTOK_CLIENT_KEY</code> e <code>TIKTOK_CLIENT_SECRET</code>).</p></div>
+      )}
+    </Dialog>
   );
 }
 
@@ -409,7 +473,7 @@ function RemoverDialog({ k, onClose }: { k: Conexao | null; onClose: () => void 
         <>
           <div className="cn-modal-hero"><span className="cn-plat-logo"><LogoPlataforma p={k.provider} size={28} /></span><div><b>{k.label}</b><span className="subtle small">{NOME[k.provider]}</span></div></div>
           <div className="cn-falha"><AlertTriangle aria-hidden />
-            <p>{k.provider === "INSTAGRAM"
+            <p>{k.provider === "TIKTOK" ? <>O AdPilot deixa de enviar vídeos para esta conta. Nada muda no TikTok.</> : k.provider === "INSTAGRAM"
               ? <>Saem da plataforma <b>{k.perfis.length} perfil(is)</b> e as publicações agendadas ou em rascunho deles. Nada muda no Instagram: o que já foi publicado continua lá.</>
               : <>Saem da plataforma <b>{k.contas.length} conta(s)</b>, <b>{campanhas} campanha(s)</b> e as métricas sincronizadas delas. Nada muda na {k.provider === "META" ? "Meta" : "Google"}: as campanhas continuam rodando lá.</>} Dá para conectar de novo depois.</p>
           </div>

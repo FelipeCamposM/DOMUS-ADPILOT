@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Escolha } from "../motion/Escolha";
 import { BotaoPublicar } from "../instagram/BotaoPublicar";
+import { BotaoTikTok } from "./BotaoTikTok";
 import { toast } from "../shell/toast";
 import { ajustarComIA, apagarVideo, cancelarVideo, gerarDeNovo, narrarComMinhaVoz, narrarComMinhasFalas, regerarComStoryboard, salvarEstilo, trocarVoz } from "./actions";
 import { FalaPorFala, GravarVoz, type VozGravada } from "./GravarVoz";
@@ -179,6 +180,7 @@ export function ProjectView({ p, podeEditar, vozes }: { p: ProjetoView; podeEdit
               </span>
               <div className="cluster" style={{ gap: 6 }}>
                 <BotaoPublicar tipo="REELS" midias={[p.creative.id]} rotulo="Publicar Reels" />
+                {podeEditar && <BotaoTikTok creativeId={p.creative.id} />}
                 <a className="btn btn-secondary btn-xs" href={`/api/creatives/${p.creative.id}/file?download=1`}><Download aria-hidden /> Baixar MP4</a>
               </div>
             </div>

@@ -48,7 +48,20 @@ export const InstagramIcon = createLucideIcon("instagram", [
   ["line", { x1: "17.5", y1: "6.5", x2: "17.51", y2: "6.5", key: "p" }],
 ]);
 
-export const LogoPlataforma = ({ p, size }: { p: string; size?: number }) => (p === "META" ? <MetaLogo size={size} /> : p === "INSTAGRAM" ? <InstagramLogo size={size} /> : <GoogleAdsLogo size={size} />);
+/** TikTok: a nota musical com as sombras ciano e rosa sobre placa preta. */
+export function TikTokLogo({ size = 28 }: { size?: number }) {
+  const nota = "M16.6 5.8a3.9 3.9 0 0 1-.9-2.3h-2.8v11a2.3 2.3 0 1 1-1.6-2.2V9.5a5.1 5.1 0 1 0 4.4 5V9a6.6 6.6 0 0 0 3.8 1.2V7.4a3.9 3.9 0 0 1-2.9-1.6Z";
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden>
+      <rect x="1" y="1" width="22" height="22" rx="6" fill="#111" />
+      <path d={nota} fill="#25F4EE" transform="translate(-0.6 -0.5)" />
+      <path d={nota} fill="#FE2C55" transform="translate(0.6 0.5)" />
+      <path d={nota} fill="#fff" />
+    </svg>
+  );
+}
+
+export const LogoPlataforma = ({ p, size }: { p: string; size?: number }) => (p === "META" ? <MetaLogo size={size} /> : p === "INSTAGRAM" ? <InstagramLogo size={size} /> : p === "TIKTOK" ? <TikTokLogo size={size} /> : <GoogleAdsLogo size={size} />);
 
 /** Marca do Claude (Anthropic), na cor oficial. */
 export function ClaudeLogo({ size = 20 }: { size?: number }) {
