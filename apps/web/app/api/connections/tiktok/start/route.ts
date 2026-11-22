@@ -16,6 +16,7 @@ export async function GET(req: NextRequest) {
     response_type: "code",
     redirect_uri: new URL("/api/connections/tiktok/callback", req.url).toString(),
     state,
+    disable_auto_auth: "1", // sempre mostra a tela de permissões (troca de conta, revisão do TikTok)
   }).toString();
   const res = NextResponse.redirect(url);
   res.cookies.set("tt_oauth", JSON.stringify({ state, ws: ctx.workspace.id }), { httpOnly: true, sameSite: "lax", secure: req.nextUrl.protocol === "https:", maxAge: 600, path: "/api/connections/tiktok" });
