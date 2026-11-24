@@ -1,4 +1,5 @@
 import { brandSchema, db, googleSearchSchema, LIMITES_RSA, type GoogleSearchSpec, type Json } from "@domus-ads/core";
+import { CONHECIMENTO } from "./conhecimento";
 import { blocoConhecimento } from "./marca-conhecimento";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
@@ -54,7 +55,36 @@ Regras (o Google rejeita o que passar dos limites; CONTE os caracteres, espaços
   "cpcMax" baixo (no máximo 1/2 do orçamento diário) e negativas amplas para não desperdiçar clique.
 - URLs: só use URLs que estejam no pedido ou no conteúdo das páginas fornecidas; sitelinks só com URLs reais de lá (senão, "sitelinks": []).
   Frases de destaque: até 25 caracteres, 4 a 6.
-- Use SÓ fatos do pedido, da marca e das páginas. Não invente preço, prazo, número, depoimento ou garantia.`;
+- Use SÓ fatos do pedido, da marca e das páginas. Não invente preço, prazo, número, depoimento ou garantia.
+
+COMO UM ESPECIALISTA SÊNIOR PENSA (siga antes de escrever o JSON):
+1. Leia a base de conhecimento inteira: produto principal, recursos que alguém PESQUISA no Google, público, região, oferta,
+   preços e a seção "Não afirmar" (é lei: nada dela entra em anúncio; o que o produto não atende vira negativa).
+2. Mapeie a intenção de busca e escolha palavras-chave por camada (das mais para as menos prováveis de comprar):
+   a) Dor + nome do sistema/nicho: "[recurso] + [sistema]" (ex.: "planejamento siap", "lançar chamada siap", "automatizar siap").
+   b) Quem busca uma alternativa: "programa para [sistema]", "extensão [sistema]", "app [sistema]", "[sistema] automático".
+   c) Categoria + nicho: "planejamento de aula com ia para professor", "gerador de plano de aula bncc" — só se o orçamento
+      comportar; em orçamento pequeno, só com qualificador do nicho/região (termos genéricos são caros e disputados).
+   d) NAVEGACIONAL (login, entrar, senha, acesso, portal, site oficial, recuperar senha, "[sistema] gov"): quem busca isso
+      quer entrar no sistema, não comprar. NÃO compre; negative quando o orçamento é pequeno.
+3. Um grupo por tema/recurso de alta intenção (ex.: Planejamento com IA, Chamada/frequência, Notas e conteúdo, Alternativa
+   à extensão). Os títulos de cada grupo repetem o termo daquele grupo (relevância = Índice de Qualidade = CPC menor).
+4. Títulos (12 a 15 por anúncio): ≥3 com a palavra-chave do grupo; ≥2 com a oferta (ex.: teste grátis); ≥2 com o diferencial
+   mais específico da marca; ≥2 com benefício concreto na linguagem do cliente; ≥1 que QUALIFICA o público (ex.: "Para
+   Professor da Rede Estadual") para quem não é cliente não clicar; ≥2 com chamada para ação; preço só se estiver na base.
+   Use as frases reais da marca quando couberem. Nada de título genérico ("Qualidade e Confiança").
+5. Descrições: dor → como resolve → diferencial/prova verdadeira → chamada. Cada uma faz sentido sozinha.
+6. Negativas da campanha: navegacionais (camada d), emprego/vagas/concurso/curso/pdf/download, públicos e plataformas que o
+   produto NÃO atende segundo "Não afirmar" (ex.: outra rede, outro estado, celular, mac), e "grátis"/"gratuito" só se NÃO houver oferta grátis.
+7. Políticas do Google: nunca sugira vínculo oficial com governo ou marca de terceiro ("oficial", "da Secretaria", "gov").
+   Pode citar o nome do sistema de terceiro para dizer com o que funciona.
+8. Sitelinks: só URLs que aparecem nas fontes da base/páginas (ex.: /comprar, /instalar), com texto que leva à ação.
+9. Antes de responder, revise como um auditor: cada título ≤30 caracteres e diferente; nenhuma promessa fora da base;
+   nenhuma palavra-chave navegacional; cada grupo tem tema único; o orçamento e a região batem com o pedido.
+
+<referencia_trafego_pago>
+${CONHECIMENTO}
+</referencia_trafego_pago>`;
 
 /** IA escreve (ou refaz, com um pedido) o rascunho da campanha. Nada vai para o Google aqui. */
 export async function runCampanhaIA(payload: CampanhaPayload, c: { signal: AbortSignal; log: (m: string) => Promise<void> }) {
@@ -69,10 +99,10 @@ export async function runCampanhaIA(payload: CampanhaPayload, c: { signal: Abort
     const pasta = join(DATA_DIR, "campanhas", d.id);
     mkdirSync(pasta, { recursive: true });
     const brand = brandSchema.parse(d.brand ?? {});
-    const marca = [brand.sobre && `Sobre a marca: ${brand.sobre}`, brand.tom && `Tom de voz: ${brand.tom}`, brand.regras && `Regras da marca: ${brand.regras}`, brand.site && `Site da marca: ${brand.site}`, blocoConhecimento(d.ws, d.conhecimento, 10_000)].filter(Boolean).join("\n");
+    const marca = [brand.sobre && `Sobre a marca: ${brand.sobre}`, brand.tom && `Tom de voz: ${brand.tom}`, brand.regras && `Regras da marca: ${brand.regras}`, brand.site && `Site da marca: ${brand.site}`, blocoConhecimento(d.ws, d.conhecimento, 30_000)].filter(Boolean).join("\n");
 
     // páginas citadas no pedido: o texto público vira contexto (sem login, sem rede interna)
-    const urls = [...new Set(`${d.prompt ?? ""} ${String(d.spec?.urlFinal ?? "")}`.match(/https?:\/\/[^\s"'<>]+/g) ?? [])].slice(0, 3);
+    const urls = [...new Set(`${d.prompt ?? ""} ${String(d.spec?.urlFinal ?? "")} ${brand.site ?? ""}`.match(/https?:\/\/[^\s"'<>]+/g) ?? [])].slice(0, 3);
     const paginas: string[] = [];
     for (const u of urls) {
       try { paginas.push(`- ${u}\n${(await lerPagina(u)).slice(0, 6000)}`); await c.log(`li a página ${u}`); }
