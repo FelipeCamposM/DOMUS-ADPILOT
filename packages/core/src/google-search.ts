@@ -54,6 +54,7 @@ export const googleSearchSchema = z.object({
   idiomas: z.array(z.enum(Object.keys(IDIOMAS) as [keyof typeof IDIOMAS, ...(keyof typeof IDIOMAS)[]])).min(1).default(["pt"]),
   parceirosPesquisa: z.boolean().default(false),
   horarioComercial: z.boolean().default(false), // só seg–sex, 8h–20h (fuso da conta)
+  dataFim: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Data de término no formato AAAA-MM-DD").nullish(), // promoção: para sozinha no fim do dia
   negativas: z.array(palavra).max(200).default([]),
   grupos: z.array(grupoSchema).min(1, "Pelo menos 1 grupo de anúncios").max(10, "No máximo 10 grupos"),
   sitelinks: z.array(z.object({
@@ -103,6 +104,7 @@ export function operacoesSearch(customerId: string, s: GoogleSearchSpec, geo: st
     containsEuPoliticalAdvertising: "DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING",
     // só quem ESTÁ no local (o padrão do Google inclui quem só "se interessa" por ele)
     geoTargetTypeSetting: { positiveGeoTargetType: "PRESENCE", negativeGeoTargetType: "PRESENCE" },
+    ...(s.dataFim ? { endDateTime: `${s.dataFim} 23:59:59` } : {}),
     ...lance,
   } } });
   if (s.horarioComercial) for (const dayOfWeek of ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"])

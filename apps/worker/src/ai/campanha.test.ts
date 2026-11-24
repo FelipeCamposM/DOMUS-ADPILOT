@@ -40,6 +40,11 @@ test("horário comercial: seg–sex, 8h–20h", () => {
   expect([ag[0]!.startHour, ag[0]!.endHour]).toEqual([8, 20]);
 });
 
+test("promoção: campanha termina no fim do dia da data de término", () => {
+  const ops = operacoesSearch("123", googleSearchSchema.parse({ ...base, dataFim: "2026-11-30" }), ["geoTargetConstants/20106"], "x");
+  expect((ops[1] as { campaignOperation: { create: Record<string, unknown> } }).campaignOperation.create.endDateTime).toBe("2026-11-30 23:59:59");
+});
+
 test("notação de palavras-chave do Google: [exata], \"frase\", ampla", () => {
   const p = textoParaPalavras('[siap goiás]\n"sistema para professores"\nsiap\n\n');
   expect(p.map((x) => x.correspondencia)).toEqual(["EXATA", "FRASE", "AMPLA"]);

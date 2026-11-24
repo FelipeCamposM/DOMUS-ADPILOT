@@ -23,6 +23,7 @@ Responda APENAS com um bloco \`\`\`json neste formato exato:
   "idiomas": ["pt"],
   "parceirosPesquisa": false,
   "horarioComercial": false,
+  "dataFim": null,
   "negativas": [{ "texto": "vagas", "correspondencia": "AMPLA" }],
   "grupos": [{
     "nome": "Tema do grupo",
@@ -52,6 +53,9 @@ Regras (o Google rejeita o que passar dos limites; CONTE os caracteres, espaços
 - horarioComercial: true (anúncios só seg–sex, 8h–20h) SÓ quando o público pesquisa/decide em horário de trabalho (B2B, serviço
   com atendimento humano). Se a base indica que o público resolve isso à noite ou no fim de semana (ex.: professor planejando em
   casa), false. Na dúvida, false.
+- dataFim: "AAAA-MM-DD" quando o pedido tem prazo (promoção, Black Friday, evento): a campanha para sozinha no fim desse dia.
+  Sem prazo, omita o campo. Campanha de promoção: a oferta, o desconto e o prazo ("Só até 30/11") aparecem nos títulos,
+  e a URL final é a do pedido (ex.: link com cupom já aplicado), sem trocar por outra página.
 - Orçamento pequeno (até R$ 5/dia): 1 a 2 grupos, só FRASE e EXATA, palavras de intenção alta e específicas do nicho (não termos genéricos caros),
   "cpcMax" baixo (no máximo 1/2 do orçamento diário) e negativas amplas para não desperdiçar clique.
 - URLs: só use URLs que estejam no pedido ou no conteúdo das páginas fornecidas; sitelinks só com URLs reais de lá (senão, "sitelinks": []).
