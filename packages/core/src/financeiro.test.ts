@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analisar, corrigirParcelasSemFatura, decidirNatureza, detectarAssinaturas, normalizar, padrao, parcelados, parearTransferencias, receitas, resumo, resumoReceitas, type PluggyTransacao, type TxBase } from "./financeiro";
+import { analisar, corrigirParcelasSemFatura, decidirNatureza, detectarAssinaturas, geral, type ContaGeral, normalizar, padrao, parcelados, parearTransferencias, receitas, resumo, resumoReceitas, type PluggyTransacao, type TxBase } from "./financeiro";
 
 const tx = (o: Partial<TxBase>): TxBase => ({
   id: Math.random().toString(36), contaId: "c1", pessoa: "PF", descricao: "X", valor: 1000, tipo: "debito", data: "2026-10-10", competencia: "2026-10-01",
@@ -112,5 +112,22 @@ describe("financeiro", () => {
     const sem = resumoReceitas(rs, "semana", "2026-11-15");
     expect([sem.inicio, sem.fim, sem.total]).toEqual(["2026-11-09", "2026-11-15", 1980]);
     expect(resumoReceitas(rs, "dia", "2026-11-06").total).toBe(350000);
+  });
+
+  it("visão geral: soma tudo sem contar fatura, transferência e retirada da PJ", () => {
+    const conta = (o: Partial<ContaGeral>): ContaGeral => ({ id: "x", nome: "X", tipo: "BANK", pessoa: "PF", saldo: null, limite: null, limite_usado: null, dia_vencimento: null, ...o });
+    const contas = [conta({ id: "b1", saldo: 50000 }), conta({ id: "b2", pessoa: "PJ", saldo: 30000 }), conta({ id: "c1", nome: "Cartão", tipo: "CREDIT", limite: 100000, limite_usado: 20000, dia_vencimento: 10 })];
+    const g = geral(contas, [
+      tx({ contaId: "c1", valor: 8000 }),
+      tx({ contaId: "c1", natureza: "estorno", tipo: "credito", valor: 1000 }),
+      tx({ contaId: "b1", cartao: false, natureza: "fatura", valor: 7000 }),
+      tx({ contaId: "b1", cartao: false, natureza: "renda", tipo: "credito", categoria: "Retirada da PJ", valor: 5000 }),
+      tx({ contaId: "b2", cartao: false, natureza: "transferencia", valor: 5000 }),
+      tx({ contaId: "b2", cartao: false, natureza: "renda", tipo: "credito", valor: 12000 }),
+      tx({ contaId: "b1", cartao: false, valor: 999, competencia: "2026-09-01" }),
+    ], "2026-10-01", "2026-10-05");
+    expect([g.saldo, g.divida, g.patrimonio, g.saiu, g.entrou, g.retirada]).toEqual([80000, 20000, 60000, 7000, 12000, 5000]);
+    expect(g.mov.find((m) => m.contaId === "b1")!.outrasSaidas).toEqual([{ nome: "Pagamento de fatura", valor: 7000 }]);
+    expect(g.insights.find((i) => i.id === "venc-c1")?.titulo).toBe("Cartão vence em 5 dias");
   });
 });

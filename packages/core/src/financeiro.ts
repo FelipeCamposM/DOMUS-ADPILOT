@@ -600,3 +600,85 @@ Regras: responda em português do Brasil, em Markdown curto (títulos ###, lista
 Seja específico: cite comerciantes, categorias e valores. Priorize ações concretas com economia estimada em R$/mês.
 Estrutura: ### Resumo em 3 linhas · ### O que chamou atenção · ### Onde cortar (com R$ estimado) · ### Próximo mês (plano em 3 passos).
 Se o usuário fez uma pergunta, responda a pergunta primeiro, usando os dados.`;
+
+/* ── Visão geral: todas as contas (PF + PJ) juntas ──────────────────────── */
+
+export interface ContaGeral { id: string; nome: string; tipo: "BANK" | "CREDIT"; pessoa: Pessoa; saldo: number | null; limite: number | null; limite_usado: number | null; dia_vencimento: number | null }
+export interface MovConta { contaId: string; saiu: number; entrou: number; outrasSaidas: { nome: string; valor: number }[]; outrasEntradas: { nome: string; valor: number }[] }
+export interface Geral {
+  saldo: number; divida: number; patrimonio: number; saiu: number; entrou: number; retirada: number;
+  /** dívida por cartão: limite usado (inclui parcelas futuras) ou, sem ele, a fatura do mês */
+  dividas: Record<string, number>;
+  mov: MovConta[]; serie: { mes: string; renda: number; gastos: number; saldo: number }[]; media3: { saiu: number; entrou: number }; insights: Insight[];
+}
+
+const ehRetirada = (t: TxBase) => t.natureza === "renda" && t.categoria === RETIRADA;
+/** Data (AAAA-MM-DD) do dia `dia` no mês de `hoje` + n (dia 31 em mês curto vira o último dia). */
+const diaDoMes = (hoje: string, dia: number, n = 0) => {
+  const m = somarMeses(mesDe(hoje), n);
+  const ultimo = new Date(Date.UTC(Number(m.slice(0, 4)), Number(m.slice(5, 7)), 0)).getUTCDate();
+  return `${m.slice(0, 8)}${String(Math.min(dia, ultimo)).padStart(2, "0")}`;
+};
+
+/**
+ * Tudo junto, sem contar duas vezes: saiu = gastos − estornos (pagar fatura e mover entre contas suas não é saída);
+ * entrou = renda, sem a "Retirada da PJ" (dinheiro que já era seu passando da PJ para a PF).
+ * Saldos e dívidas são os de agora; saiu/entrou são do mês (competência).
+ */
+export function geral(contas: ContaGeral[], txs: TxBase[], mes: string, hoje: string): Geral {
+  const mov = new Map<string, MovConta>(contas.map((c) => [c.id, { contaId: c.id, saiu: 0, entrou: 0, outrasSaidas: [], outrasEntradas: [] }]));
+  const somar = (xs: { nome: string; valor: number }[], nome: string, valor: number) => {
+    const x = xs.find((y) => y.nome === nome);
+    if (x) x.valor += valor; else xs.push({ nome, valor });
+  };
+  let retirada = 0;
+  for (const t of txs) {
+    const m = mov.get(t.contaId);
+    if (t.competencia !== mes || !m || t.natureza === "ignorado") continue;
+    if (t.natureza === "gasto") m.saiu += t.valor;
+    else if (t.natureza === "estorno") m.saiu -= t.valor;
+    else if (ehRetirada(t)) { somar(m.outrasEntradas, RETIRADA, valorRenda(t)); retirada += valorRenda(t); }
+    else if (t.natureza === "renda") m.entrou += valorRenda(t);
+    else somar(t.tipo === "debito" ? m.outrasSaidas : m.outrasEntradas, NATUREZA_ROTULO[t.natureza], t.valor);
+  }
+  const movs = [...mov.values()];
+  const soma = (xs: number[]) => xs.reduce((a, x) => a + x, 0);
+  const bancos = contas.filter((c) => c.tipo === "BANK");
+  const cartoes = contas.filter((c) => c.tipo === "CREDIT");
+  const dividas: Record<string, number> = Object.fromEntries(cartoes.map((c) => [c.id, c.limite_usado ?? Math.max(0, mov.get(c.id)!.saiu)]));
+  const saldo = soma(bancos.map((c) => c.saldo ?? 0));
+  const divida = soma(Object.values(dividas));
+  const saiu = soma(movs.map((m) => m.saiu));
+  const entrou = soma(movs.map((m) => m.entrou));
+  const s = serie(txs.filter((t) => !ehRetirada(t)), mes, 12);
+  const ant = s.slice(-4, -1).filter((x) => x.gastos || x.renda);
+  const media = (k: "gastos" | "renda") => (ant.length ? Math.round(soma(ant.map((x) => x[k])) / ant.length) : 0);
+  const media3 = { saiu: media("gastos"), entrou: media("renda") };
+
+  const out: Insight[] = [];
+  const patrimonio = saldo - divida;
+  out.push({ id: "patrimonio", nivel: patrimonio < 0 ? "alerta" : "bom", titulo: `Patrimônio líquido: ${brl(patrimonio)}`, texto: `${brl(saldo)} em conta menos ${brl(divida)} devidos nos cartões.`, valor: patrimonio });
+  for (const c of bancos) if ((c.saldo ?? 0) < 0) out.push({ id: `neg-${c.id}`, nivel: "alerta", titulo: `${c.nome} está no negativo`, texto: `Saldo de ${brl(c.saldo!)}: cheque especial cobra juros altos todo dia.` });
+  const faturasMes = soma(cartoes.map((c) => Math.max(0, mov.get(c.id)!.saiu)));
+  if (faturasMes > 0 && faturasMes > saldo) out.push({ id: "faturas", nivel: "alerta", titulo: "Faturas maiores que o saldo", texto: `As faturas de ${nomeMes(mes)} somam ${brl(faturasMes)} e há ${brl(saldo)} em conta.` });
+  for (const c of cartoes) {
+    if (c.dia_vencimento && (dividas[c.id] ?? 0) > 0) {
+      const venc = [0, 1].map((n) => diaDoMes(hoje, c.dia_vencimento!, n)).find((d) => d >= hoje)!;
+      const dias = Math.round((Date.parse(venc) - Date.parse(hoje)) / 86_400_000);
+      if (dias <= 7) out.push({ id: `venc-${c.id}`, nivel: "atencao", titulo: `${c.nome} vence ${dias === 0 ? "hoje" : dias === 1 ? "amanhã" : `em ${dias} dias`}`, texto: `Dia ${c.dia_vencimento}. Dívida no cartão: ${brl(dividas[c.id]!)}.` });
+    }
+    if (c.limite && (c.limite_usado ?? 0) / c.limite > 0.8) out.push({ id: `limite-${c.id}`, nivel: "atencao", titulo: `${c.nome}: ${pctTxt((c.limite_usado ?? 0) / c.limite)} do limite usado`, texto: `Sobram ${brl(c.limite - (c.limite_usado ?? 0))}. Acima de 80% pesa no seu score.` });
+  }
+  if (media3.saiu > 0) {
+    const dias = Math.max(0, Math.floor(saldo / (media3.saiu / 30)));
+    out.push({ id: "folego", nivel: dias < 30 ? "alerta" : dias < 90 ? "atencao" : "bom", titulo: `Fôlego: ${dias} dias`, texto: `Sem entrar nada, o saldo em conta cobre ${dias} dias no ritmo de gastos dos últimos meses (${brl(media3.saiu)}/mês).` });
+    if (saiu > media3.saiu * 1.15) out.push({ id: "saiu-alto", nivel: "atencao", titulo: `Saídas ${pctTxt(saiu / media3.saiu - 1)} acima da média`, texto: `${brl(saiu)} em ${nomeMes(mes)} contra ${brl(media3.saiu)} de média.` });
+  }
+  const resultado = entrou - saiu;
+  if (entrou || saiu) out.push({ id: "resultado", nivel: resultado < 0 ? "atencao" : "bom", titulo: `${resultado < 0 ? "Saiu mais do que entrou" : "Sobrou dinheiro"}: ${brl(resultado)}`, texto: `Entrou ${brl(entrou)} e saiu ${brl(saiu)} em ${nomeMes(mes)}${entrou > 0 && resultado > 0 ? ` (${pctTxt(resultado / entrou)} guardado)` : ""}.` });
+  const maior = [...bancos].sort((a, b) => (b.saldo ?? 0) - (a.saldo ?? 0))[0];
+  if (maior && bancos.length > 1 && saldo > 0 && (maior.saldo ?? 0) / saldo > 0.7) out.push({ id: "concentra", nivel: "info", titulo: `${pctTxt((maior.saldo ?? 0) / saldo)} do dinheiro está em ${maior.nome}`, texto: "Se for reserva, renderia mais numa aplicação com liquidez diária do que parado na conta." });
+  if (retirada > 0) out.push({ id: "retirada", nivel: "info", titulo: `${brl(retirada)} tirados da PJ para a PF`, texto: "Fica fora do total: é o mesmo dinheiro mudando de conta." });
+  const ordem: Record<Nivel, number> = { alerta: 0, atencao: 1, info: 2, bom: 3 };
+  return { saldo, divida, patrimonio, saiu, entrou, retirada, dividas, mov: movs, serie: s, media3, insights: out.sort((a, b) => ordem[a.nivel] - ordem[b.nivel]) };
+}

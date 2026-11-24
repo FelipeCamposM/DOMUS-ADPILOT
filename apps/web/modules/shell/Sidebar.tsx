@@ -1,7 +1,7 @@
 "use client";
 
 import { gsap } from "gsap";
-import { Activity, Bot, Boxes, Briefcase, Cable, CalendarDays, Clapperboard, FolderOpen, Globe, Images, LayoutDashboard, Mail, Megaphone, Palette, Radar, ScrollText, Settings, Settings2, SlidersHorizontal, Sparkles, TrendingUp, Wallet } from "lucide-react";
+import { Activity, Bot, Boxes, Briefcase, Cable, CalendarDays, Clapperboard, FolderOpen, Globe, Images, Landmark, LayoutDashboard, Mail, Megaphone, Palette, Radar, ScrollText, Settings, Settings2, SlidersHorizontal, Sparkles, TrendingUp, Wallet } from "lucide-react";
 import Link from "next/link";
 import { InstagramIcon, TikTokIcon, WhatsappIcon } from "../connections/Logos";
 import { usePathname } from "next/navigation";
@@ -23,6 +23,7 @@ export const NAV = [
   { href: "/crm/prospeccao", label: "Prospecção", icon: Radar, group: "CRM" },
   { href: "/crm/sites", label: "Sites", icon: Globe, group: "CRM" },
   { href: "/crm/config", label: "Configurações", icon: Settings2, group: "CRM" },
+  { href: "/financeiro/geral", label: "Tudo junto", icon: Landmark, group: "Financeiro" },
   { href: "/financeiro/receitas", label: "Receitas", icon: TrendingUp, group: "Financeiro" },
   { href: "/financeiro/pf", label: "Pessoa física", icon: Wallet, group: "Financeiro" },
   { href: "/financeiro/pj", label: "Pessoa jurídica", icon: Briefcase, group: "Financeiro" },

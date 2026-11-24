@@ -15,7 +15,7 @@ export interface Analise { id: string; mes: string; pergunta: string | null; res
 const dia = (d: string | null) => (d ? new Date(`${d}T12:00:00Z`).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", timeZone: "UTC" }) : "—");
 
 /** Cartão com inclinação 3D que segue o mouse e brilho de vidro. */
-function CartaoVisual({ nome, banco, cor, final, bandeira, children }: { nome: string; banco: string; cor: string; final: string | null; bandeira: string | null; children?: React.ReactNode }) {
+export function CartaoVisual({ nome, banco, cor, final, bandeira, children }: { nome: string; banco: string; cor: string; final: string | null; bandeira: string | null; children?: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const mover = (e: React.MouseEvent) => {
     const el = ref.current!, b = el.getBoundingClientRect();

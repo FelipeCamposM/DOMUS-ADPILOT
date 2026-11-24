@@ -224,7 +224,7 @@ export function Receitas({ d }: { d: DadosReceitas }) {
 }
 
 /** Data e hora de Brasília correndo (só no navegador, para não divergir do servidor). */
-function Relogio() {
+export function Relogio() {
   const [t, setT] = useState<Date | null>(null);
   useEffect(() => {
     setT(new Date());
@@ -237,7 +237,7 @@ function Relogio() {
 }
 
 /** Valor sem o "R$" (que fica separado, em destaque), contando até o número. */
-function Valor({ v }: { v: number }) {
+export function Valor({ v }: { v: number }) {
   const ref = useRef<HTMLSpanElement>(null);
   const ant = useRef(0);
   useEffect(() => {
@@ -326,7 +326,7 @@ function Tendencia({ r, anteriores, hoje, media }: { r: ResumoReceitas; anterior
 }
 
 /** Cartão de uma fonte: brilho segue o mouse, barra enche. */
-function Fonte({ nome, valor, cor, total }: { nome: string; valor: number; cor: string; total: number }) {
+export function Fonte({ nome, valor, cor, total, sub }: { nome: string; valor: number; cor: string; total: number; sub?: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const mover = (e: React.MouseEvent) => {
     const b = ref.current!.getBoundingClientRect();
@@ -338,7 +338,7 @@ function Fonte({ nome, valor, cor, total }: { nome: string; valor: number; cor: 
       <span className="fin-rec-fonte-nome"><i />{nome}</span>
       <b className="tabular"><CountUp value={valor / 100} kind="money" /></b>
       <Enche fracao={valor / (total || 1)} cor={cor} />
-      <small>{Math.round((valor / (total || 1)) * 100)}% do total</small>
+      {sub ?? <small>{Math.round((valor / (total || 1)) * 100)}% do total</small>}
     </div>
   );
 }
@@ -424,7 +424,7 @@ function Desconsideradas({ itens, contas }: { itens: ReceitaNota[]; contas: Reco
 }
 
 /** Colunas dos últimos períodos: crescem em cascata; o período aberto acende. */
-function Colunas({ serie, periodo, atual, ir }: { serie: { inicio: string; valor: number }[]; periodo: PeriodoRec; atual: string; ir: (inicio: string) => void }) {
+export function Colunas({ serie, periodo, atual, ir }: { serie: { inicio: string; valor: number }[]; periodo: PeriodoRec; atual: string; ir: (inicio: string) => void }) {
   const ref = useRef<SVGSVGElement>(null);
   const [dica, setDica] = useState<number | null>(null);
   const W = 360, H = 160, P = 18;
