@@ -1,5 +1,5 @@
 import { db } from "@domus-ads/core";
-import webpush from "web-push";
+import * as webpush from "web-push";
 
 /** Mesmos eventos do sininho do topo, agora também como notificação no celular/PC (PWA). */
 type Tipo = "lead" | "acao" | "falha" | "email";
