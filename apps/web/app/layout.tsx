@@ -11,6 +11,7 @@ export const metadata: Metadata = {
   title: { default: "DOMUS AdPilot", template: "%s · DOMUS AdPilot" },
   description: "Tráfego pago, métricas e IA num só lugar.",
   robots: { index: false, follow: false },
+  appleWebApp: { capable: true, title: "AdPilot", statusBarStyle: "black" },
 };
 
 export const viewport: Viewport = { themeColor: "#050407", colorScheme: "dark", viewportFit: "cover" };
