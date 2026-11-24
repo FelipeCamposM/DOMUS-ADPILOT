@@ -65,11 +65,11 @@ ${SKILL_COPY}`;
 interface Contexto { workspace_id: string; ig_account_id: string; username: string; bio: string | null; marca: string | null; brand: Brand | null; credentials_enc: string; ig_user_id: string }
 
 /** Marca e perfil. completo: também o texto do site e os posts de melhor desempenho (só no plano do período). */
-async function contexto(calendarioId: string, completo: boolean, log: (m: string) => Promise<void>): Promise<{ ctx: Contexto; texto: string }> {
+async function contexto(calendarioId: string, completo: boolean, log: (m: string) => Promise<void>, brandId: string | null = null): Promise<{ ctx: Contexto; texto: string }> {
   const [c] = await db()<(Omit<Contexto, "brand"> & { brand: unknown; conhecimento: string | null })[]>`
     select c.workspace_id, c.ig_account_id, a.username, a.bio, a.ig_user_id, k.credentials_enc, b.nome as marca, b.brand, b.conhecimento
     from ads.calendarios c join ads.instagram_accounts a on a.id = c.ig_account_id join ads.ad_connections k on k.id = a.connection_id
-    left join ads.brands b on b.id = c.brand_id and b.workspace_id = c.workspace_id
+    left join ads.brands b on b.id = coalesce(${brandId}::uuid, c.brand_id) and b.workspace_id = c.workspace_id
     where c.id = ${calendarioId}`;
   if (!c) throw new Error("Planejamento não encontrado");
   const p = brandSchema.safeParse(c.brand ?? {});
@@ -173,12 +173,12 @@ async function planejar(id: string, c: { signal: AbortSignal; log: (m: string) =
 
 async function refazer(p: { itemId: string; campo: CampoRefazer; dica?: string }, c: { signal: AbortSignal; log: (m: string) => Promise<void> }) {
   const sql = db();
-  const [it] = await sql<{ id: string; calendario_id: string; data_hora: Date; formato: FormatoCal; tema: string; objetivo: string; roteiro: Roteiro; legenda: string; hashtags: string[]; cal_objetivo: string }[]>`
-    select i.id, i.calendario_id, i.data_hora, i.formato, i.tema, i.objetivo, i.roteiro, i.legenda, i.hashtags, k.objetivo as cal_objetivo
+  const [it] = await sql<{ id: string; calendario_id: string; data_hora: Date; formato: FormatoCal; tema: string; objetivo: string; roteiro: Roteiro; legenda: string; hashtags: string[]; cal_objetivo: string; brand_id: string | null }[]>`
+    select i.id, i.calendario_id, i.brand_id, i.data_hora, i.formato, i.tema, i.objetivo, i.roteiro, i.legenda, i.hashtags, k.objetivo as cal_objetivo
     from ads.calendario_itens i join ads.calendarios k on k.id = i.calendario_id where i.id = ${p.itemId}`;
   if (!it) throw new Error("Post do calendário não encontrado");
   try {
-    const { ctx, texto } = await contexto(it.calendario_id, false, c.log);
+    const { ctx, texto } = await contexto(it.calendario_id, false, c.log, it.brand_id);
     const vizinhos = await sql<{ tema: string }[]>`select tema from ads.calendario_itens where calendario_id = ${it.calendario_id} and id <> ${it.id} order by data_hora limit 40`;
     const atual = { formato: it.formato, tema: it.tema, objetivo: it.objetivo, roteiro: it.roteiro, legenda: it.legenda, hashtags: it.hashtags };
     const formato = p.campo === "item" ? `{"tema": "...", "objetivo": "...", "roteiro": {...}, "legenda": "...", "hashtags": ["#..."]} (o post inteiro, novo, no mesmo formato ${it.formato})`
@@ -286,7 +286,7 @@ async function passada() {
     from ads.calendario_itens i join ads.calendarios k on k.id = i.calendario_id join ads.workspaces w on w.id = i.workspace_id
     join ads.instagram_accounts a on a.id = k.ig_account_id
     -- calendário sem marca: a marca cujo nome está no @ do perfil (senão a mais antiga), para a arte nunca sair sem logo e cores
-    left join lateral (select b.id, b.nome from ads.brands b where b.workspace_id = i.workspace_id and (k.brand_id is null or b.id = k.brand_id)
+    left join lateral (select b.id, b.nome from ads.brands b where b.workspace_id = i.workspace_id and (coalesce(i.brand_id, k.brand_id) is null or b.id = coalesce(i.brand_id, k.brand_id))
       order by position(lower(replace(b.nome, ' ', '')) in lower(a.username)) = 0, b.created_at limit 1) b on true
     where i.status = 'APROVADO' and i.refazendo is null`;
   for (const i of aprovados) {
@@ -299,7 +299,7 @@ async function passada() {
 
   // 2. em geração: vídeo parou na revisão do roteiro → aprova sozinho; pronto → vai para a sua aprovação; falhou → avisa
   const gerando = await sql<(Pronto & { project_id: string; p_status: string | null; p_kind: string; p_erro: string | null; creative_id: string | null; ocupado: boolean })[]>`
-    select i.id, i.workspace_id, k.ig_account_id, k.brand_id, i.data_hora, i.formato, i.tema, i.legenda, i.hashtags, i.project_id,
+    select i.id, i.workspace_id, k.ig_account_id, coalesce(i.brand_id, k.brand_id) as brand_id, i.data_hora, i.formato, i.tema, i.legenda, i.hashtags, i.project_id,
       p.status as p_status, p.kind as p_kind, p.error as p_erro, p.creative_id,
       exists (select 1 from ads.jobs j where j.type in ('GENERATE_VIDEO','GENERATE_IMAGE') and j.status in ('PENDING','RUNNING') and j.payload->>'projectId' = p.id::text) as ocupado
     from ads.calendario_itens i join ads.calendarios k on k.id = i.calendario_id left join ads.video_projects p on p.id = i.project_id
@@ -319,7 +319,7 @@ async function passada() {
 
   // 3. arte pronta esperando você: aprovado → agenda; sem resposta até passar da tolerância → não sai; e manda o próximo para o WhatsApp
   const revisao = await sql<(Pronto & { project_id: string; creative_id: string | null; aprovacao: string | null; erro: string | null; updated_at: Date; username: string })[]>`
-    select i.id, i.workspace_id, k.ig_account_id, k.brand_id, i.data_hora, i.formato, i.tema, i.legenda, i.hashtags, i.project_id, i.aprovacao, i.erro, i.updated_at,
+    select i.id, i.workspace_id, k.ig_account_id, coalesce(i.brand_id, k.brand_id) as brand_id, i.data_hora, i.formato, i.tema, i.legenda, i.hashtags, i.project_id, i.aprovacao, i.erro, i.updated_at,
       p.creative_id, a.username
     from ads.calendario_itens i join ads.calendarios k on k.id = i.calendario_id join ads.instagram_accounts a on a.id = k.ig_account_id
     left join ads.video_projects p on p.id = i.project_id

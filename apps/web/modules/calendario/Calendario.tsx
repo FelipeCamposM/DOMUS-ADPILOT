@@ -13,7 +13,7 @@ import { DataPicker } from "../shell/DataPicker";
 import { Dialog } from "../shell/Dialog";
 import { toast } from "../shell/toast";
 import { gradeDoMes, somaDias } from "./grade";
-import { apagarPlanejamento, aprovarArte, aprovarItens, descartarItem, mudarHorario, novoItem, pedirMudanca, planejarPeriodo, refazerComIA, replanejar, salvarItem, voltarParaSugestao } from "./actions";
+import { apagarPlanejamento, aprovarArte, aprovarItens, descartarItem, mudarHorario, mudarMarcaItem, novoItem, pedirMudanca, planejarPeriodo, refazerComIA, replanejar, salvarItem, voltarParaSugestao } from "./actions";
 import { HeroFx } from "@/modules/shell/HeroFx";
 
 import { Seletor } from "../shell/Seletor";
@@ -180,7 +180,7 @@ export function Calendario({ conta, contas, marcas, mes, itens, avulsos, planos,
 
       <Planejar open={planejar} onClose={() => setPlanejar(false)} contaId={conta.id} marcas={marcas} />
       <Dialog open={!!item} onClose={() => setAberto(null)} title={item ? `${FORMATOS_CAL[item.formato]} · ${new Date(item.data_hora).toLocaleString("pt-BR", { timeZone: TZ, weekday: "long", day: "2-digit", month: "long", hour: "2-digit", minute: "2-digit" })}` : ""} largo>
-        {item && <Editor key={`${item.id}-${item.updated_at}`} item={item} podeEditar={podeEditar} onFechar={() => setAberto(null)} />}
+        {item && <Editor key={`${item.id}-${item.updated_at}`} item={item} marcas={marcas} podeEditar={podeEditar} onFechar={() => setAberto(null)} />}
       </Dialog>
     </div>
   );
@@ -256,7 +256,7 @@ function Planejar({ open, onClose, contaId, marcas }: { open: boolean; onClose: 
 }
 
 /** Edição de um post: tudo em campos; cada parte tem ↻ para a IA refazer só ela (com um pedido opcional). */
-function Editor({ item, podeEditar, onFechar }: { item: ItemTela; podeEditar: boolean; onFechar: () => void }) {
+function Editor({ item, marcas, podeEditar, onFechar }: { item: ItemTela; marcas: { id: string; nome: string }[]; podeEditar: boolean; onFechar: () => void }) {
   const router = useRouter();
   const [pend, start] = useTransition();
   const [v, setV] = useState({ dataHora: paraInput(item.data_hora), formato: item.formato, tema: item.tema, objetivo: item.objetivo, roteiro: item.roteiro, legenda: item.legenda, hashtags: item.hashtags.join(" ") });
@@ -330,6 +330,10 @@ function Editor({ item, podeEditar, onFechar }: { item: ItemTela; podeEditar: bo
           <div className="field"><label className="label" htmlFor="ed-formato">Formato</label>
             <Seletor id="ed-formato" className="seletor-campo" ariaLabel="Formato" valor={v.formato} onChange={(x) => setV({ ...v, formato: x as FormatoCal })}
               opcoes={(Object.keys(FORMATOS_CAL) as FormatoCal[]).map((k) => ({ valor: k, rotulo: FORMATOS_CAL[k] }))} /></div>
+          <div className="field"><label className="label" htmlFor="ed-marca">Marca</label>
+            <Seletor id="ed-marca" className="seletor-campo" ariaLabel="Marca" valor={item.brand_id ?? ""}
+              onChange={(x) => start(async () => { const r = await mudarMarcaItem(item.id, x || null); if (!r.ok) toast.err(r.error); router.refresh(); })}
+              opcoes={[{ valor: "", rotulo: "Sem marca (usa o perfil)" }, ...marcas.map((m) => ({ valor: m.id, rotulo: m.nome }))]} /></div>
           <span style={{ flex: 1 }} />
           <span className="chip cal-status" data-status={item.status}>{STATUS[item.status]}</span>
         </div>

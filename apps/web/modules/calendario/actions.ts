@@ -95,6 +95,23 @@ export async function salvarItem(id: string, input: unknown) {
   });
 }
 
+/** Marca deste post (null = a do planejamento). A arte e a IA usam a logo, as cores e o tom dela. */
+export async function mudarMarcaItem(id: string, brandId: string | null) {
+  return run(async () => {
+    const ctx = await requireCtx();
+    requireRole(ctx, "editor");
+    const i = await itemDoWorkspace(ctx, id);
+    if (!EDITAVEIS.includes(i.status)) throw new Error("Este post já está sendo gerado ou publicado");
+    const b = brandId ? uuid.parse(brandId) : null;
+    if (b) {
+      const [m] = await db()`select 1 from ads.brands where id = ${b} and workspace_id = ${ctx.workspace.id}`;
+      if (!m) throw new Error("Marca não encontrada");
+    }
+    await db()`update ads.calendario_itens set brand_id = ${b}, updated_at = now() where id = ${i.id}`;
+    revalidar();
+  });
+}
+
 /** A IA refaz um campo (ou o post inteiro), com uma dica opcional do usuário. */
 export async function refazerComIA(id: string, campo: string, dica: string) {
   return run(async () => {
