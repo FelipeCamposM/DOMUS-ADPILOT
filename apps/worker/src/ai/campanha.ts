@@ -84,6 +84,9 @@ COMO UM ESPECIALISTA SÊNIOR PENSA (siga antes de escrever o JSON):
    Antes de cada negativa AMPLA, teste: ela bloquearia a busca de quem compra? (ex.: "aluno" bloqueia "frequência aluno siap";
    "modelo" bloqueia "modelo de planejamento siap"). Se sim, não negative, ou use FRASE com o termo exato do público errado.
 8b. Sitelinks só para páginas que levam à ação (testar, comprar, instalar, como funciona, planos). Nada de sugestões, termos ou blog.
+7a. Maiúsculas: o Google REPROVA palavra inteira em maiúsculas que não seja sigla real ou marca ("OFF", "GRÁTIS", "BLACK10").
+   Escreva "50% Off" ou "50% de Desconto"; cupom no texto só como "cupom já aplicado no link" (o link já leva o cupom).
+   Siglas (SIAP, IA, PDF) e o nome da marca como ela escreve podem ficar.
 7. Políticas do Google: nunca sugira vínculo oficial com governo ou marca de terceiro ("oficial", "da Secretaria", "gov").
    Pode citar o nome do sistema de terceiro para dizer com o que funciona.
 8. Sitelinks: só URLs que aparecem nas fontes da base/páginas (ex.: /comprar, /instalar), com texto que leva à ação.
