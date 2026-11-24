@@ -49,8 +49,9 @@ Regras (o Google rejeita o que passar dos limites; CONTE os caracteres, espaços
   idiomas: "pt", "en" ou "es".
 - orcamentoDiario: o valor pedido (ponto como separador). Se não pedirem valor, use "50.00".
   Se pedirem um valor POR MÊS, divida por 30.4 (ou por 22 com "horarioComercial": true), arredondando para baixo em centavos.
-- horarioComercial: true (anúncios só seg–sex, 8h–20h) quando o público decide em horário de trabalho (B2B, profissional, serviço)
-  ou quando o orçamento é pequeno (até R$ 5/dia), para não gastar de madrugada; senão false.
+- horarioComercial: true (anúncios só seg–sex, 8h–20h) SÓ quando o público pesquisa/decide em horário de trabalho (B2B, serviço
+  com atendimento humano). Se a base indica que o público resolve isso à noite ou no fim de semana (ex.: professor planejando em
+  casa), false. Na dúvida, false.
 - Orçamento pequeno (até R$ 5/dia): 1 a 2 grupos, só FRASE e EXATA, palavras de intenção alta e específicas do nicho (não termos genéricos caros),
   "cpcMax" baixo (no máximo 1/2 do orçamento diário) e negativas amplas para não desperdiçar clique.
 - URLs: só use URLs que estejam no pedido ou no conteúdo das páginas fornecidas; sitelinks só com URLs reais de lá (senão, "sitelinks": []).
@@ -76,6 +77,9 @@ COMO UM ESPECIALISTA SÊNIOR PENSA (siga antes de escrever o JSON):
 5. Descrições: dor → como resolve → diferencial/prova verdadeira → chamada. Cada uma faz sentido sozinha.
 6. Negativas da campanha: navegacionais (camada d), emprego/vagas/concurso/curso/pdf/download, públicos e plataformas que o
    produto NÃO atende segundo "Não afirmar" (ex.: outra rede, outro estado, celular, mac), e "grátis"/"gratuito" só se NÃO houver oferta grátis.
+   Antes de cada negativa AMPLA, teste: ela bloquearia a busca de quem compra? (ex.: "aluno" bloqueia "frequência aluno siap";
+   "modelo" bloqueia "modelo de planejamento siap"). Se sim, não negative, ou use FRASE com o termo exato do público errado.
+8b. Sitelinks só para páginas que levam à ação (testar, comprar, instalar, como funciona, planos). Nada de sugestões, termos ou blog.
 7. Políticas do Google: nunca sugira vínculo oficial com governo ou marca de terceiro ("oficial", "da Secretaria", "gov").
    Pode citar o nome do sistema de terceiro para dizer com o que funciona.
 8. Sitelinks: só URLs que aparecem nas fontes da base/páginas (ex.: /comprar, /instalar), com texto que leva à ação.
