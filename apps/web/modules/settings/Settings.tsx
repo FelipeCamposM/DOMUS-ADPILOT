@@ -1,7 +1,7 @@
 "use client";
 
 import { confirmar } from "../shell/confirmar";
-import { AudioLines, CalendarClock, HardDrive, KeyRound, Loader2, MessageCircle, Plus, Power, Server, Terminal, Trash2, Users } from "lucide-react";
+import { AudioLines, Bell, CalendarClock, HardDrive, KeyRound, Loader2, MessageCircle, Plus, Power, Server, Terminal, Trash2, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
@@ -15,6 +15,7 @@ import { PrazosCalendario } from "./PrazosCalendario";
 import type { ConfigCal } from "@domus-ads/core/calendario";
 import { inicializacaoWorker } from "./ai-accounts";
 import { Whatsapp, type EstadoWhatsapp } from "./Whatsapp";
+import { Push } from "./Push";
 
 import { Seletor } from "../shell/Seletor";
 export type { ContaIA };
@@ -38,7 +39,7 @@ const INDICE = [
   ["Workspace", [["workspace", "Workspace", Users], ["membros", "Membros", Users]]],
   ["Inteligência", [["ia", "Contas de IA", Terminal], ["vozes", "Vozes", AudioLines]]],
   ["Plataforma", [["armazenamento", "Armazenamento", HardDrive], ["calendario", "Calendário", CalendarClock], ["whatsapp", "WhatsApp", MessageCircle], ["worker", "Worker local", Server]]],
-  ["Pessoal", [["conta", "Minha conta", KeyRound]]],
+  ["Pessoal", [["notificacoes", "Notificações", Bell], ["conta", "Minha conta", KeyRound]]],
 ] as const;
 
 /** Índice fixo ao lado das seções, marcando a que está na tela. */
@@ -84,6 +85,7 @@ export function Settings(p: {
   usoVoz: { id: string; created_at: string; voice_name: string | null; characters: number; credits: number; titulo: string | null; video_project_id: string | null }[];
   worker: { online: boolean; lastSeen: string | null; info: Record<string, unknown> };
   armazenamento: CfgArmazenamento; uso: UsoArmazenamento; calendario: ConfigCal;
+  push: { chave: string | null; desligados: string[]; aparelhos: number };
 }) {
   const { pend, rodar } = useAcao();
   const [wsNome, setWsNome] = useState(p.ws.name);
@@ -217,6 +219,10 @@ export function Settings(p: {
             </button>
           </div>
         )}
+      </Secao>
+
+      <Secao id="notificacoes" icon={<Bell size={16} aria-hidden />} titulo="Notificações" desc="Avisos no celular e no PC, mesmo com o AdPilot fechado. Ligue em cada aparelho; os tipos escolhidos valem para todos.">
+        <Push {...p.push} />
       </Secao>
 
       <Secao id="conta" icon={<KeyRound size={16} aria-hidden />} titulo="Minha conta" desc="Troque a senha (por exemplo, a provisória que recebeu).">

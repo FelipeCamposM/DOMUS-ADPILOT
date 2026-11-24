@@ -32,6 +32,7 @@ import { acaoWhatsapp, avisar, enviarDaFila, estadoWhatsapp, gravarQr, ouvirWhat
 const TIPOS: readonly JobType[] = ["SYNC_META", "SYNC_GOOGLE", "AI_CHAT", "AI_LOGIN", "AI_DETECT", "WORKER_STARTUP", "GENERATE_VIDEO", "GENERATE_IMAGE", "AI_CAMPAIGN", "RESTORE_MEDIA", "SYNC_INSTAGRAM", "PUBLISH_INSTAGRAM", "AI_INSTAGRAM_CAPTION", "AI_USAGE", "WHATSAPP", "AI_CALENDARIO", "GENERATE_AUDIO", "AI_SISTEMA", "WHATSAPP_ENVIAR", "MARCA_CONHECIMENTO", "PROSPECTAR_LEADS", "AI_LEADS", "AI_AJUSTAR_MENSAGEM", "FIN_SYNC", "AI_FINANCEIRO", "ESTILOS"];
 const sql = db();
 const ativos = new Map<string, AbortController>();
+import { enviarPush } from "./push";
 /** uma busca no Google Maps por vez: duas juntas no mesmo IP chamam o bloqueio */
 let buscando = false;
 let parando = false;
@@ -249,3 +250,4 @@ repetir(async function usoDasContas() { await atualizarUsoContas((m) => console.
 repetir(async function arquivarNoDrive() { await arquivarExcesso((m) => console.log(`[${agora()}] arquivo: ${m}`)); }, 30 * 60_000);
 repetir(async function detectarContas() { await publicarDetectadas(await detectar()); }, 10 * 60_000);
 await loop();
+repetir(enviarPush, 20_000); // notificações do PWA (Configurações → Notificações)

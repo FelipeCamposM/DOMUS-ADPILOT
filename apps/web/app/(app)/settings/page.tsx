@@ -13,7 +13,7 @@ export default async function SettingsPage() {
   const sql = db();
   const admin = isPlatformAdmin(ctx);
   // tudo em paralelo: em sequência eram ~10 idas ao banco/APIs (ElevenLabs, R2) somando a cada abertura da aba
-  const [membros, contas, w, chaveEl, usoVoz, avisos, cfgArmazenamento, uso, calendario] = await Promise.all([sql<Membro[]>`
+  const [membros, contas, w, chaveEl, usoVoz, avisos, cfgArmazenamento, uso, calendario, [push]] = await Promise.all([sql<Membro[]>`
     select m.user_id, u.email, m.role from ads.workspace_members m join auth.users u on u.id = m.user_id
     where m.workspace_id = ${ctx.workspace.id} order by array_position(array['owner','admin','editor','viewer'], m.role), u.email`,
   sql<(Omit<ContaIA, "limited_until" | "last_used_at"> & { config_dir: string; limited_until: Date | null; last_used_at: Date | null })[]>`
@@ -34,6 +34,9 @@ export default async function SettingsPage() {
   armazenamento(),
   usoArmazenamento(),
   configCalendario(),
+  sql<{ desligados: string[]; aparelhos: number }[]>`
+    select coalesce((select desligados from ads.push_preferencias where user_id = ${ctx.user.id}), '{}') as desligados,
+      (select count(*)::int from ads.push_inscricoes where user_id = ${ctx.user.id}) as aparelhos`,
   ]);
   const elevenlabs = {
     configurada: !!chaveEl, vozes: null as number | null, erro: null as string | null,
@@ -70,6 +73,7 @@ export default async function SettingsPage() {
         armazenamento={cfgArmazenamento}
         uso={uso}
         calendario={calendario}
+        push={{ chave: process.env.VAPID_PUBLIC_KEY ?? null, desligados: push?.desligados ?? [], aparelhos: push?.aparelhos ?? 0 }}
         worker={{ online: w.online, lastSeen: iso(w.lastSeen), info: { ...w.info, detected: undefined, whatsappQr: admin ? w.info.whatsappQr : undefined } }}
       />
     </div>

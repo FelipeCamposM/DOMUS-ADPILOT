@@ -179,3 +179,39 @@ export async function salvarConfigCalendario(input: unknown) {
     revalidatePath("/settings");
   });
 }
+
+const inscricaoSchema = z.object({
+  endpoint: z.string().url("Inscrição inválida").max(1000),
+  keys: z.object({ p256dh: z.string().min(10, "Inscrição inválida").max(200), auth: z.string().min(10, "Inscrição inválida").max(100) }),
+  aparelho: z.string().trim().max(120).optional(),
+});
+
+/** Notificações push: guarda a inscrição deste aparelho (o worker manda os avisos). */
+export async function inscreverPush(input: unknown) {
+  return run(async () => {
+    const ctx = await requireCtx();
+    const v = inscricaoSchema.parse(input);
+    await db()`insert into ads.push_inscricoes (endpoint, user_id, p256dh, auth, aparelho) values (${v.endpoint}, ${ctx.user.id}, ${v.keys.p256dh}, ${v.keys.auth}, ${v.aparelho ?? null})
+      on conflict (endpoint) do update set user_id = excluded.user_id, p256dh = excluded.p256dh, auth = excluded.auth, aparelho = excluded.aparelho`;
+    revalidatePath("/settings");
+  });
+}
+
+export async function removerPush(endpoint: string) {
+  return run(async () => {
+    const ctx = await requireCtx();
+    await db()`delete from ads.push_inscricoes where endpoint = ${z.string().max(1000).parse(endpoint)} and user_id = ${ctx.user.id}`;
+    revalidatePath("/settings");
+  });
+}
+
+/** Tipos de aviso que a pessoa desligou (vale para todos os aparelhos dela). */
+export async function salvarPushDesligados(input: unknown) {
+  return run(async () => {
+    const ctx = await requireCtx();
+    const v = z.array(z.enum(["lead", "acao", "falha", "email"], { message: "Tipo de aviso inválido" })).max(4).parse(input);
+    await db()`insert into ads.push_preferencias (user_id, desligados) values (${ctx.user.id}, ${v})
+      on conflict (user_id) do update set desligados = excluded.desligados`;
+    revalidatePath("/settings");
+  });
+}
