@@ -1,11 +1,12 @@
-import { db } from "@domus-ads/core";
-import { FileText, Plus, Sparkles } from "lucide-react";
+﻿import { db } from "@domus-ads/core";
+import { Plus } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 import { can, requireCtx } from "@/lib/ctx";
-import { ago } from "@/lib/format";
 import { campanhas, opcoesFiltro, parseFiltro } from "@/lib/queries";
 import { CampaignTable } from "@/modules/campaigns/CampaignTable";
+import { Rascunhos } from "@/modules/campaigns/ListaRascunhos";
+import { GoogleAdsLogo, MetaLogo } from "@/modules/connections/Logos";
 import { Filters } from "@/modules/dashboard/Filters";
 import { HeroFx } from "@/modules/shell/HeroFx";
 
@@ -21,7 +22,7 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
       <div className="page-head">
         <HeroFx />
         <div>
-          <div className="eyebrow" data-enter>Meta + Google</div>
+          <div className="eyebrow cp-eyebrow" data-enter><GoogleAdsLogo size={14} /> Google Ads <MetaLogo size={14} /> Meta Ads</div>
           <h1 className="page-title" data-enter>Campanhas</h1>
         </div>
         <div className="cluster" data-enter style={{ gap: 8 }}>
@@ -29,24 +30,7 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
           {can(ctx, "editor") && <Link href="/campaigns/nova" className="btn btn-primary"><Plus aria-hidden /> Nova campanha</Link>}
         </div>
       </div>
-      {rascunhos.length > 0 && (
-        <div className="panel" data-enter style={{ marginBottom: 16 }}>
-          <div className="panel-head"><div><div className="panel-title">Rascunhos</div><div className="subtle caption">Propostas da IA e campanhas em montagem. Nada disso está no Google ainda.</div></div></div>
-          <div style={{ padding: 14, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 10 }}>
-            {rascunhos.map((r) => (
-              <Link key={r.id} href={`/campaigns/rascunhos/${r.id}`} className="panel spotlight" style={{ padding: 12, display: "flex", gap: 10, alignItems: "center", textDecoration: "none", color: "inherit" }}>
-                <span className="icon-tile" style={{ width: 34, height: 34, flex: "none" }}>{r.source === "AI" ? <Sparkles size={16} aria-hidden className={r.status === "GENERATING" ? "animate-pulse" : undefined} /> : <FileText size={16} aria-hidden />}</span>
-                <span style={{ minWidth: 0 }}>
-                  <b style={{ fontWeight: 600, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</b>
-                  <span className="subtle" style={{ fontSize: 11.5 }} suppressHydrationWarning>
-                    {({ GENERATING: "IA escrevendo…", DRAFT: "Rascunho", FAILED: "Com erro", PUBLISHING: "Publicando…" } as Record<string, string>)[r.status] ?? r.status} · Google Pesquisa · {ago(r.updated_at.toISOString())}
-                  </span>
-                </span>
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
+      {rascunhos.length > 0 && <Rascunhos itens={rascunhos.map((r) => ({ ...r, updated_at: r.updated_at.toISOString() }))} podeEditar={can(ctx, "editor")} />}
       <CampaignTable
         linhas={linhas.map((l) => ({ ...l, last_synced_at: l.last_synced_at?.toISOString() ?? null }))}
         podeEditar={can(ctx, "editor")}

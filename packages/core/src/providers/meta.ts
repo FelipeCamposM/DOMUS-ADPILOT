@@ -92,6 +92,10 @@ export class MetaAdsProvider implements AdsProvider {
     await this.post(c.externalId, { status: "ACTIVE" });
   }
 
+  async removeCampaign(c: CampaignRef) {
+    await this.post(c.externalId, { status: "DELETED" });
+  }
+
   async updateBudget(c: CampaignRef, dailyBudget: string) {
     try {
       await this.post(c.externalId, { daily_budget: toMinor(dailyBudget).toString() });

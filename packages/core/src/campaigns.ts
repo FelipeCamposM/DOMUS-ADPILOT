@@ -39,6 +39,20 @@ export async function setCampaignStatus(p: { workspaceId: string; campaignId: st
   });
 }
 
+/** Exclui a campanha na plataforma e esconde aqui (status ARCHIVED: métricas antigas continuam no histórico). */
+export async function removeCampaign(p: { workspaceId: string; campaignId: string; actor: Actor; source?: AuditSource }) {
+  const c = await load(p.workspaceId, p.campaignId);
+  if (c.status === "ARCHIVED") return;
+  await providerFor(c.provider, c.credentials_enc).removeCampaign(ref(c));
+  await db().begin(async (tx) => {
+    await tx`update ads.campaigns set status = 'ARCHIVED', updated_at = now() where id = ${c.id}`;
+    await audit(tx, {
+      workspaceId: p.workspaceId, actor: p.actor, source: p.source, action: "Excluir campanha",
+      entityType: "campaign", entityId: c.id, entityName: c.name, before: { status: c.status }, after: { status: "ARCHIVED" },
+    });
+  });
+}
+
 export async function setCampaignBudget(p: { workspaceId: string; campaignId: string; dailyBudget: string; actor: Actor; source?: AuditSource }) {
   const value = toDecimal(p.dailyBudget);
   if (value === "0.00") throw new Error("Orçamento deve ser maior que zero");

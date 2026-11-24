@@ -132,6 +132,11 @@ export class GoogleAdsProvider implements AdsProvider {
     await this.setStatus(c, "ENABLED");
   }
 
+  async removeCampaign(c: CampaignRef) {
+    const id = cid(c.accountExternalId);
+    await this.call(`customers/${id}/campaigns:mutate`, { operations: [{ remove: `customers/${id}/campaigns/${c.externalId}` }] });
+  }
+
   async updateBudget(c: CampaignRef, dailyBudget: string) {
     const rn = c.providerData.budgetResourceName;
     if (typeof rn !== "string") throw new ProviderError("Campanha sem orçamento sincronizado. Sincronize a conta e tente de novo.");

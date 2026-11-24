@@ -1,6 +1,6 @@
 "use server";
 
-import { db, enqueueJob, jobDeSync, setCampaignBudget, setCampaignStatus } from "@domus-ads/core";
+import { db, enqueueJob, jobDeSync, removeCampaign, setCampaignBudget, setCampaignStatus } from "@domus-ads/core";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { run } from "@/lib/action";
@@ -14,6 +14,15 @@ export async function alterarStatus(campaignId: string, status: "ACTIVE" | "PAUS
     requireRole(ctx, "editor");
     const s = z.enum(["ACTIVE", "PAUSED"], { message: "Status inválido" }).parse(status);
     await setCampaignStatus({ workspaceId: ctx.workspace.id, campaignId: id.parse(campaignId), status: s, actor: ctx.actor });
+    revalidatePath("/", "layout");
+  });
+}
+
+export async function excluirCampanha(campaignId: string) {
+  return run(async () => {
+    const ctx = await requireCtx();
+    requireRole(ctx, "editor");
+    await removeCampaign({ workspaceId: ctx.workspace.id, campaignId: id.parse(campaignId), actor: ctx.actor });
     revalidatePath("/", "layout");
   });
 }

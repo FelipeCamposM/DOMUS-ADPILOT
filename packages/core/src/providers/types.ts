@@ -46,6 +46,8 @@ export interface AdsProvider {
   getCampaigns(accountExternalId: string): Promise<RemoteCampaign[]>;
   pauseCampaign(c: CampaignRef): Promise<void>;
   activateCampaign(c: CampaignRef): Promise<void>;
+  /** Exclui na plataforma (Google: REMOVED; Meta: DELETED). Não tem volta. */
+  removeCampaign(c: CampaignRef): Promise<void>;
   updateBudget(c: CampaignRef, dailyBudget: string): Promise<void>;
   getInsights(accountExternalId: string, range: { since: string; until: string }): Promise<DailyMetric[]>;
 }
