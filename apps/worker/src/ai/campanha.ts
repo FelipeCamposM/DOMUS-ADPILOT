@@ -21,6 +21,7 @@ Responda APENAS com um bloco \`\`\`json neste formato exato:
   "localizacoes": ["Goiânia, Goiás"],
   "idiomas": ["pt"],
   "parceirosPesquisa": false,
+  "horarioComercial": false,
   "negativas": [{ "texto": "vagas", "correspondencia": "AMPLA" }],
   "grupos": [{
     "nome": "Tema do grupo",
@@ -46,6 +47,11 @@ Regras (o Google rejeita o que passar dos limites; CONTE os caracteres, espaços
 - localizacoes: "Brasil", o estado por extenso ("Goiás") ou cidade com o estado ("Senador Canedo, Goiás"), com a grafia oficial do IBGE;
   idiomas: "pt", "en" ou "es".
 - orcamentoDiario: o valor pedido (ponto como separador). Se não pedirem valor, use "50.00".
+  Se pedirem um valor POR MÊS, divida por 30.4 (ou por 22 com "horarioComercial": true), arredondando para baixo em centavos.
+- horarioComercial: true (anúncios só seg–sex, 8h–20h) quando o público decide em horário de trabalho (B2B, profissional, serviço)
+  ou quando o orçamento é pequeno (até R$ 5/dia), para não gastar de madrugada; senão false.
+- Orçamento pequeno (até R$ 5/dia): 1 a 2 grupos, só FRASE e EXATA, palavras de intenção alta e específicas do nicho (não termos genéricos caros),
+  "cpcMax" baixo (no máximo 1/2 do orçamento diário) e negativas amplas para não desperdiçar clique.
 - URLs: só use URLs que estejam no pedido ou no conteúdo das páginas fornecidas; sitelinks só com URLs reais de lá (senão, "sitelinks": []).
   Frases de destaque: até 25 caracteres, 4 a 6.
 - Use SÓ fatos do pedido, da marca e das páginas. Não invente preço, prazo, número, depoimento ou garantia.`;

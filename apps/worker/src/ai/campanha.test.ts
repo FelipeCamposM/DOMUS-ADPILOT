@@ -29,6 +29,15 @@ test("monta a criação inteira, numa ordem que respeita as referências, com a 
   expect(tipos).toContain("adGroupAdOperation");
   expect(tipos.filter((t) => t === "campaignAssetOperation")).toHaveLength(2);
   expect(JSON.stringify(ops)).toContain('"matchType":"EXACT"');
+  expect(camp.geoTargetTypeSetting).toEqual({ positiveGeoTargetType: "PRESENCE", negativeGeoTargetType: "PRESENCE" });
+  expect(JSON.stringify(ops)).not.toContain("adSchedule");
+});
+
+test("horário comercial: seg–sex, 8h–20h", () => {
+  const ops = operacoesSearch("123", googleSearchSchema.parse({ ...base, horarioComercial: true }), ["geoTargetConstants/20106"], "x");
+  const ag = ops.map((o) => (o as { campaignCriterionOperation?: { create: { adSchedule?: { dayOfWeek: string; startHour: number; endHour: number } } } }).campaignCriterionOperation?.create.adSchedule).filter(Boolean);
+  expect(ag.map((a) => a!.dayOfWeek)).toEqual(["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"]);
+  expect([ag[0]!.startHour, ag[0]!.endHour]).toEqual([8, 20]);
 });
 
 test("notação de palavras-chave do Google: [exata], \"frase\", ampla", () => {

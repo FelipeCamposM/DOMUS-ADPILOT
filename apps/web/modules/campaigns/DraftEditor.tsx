@@ -17,7 +17,7 @@ type Grupo = { nome: string; palavras: string; negativas: string; anuncios: Anun
 type Sitelink = { texto: string; descricao1: string; descricao2: string; url: string };
 interface Estado {
   nome: string; orcamentoDiario: string; lances: keyof typeof LANCES; cpcMax: string; urlFinal: string; localizacoes: string[]; idiomas: (keyof typeof IDIOMAS)[];
-  parceirosPesquisa: boolean; negativas: string; grupos: Grupo[]; sitelinks: Sitelink[]; frasesDestaque: string[];
+  parceirosPesquisa: boolean; horarioComercial: boolean; negativas: string; grupos: Grupo[]; sitelinks: Sitelink[]; frasesDestaque: string[];
 }
 export interface RascunhoView {
   id: string; name: string; status: string; source: string; error: string | null; validated_at: string | null; ad_account_id: string | null; spec: Record<string, unknown>;
@@ -29,7 +29,7 @@ function doSpec(s: Record<string, unknown>): Estado {
   return {
     nome: String(s.nome ?? ""), orcamentoDiario: String(s.orcamentoDiario ?? ""), lances: (s.lances as Estado["lances"]) ?? "MAXIMIZE_CLICKS", cpcMax: String(s.cpcMax ?? ""),
     urlFinal: String(s.urlFinal ?? ""), localizacoes: (s.localizacoes as string[]) ?? ["Brasil"], idiomas: (s.idiomas as Estado["idiomas"]) ?? ["pt"],
-    parceirosPesquisa: !!s.parceirosPesquisa, negativas: txt(s.negativas), sitelinks: (s.sitelinks as Sitelink[]) ?? [], frasesDestaque: (s.frasesDestaque as string[]) ?? [],
+    parceirosPesquisa: !!s.parceirosPesquisa, horarioComercial: !!s.horarioComercial, negativas: txt(s.negativas), sitelinks: (s.sitelinks as Sitelink[]) ?? [], frasesDestaque: (s.frasesDestaque as string[]) ?? [],
     grupos: g.length ? g.map((x, i) => ({
       nome: String(x.nome ?? ""), palavras: txt(x.palavras), negativas: txt(x.negativas), cpcMax: String(x.cpcMax ?? ""), aberto: i === 0,
       anuncios: ((x.anuncios as Anuncio[] | undefined) ?? []).map((a) => ({ titulos: a.titulos ?? [], descricoes: a.descricoes ?? [], caminho1: a.caminho1 ?? "", caminho2: a.caminho2 ?? "" })),
@@ -39,7 +39,7 @@ function doSpec(s: Record<string, unknown>): Estado {
 function paraSpec(e: Estado) {
   return {
     nome: e.nome, orcamentoDiario: e.orcamentoDiario.replace(",", "."), lances: e.lances, ...(e.cpcMax.trim() ? { cpcMax: e.cpcMax.replace(",", ".") } : {}),
-    urlFinal: e.urlFinal, localizacoes: e.localizacoes, idiomas: e.idiomas, parceirosPesquisa: e.parceirosPesquisa, negativas: textoParaPalavras(e.negativas),
+    urlFinal: e.urlFinal, localizacoes: e.localizacoes, idiomas: e.idiomas, parceirosPesquisa: e.parceirosPesquisa, horarioComercial: e.horarioComercial, negativas: textoParaPalavras(e.negativas),
     grupos: e.grupos.map((g) => ({
       nome: g.nome, palavras: textoParaPalavras(g.palavras), negativas: textoParaPalavras(g.negativas), ...(g.cpcMax.trim() ? { cpcMax: g.cpcMax.replace(",", ".") } : {}),
       anuncios: g.anuncios.map((a) => ({ titulos: a.titulos.map((t) => t.trim()).filter(Boolean), descricoes: a.descricoes.map((t) => t.trim()).filter(Boolean), caminho1: a.caminho1, caminho2: a.caminho2 })),
@@ -117,7 +117,7 @@ export function DraftEditor({ d, contas, moeda, podeEditar, podePublicar }: { d:
           <div className="panel-title">Campanha</div>
           <div className="kpis" style={{ gridTemplateColumns: "2fr 1fr", gap: 12 }}>
             <Campo label="Nome" valor={e.nome} on={(v) => muda((x) => ({ ...x, nome: v }))} max={120} off={bloqueado} />
-            <Campo label={`Orçamento diário (${moeda})`} valor={e.orcamentoDiario} on={(v) => muda((x) => ({ ...x, orcamentoDiario: v }))} max={12} off={bloqueado} dica={e.orcamentoDiario ? `≈ ${(Number(e.orcamentoDiario.replace(",", ".")) * 30.4 || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} ${moeda}/mês` : undefined} />
+            <Campo label={`Orçamento diário (${moeda})`} valor={e.orcamentoDiario} on={(v) => muda((x) => ({ ...x, orcamentoDiario: v }))} max={12} off={bloqueado} dica={e.orcamentoDiario ? `≈ ${(Number(e.orcamentoDiario.replace(",", ".")) * (e.horarioComercial ? 22 : 30.4) || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} ${moeda}/mês` : undefined} />
           </div>
           <div className="kpis" style={{ gridTemplateColumns: "2fr 1fr", gap: 12 }}>
             <Campo label="URL final (página de destino)" valor={e.urlFinal} on={(v) => muda((x) => ({ ...x, urlFinal: v }))} max={2000} off={bloqueado} />
@@ -148,6 +148,9 @@ export function DraftEditor({ d, contas, moeda, podeEditar, podePublicar }: { d:
             </div>
             <button type="button" role="switch" aria-checked={e.parceirosPesquisa} className="chave" disabled={bloqueado} onClick={() => muda((x) => ({ ...x, parceirosPesquisa: !x.parceirosPesquisa }))}>
               <span className="chave-trilho"><span className="chave-bola" /></span> Parceiros de pesquisa do Google
+            </button>
+            <button type="button" role="switch" aria-checked={e.horarioComercial} className="chave" disabled={bloqueado} onClick={() => muda((x) => ({ ...x, horarioComercial: !x.horarioComercial }))}>
+              <span className="chave-trilho"><span className="chave-bola" /></span> Só seg–sex, 8h–20h
             </button>
           </div>
         </section>

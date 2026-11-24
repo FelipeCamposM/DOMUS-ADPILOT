@@ -53,6 +53,7 @@ export const googleSearchSchema = z.object({
   localizacoes: z.array(z.string().trim().min(2).max(80)).min(1, "Informe pelo menos uma localização (ex.: Brasil, Goiás, Goiânia)").max(20),
   idiomas: z.array(z.enum(Object.keys(IDIOMAS) as [keyof typeof IDIOMAS, ...(keyof typeof IDIOMAS)[]])).min(1).default(["pt"]),
   parceirosPesquisa: z.boolean().default(false),
+  horarioComercial: z.boolean().default(false), // só seg–sex, 8h–20h (fuso da conta)
   negativas: z.array(palavra).max(200).default([]),
   grupos: z.array(grupoSchema).min(1, "Pelo menos 1 grupo de anúncios").max(10, "No máximo 10 grupos"),
   sitelinks: z.array(z.object({
@@ -100,8 +101,12 @@ export function operacoesSearch(customerId: string, s: GoogleSearchSpec, geo: st
     resourceName: camp, name: s.nome, status: "PAUSED", advertisingChannelType: "SEARCH", campaignBudget: orc,
     networkSettings: { targetGoogleSearch: true, targetSearchNetwork: s.parceirosPesquisa, targetContentNetwork: false, targetPartnerSearchNetwork: false },
     containsEuPoliticalAdvertising: "DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING",
+    // só quem ESTÁ no local (o padrão do Google inclui quem só "se interessa" por ele)
+    geoTargetTypeSetting: { positiveGeoTargetType: "PRESENCE", negativeGeoTargetType: "PRESENCE" },
     ...lance,
   } } });
+  if (s.horarioComercial) for (const dayOfWeek of ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"])
+    ops.push({ campaignCriterionOperation: { create: { campaign: camp, adSchedule: { dayOfWeek, startHour: 8, startMinute: "ZERO", endHour: 20, endMinute: "ZERO" } } } });
 
   for (const g of geo) ops.push({ campaignCriterionOperation: { create: { campaign: camp, location: { geoTargetConstant: g } } } });
   for (const i of s.idiomas) ops.push({ campaignCriterionOperation: { create: { campaign: camp, language: { languageConstant: `languageConstants/${IDIOMAS[i].id}` } } } });
