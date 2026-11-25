@@ -454,7 +454,7 @@ export async function responderWhatsapp(texto: string) {
     return avisar("✍️ Certo! Estou ajustando o seu vídeo com o pedido. Quando ficar pronto, eu mando aqui de novo.");
   }
   const [ok] = await sql`update ads.calendario_itens set status = 'APROVADO', aprovacao = null, project_id = null, refazendo = 'item', erro = null, updated_at = now(),
-      pedido_arte = right(concat_ws(E'\n', pedido_arte, ${`- ${pedido}`}), 1500)
+      pedido_arte = right(concat_ws(E'\n', pedido_arte, ${`- ${pedido}`}::text), 1500)
     where id = ${i.id} and status = 'REVISAO' returning id`;
   if (!ok) return;
   await enqueueJob(sql, { workspaceId: i.workspace_id, type: "AI_CALENDARIO", payload: { itemId: i.id, campo: "item", dica: pedido }, maxAttempts: 1 });
