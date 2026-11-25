@@ -47,7 +47,8 @@ Regras:
 - music: se o briefing pedir uma tag, use-a; se for "auto", escolha a que combina com o produto e o tom; se for "none", "music": null. Tags: ${MUSICA_TAGS.join(", ")}.
 - "plano" e "intencao" são para o cliente aprovar sabendo o que vai ser feito: escreva em português claro, direto, sem jargão, frases curtas.
 - "visual" de cada cena (até 60 palavras): descreva de verdade o que vai aparecer e animar (elementos, metáfora do que é dito, como entra e sai),
-  não repita a headline.
+  não repita a headline. Pense como diretor de motion premiado: metáforas visuais ousadas e específicas do assunto
+  (um objeto que se transforma, a câmera atravessando algo, tipografia que vira cenário), nunca "texto aparece sobre fundo".
 - Use só fatos do briefing e da <base_de_conhecimento>. Não invente preço, prazo, estatística ou promessa que não esteja neles.
 
 ${SKILL_COPY}`;
@@ -123,7 +124,21 @@ ${referencia.slice(0, 60_000)}
   Nada de "template": se a direção pede papel, colagem, isométrico ou tipografia suíça, o vídeo PARECE isso.
 - PROIBIDO (clichês que já se repetiram): alvo/anéis concêntricos com mira, faixas de texto atravessando a tela
   (marquee), moldura HUD com cantos e timecode, grade + partículas + bolhas desfocadas como fundo, sweep de luz em
-  toda transição. Só use algum disso se a direção acima pedir explicitamente.
+  toda transição, mancha/círculo de luz borrado atrás do texto, fundo escuro liso com texto centralizado parado,
+  lista de cards com ícone de check, cartão "antes/depois" genérico. Só use algum disso se a direção acima pedir explicitamente.
+- PADRÃO DE QUALIDADE: isto compete no feed com motion de estúdio. Se parecer slide de apresentação ou template de
+  Canva, está errado. O alvo é a pessoa parar de rolar e pensar "como fizeram isso?":
+  - Primeiro quadro já em movimento e com impacto (nada de tela vazia esperando o texto); o gancho é VISUAL, não só a frase.
+  - Câmera viva: a cena inteira tem movimento de câmera (push-in, dolly lateral, giro em perspectiva 3D com
+    transform-style: preserve-3d, zoom através de um elemento) e pelo menos 3 camadas de profundidade com parallax.
+  - Tipografia como imagem: palavras enormes que se partem, esticam, giram em 3D, saem da tela, viram forma ou máscara
+    de vídeo/cor; letras por letra ou palavra por palavra com stagger e easings fortes (expo, back, elastic), não fade.
+  - Cada cena tem UMA metáfora visual construída de verdade em SVG/CSS (o objeto, a cena, a transformação do que é
+    dito), grande e no centro da ação; texto é parte dela, não um cartão em cima de um fundo.
+  - Nada fica parado mais de ~1 s: depois de entrar, os elementos continuam respirando (drift, rotação lenta, escala).
+  - Transições que costuram uma cena na outra (o elemento final de uma vira o inicial da próxima, máscara pela forma,
+    whip-pan com motion blur via filter: blur, corte seco no beat), cada uma diferente.
+  - Contraste e cor com coragem: blocos chapados, inversões de fundo entre cenas, cor de destaque em áreas grandes.
 - Movimento com intenção: cada cena tem uma ideia visual (metáfora do que é dito), não só texto entrando. Varie o
   tipo de transição entre as cenas (corte seco, máscara, wipe com forma, zoom através de um elemento, morph de cor…).
 - A narração aparece como legenda sincronizada (MK.words ou o seu próprio sistema; se a cena tiver "words", use os

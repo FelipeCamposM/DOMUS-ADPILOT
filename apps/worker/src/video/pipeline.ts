@@ -6,7 +6,7 @@ import { DATA_DIR } from "../env";
 import { bloco, perguntarIA } from "../ai/ask";
 import { DIRECAO_3D, DIRECOES, lerStoryboard, promptAjuste, type Direcao, promptComposicao, promptCorrecao, promptRoteiro, SISTEMA_ROTEIRO, sistemaAjusteCenas, sistemaComposicao, violacoes } from "./compose";
 import { contextoCriativo } from "./contexto";
-import { arquivoMusica, arquivoSfx } from "./sfx";
+import { arquivoMusica, arquivoSfx, musicaSobMedida } from "./sfx";
 import { duracao, ffmpeg, hyperframes } from "./tools";
 import { montarComposicao, paletaCenas } from "./kit/cenas";
 import { CENAS_JS } from "./kit/cenas-runtime";
@@ -164,7 +164,14 @@ export async function runVideo(payload: VideoPayload, c: Ctx) {
     let musica: { file: string; volume: number; nome: string } | null = null;
     let ritmo: { bpm: number; batidas: number[]; compassos: number[] } | null = null;
     if (sb.music) {
-      const lib = await arquivoMusica(p.workspace_id, sb.music.tag, pasta, `${brief.estilo}`.slice(0, 200));
+      // Livre com música automática: trilha composta para este vídeo (a da biblioteca se repetia em todos)
+      const pl = sb.plano;
+      const sob = brief.estiloVisual === "livre" && brief.musica === "auto" ? await musicaSobMedida(p.workspace_id, sb.music.tag, pasta,
+        [`Score for a ${Math.round(sb.duration)}-second vertical social video ad`, pl?.ideia && `about: ${pl.ideia}`, pl?.tom && `tone: ${pl.tom}`,
+          sb.direcao && `visual style: ${sb.direcao.nome}`, "distinctive contemporary production, not generic stock music",
+          "instant hook in the first second, builds energy, a hard drop around two thirds, punchy clean ending, leaves room for a voice-over"].filter(Boolean).join("; "),
+        sb.duration, c.log) : null;
+      const lib = sob ?? await arquivoMusica(p.workspace_id, sb.music.tag, pasta, `${brief.estilo}`.slice(0, 200));
       if (lib) musica = { file: lib.file, volume: sb.music.volume, nome: lib.name };
       else {
         const t = gerarTrilha(sb.music.tag, sb.duration, join(pasta, "trilha.wav"), p.id.charCodeAt(0) + p.id.charCodeAt(1));

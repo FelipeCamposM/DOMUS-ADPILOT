@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { caminhoDrive, caminhoLocal, db, lerArquivo, SFX_CATEGORIAS, type MUSICA_TAGS } from "@domus-ads/core";
 import { DATA_DIR } from "../env";
@@ -64,6 +64,23 @@ export async function arquivoSfx(workspaceId: string, cat: Sfx, indice: number, 
   const item = lib[indice % lib.length]!;
   const destino = join(pasta, `sfx-${item.id}`);
   return obter(item, destino);
+}
+
+/**
+ * Trilha composta no ElevenLabs para um vídeo só (clima, arco e duração dele). Fica na pasta do projeto: ajustes e
+ * troca de voz reaproveitam. Também entra na biblioteca. null se o ElevenLabs falhar (aí vale a da biblioteca).
+ */
+export async function musicaSobMedida(workspaceId: string, tag: (typeof MUSICA_TAGS)[number], pasta: string, prompt: string, segundos: number, log: (m: string) => Promise<void>): Promise<{ file: string; name: string } | null> {
+  const f = join(pasta, "trilha-ia.mp3");
+  if (existsSync(f)) return { file: f, name: "Trilha feita para este vídeo · ElevenLabs" };
+  try {
+    const g = await gerarAudio(workspaceId, { tipo: "MUSIC", tag, prompt, duracao: segundos + 2 }, log);
+    copyFileSync(g.file, f);
+    return { file: f, name: "Trilha feita para este vídeo · ElevenLabs" };
+  } catch (e) {
+    await log(`trilha sob medida falhou (${(e as Error).message}); usando a da biblioteca`);
+    return null;
+  }
 }
 
 /**

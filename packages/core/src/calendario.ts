@@ -72,7 +72,7 @@ export const configCalSchema = z.object({
   toleranciaH: z.number().min(0.5, "Mínimo meia hora").max(24, "Máximo 24 horas"),
   // Reels do calendário: voz local e estilo visual
   voz: z.enum(Object.keys(VOZES) as [keyof typeof VOZES, ...(keyof typeof VOZES)[]], { message: "Voz inválida" }).default("pf_dora"),
-  estiloVideo: z.enum(Object.keys(ESTILOS) as [EstiloVisual, ...EstiloVisual[]], { message: "Estilo inválido" }).default("hud"),
+  estiloVideo: z.enum(Object.keys(ESTILOS) as [EstiloVisual, ...EstiloVisual[]], { message: "Estilo inválido" }).default("livre"),
 });
 export type ConfigCal = z.infer<typeof configCalSchema>;
-export const CONFIG_CAL_PADRAO: ConfigCal = { toleranciaH: 3, voz: "pf_dora", estiloVideo: "hud" };
+export const CONFIG_CAL_PADRAO: ConfigCal = { toleranciaH: 3, voz: "pf_dora", estiloVideo: "livre" };
