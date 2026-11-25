@@ -35,6 +35,17 @@ export async function googleAccessToken(refreshToken: string): Promise<string> {
 }
 
 type Row = Record<string, Record<string, string | undefined> | undefined>;
+
+export interface DetalhesGoogle {
+  status: string; situacao: string; motivos: string[]; lance: string; cpcMax: string | null; orcamentoDia: string | null;
+  inicio: string | null; fim: string | null; locais: string[]; locaisExcluidos: string[];
+  horarios: { dia: string; de: number; ate: number }[]; negativas: string[]; sitelinks: { texto: string; url: string | null }[];
+  grupos: {
+    nome: string; status: string; cpc: string | null; negativas: string[];
+    anuncios: { titulos: string[]; descricoes: string[]; url: string | null; caminho: string; aprovacao: string; situacao: string }[];
+    palavras: { texto: string; tipo: string; situacao: string; motivos: string[]; nota: number | null; impressoes: number; cliques: number }[];
+  }[];
+}
 const cid = (id: string) => id.replace(/-/g, "");
 
 export class GoogleAdsProvider implements AdsProvider {
@@ -161,6 +172,89 @@ export class GoogleAdsProvider implements AdsProvider {
       conversions: Number(r.metrics?.conversions ?? 0).toFixed(2),
       revenue: Number(r.metrics?.conversionsValue ?? 0).toFixed(2),
     }));
+  }
+
+  /** O que está no ar de verdade numa campanha de Pesquisa (lido do Google, não do rascunho): grupos, anúncios, palavras, segmentação. */
+  async detalhesPesquisa(customerId: string, campaignId: string): Promise<DetalhesGoogle> {
+    const id = Number(campaignId); // só dígitos entram na query
+    const q = (s: string) => this.search(customerId, s) as Promise<unknown[]>;
+    const [[camp], grupos, anuncios, palavras, metr, crit, links] = await Promise.all([
+      q(`SELECT campaign.status, campaign.primary_status, campaign.primary_status_reasons, campaign.bidding_strategy_type,
+                campaign.target_spend.cpc_bid_ceiling_micros, campaign.start_date_time, campaign.end_date_time, campaign_budget.amount_micros
+         FROM campaign WHERE campaign.id = ${id}`),
+      q(`SELECT ad_group.id, ad_group.name, ad_group.status, ad_group.cpc_bid_micros FROM ad_group WHERE campaign.id = ${id} AND ad_group.status != 'REMOVED'`),
+      q(`SELECT ad_group.id, ad_group_ad.ad.responsive_search_ad.headlines, ad_group_ad.ad.responsive_search_ad.descriptions,
+                ad_group_ad.ad.responsive_search_ad.path1, ad_group_ad.ad.responsive_search_ad.path2, ad_group_ad.ad.final_urls,
+                ad_group_ad.policy_summary.approval_status, ad_group_ad.primary_status
+         FROM ad_group_ad WHERE campaign.id = ${id} AND ad_group_ad.status != 'REMOVED'`),
+      q(`SELECT ad_group.id, ad_group_criterion.resource_name, ad_group_criterion.keyword.text, ad_group_criterion.keyword.match_type, ad_group_criterion.negative,
+                ad_group_criterion.primary_status, ad_group_criterion.primary_status_reasons, ad_group_criterion.quality_info.quality_score
+         FROM ad_group_criterion WHERE campaign.id = ${id} AND ad_group_criterion.type = 'KEYWORD' AND ad_group_criterion.status != 'REMOVED'`),
+      q(`SELECT ad_group_criterion.resource_name, metrics.impressions, metrics.clicks FROM keyword_view WHERE campaign.id = ${id} AND segments.date DURING LAST_30_DAYS`),
+      q(`SELECT campaign_criterion.type, campaign_criterion.negative, campaign_criterion.location.geo_target_constant, campaign_criterion.keyword.text,
+                campaign_criterion.ad_schedule.day_of_week, campaign_criterion.ad_schedule.start_hour, campaign_criterion.ad_schedule.end_hour
+         FROM campaign_criterion WHERE campaign.id = ${id}`),
+      q(`SELECT asset.sitelink_asset.link_text, asset.final_urls FROM campaign_asset
+         WHERE campaign.id = ${id} AND campaign_asset.field_type = 'SITELINK' AND campaign_asset.status != 'REMOVED'`).catch(() => []),
+    ]);
+    if (!camp) throw new ProviderError("Campanha não encontrada no Google Ads");
+    const s = (r: unknown, p: string) => { const v = p.split(".").reduce<unknown>((o, k) => (o as Record<string, unknown> | undefined)?.[k], r); return v == null ? null : String(v); };
+    const arr = <T = string>(r: unknown, p: string) => (p.split(".").reduce<unknown>((o, k) => (o as Record<string, unknown> | undefined)?.[k], r) as T[] | undefined) ?? [];
+    const micros = (v: string | null) => (v ? fromMicros(v) : null);
+
+    const porKw = new Map<string, { i: number; c: number }>();
+    for (const m of metr) {
+      const k = s(m, "adGroupCriterion.resourceName")!, a = porKw.get(k) ?? { i: 0, c: 0 };
+      porKw.set(k, { i: a.i + Number(s(m, "metrics.impressions") ?? 0), c: a.c + Number(s(m, "metrics.clicks") ?? 0) });
+    }
+    const geos = crit.map((c) => s(c, "campaignCriterion.location.geoTargetConstant")).filter((g): g is string => !!g);
+    const nomes = new Map<string, string>();
+    if (geos.length) {
+      const rows = await q(`SELECT geo_target_constant.resource_name, geo_target_constant.canonical_name FROM geo_target_constant
+        WHERE geo_target_constant.resource_name IN (${geos.map((g) => `'${g.replace(/[^\w/]/g, "")}'`).join(",")})`).catch(() => []);
+      for (const r of rows) nomes.set(s(r, "geoTargetConstant.resourceName")!, s(r, "geoTargetConstant.canonicalName")!);
+    }
+    const crits = (tipo: string, neg: boolean) => crit.filter((c) => s(c, "campaignCriterion.type") === tipo && (s(c, "campaignCriterion.negative") === "true") === neg);
+
+    return {
+      status: s(camp, "campaign.status")!,
+      situacao: s(camp, "campaign.primaryStatus") ?? "",
+      motivos: arr(camp, "campaign.primaryStatusReasons"),
+      lance: s(camp, "campaign.biddingStrategyType") ?? "",
+      cpcMax: micros(s(camp, "campaign.targetSpend.cpcBidCeilingMicros")),
+      orcamentoDia: micros(s(camp, "campaignBudget.amountMicros")),
+      inicio: s(camp, "campaign.startDateTime"),
+      fim: s(camp, "campaign.endDateTime"),
+      locais: crits("LOCATION", false).map((c) => { const g = s(c, "campaignCriterion.location.geoTargetConstant")!; return nomes.get(g) ?? g; }),
+      locaisExcluidos: crits("LOCATION", true).map((c) => { const g = s(c, "campaignCriterion.location.geoTargetConstant")!; return nomes.get(g) ?? g; }),
+      horarios: crits("AD_SCHEDULE", false).map((c) => ({ dia: s(c, "campaignCriterion.adSchedule.dayOfWeek")!, de: Number(s(c, "campaignCriterion.adSchedule.startHour") ?? 0), ate: Number(s(c, "campaignCriterion.adSchedule.endHour") ?? 24) })),
+      negativas: crits("KEYWORD", true).map((c) => s(c, "campaignCriterion.keyword.text")!),
+      sitelinks: links.map((l) => ({ texto: s(l, "asset.sitelinkAsset.linkText") ?? "", url: arr(l, "asset.finalUrls")[0] ?? null })),
+      grupos: grupos.map((g) => {
+        const gid = s(g, "adGroup.id");
+        const kws = palavras.filter((p) => s(p, "adGroup.id") === gid);
+        return {
+          nome: s(g, "adGroup.name") ?? "", status: s(g, "adGroup.status") ?? "", cpc: micros(s(g, "adGroup.cpcBidMicros")),
+          anuncios: anuncios.filter((a) => s(a, "adGroup.id") === gid).map((a) => ({
+            titulos: arr<{ text: string }>(a, "adGroupAd.ad.responsiveSearchAd.headlines").map((h) => h.text),
+            descricoes: arr<{ text: string }>(a, "adGroupAd.ad.responsiveSearchAd.descriptions").map((h) => h.text),
+            url: arr(a, "adGroupAd.ad.finalUrls")[0] ?? null,
+            caminho: [s(a, "adGroupAd.ad.responsiveSearchAd.path1"), s(a, "adGroupAd.ad.responsiveSearchAd.path2")].filter(Boolean).join("/"),
+            aprovacao: s(a, "adGroupAd.policySummary.approvalStatus") ?? "", situacao: s(a, "adGroupAd.primaryStatus") ?? "",
+          })),
+          palavras: kws.filter((p) => s(p, "adGroupCriterion.negative") !== "true").map((p) => {
+            const m = porKw.get(s(p, "adGroupCriterion.resourceName")!);
+            const nota = s(p, "adGroupCriterion.qualityInfo.qualityScore");
+            return {
+              texto: s(p, "adGroupCriterion.keyword.text")!, tipo: s(p, "adGroupCriterion.keyword.matchType")!,
+              situacao: s(p, "adGroupCriterion.primaryStatus") ?? "", motivos: arr(p, "adGroupCriterion.primaryStatusReasons"),
+              nota: nota ? Number(nota) : null, impressoes: m?.i ?? 0, cliques: m?.c ?? 0,
+            };
+          }),
+          negativas: kws.filter((p) => s(p, "adGroupCriterion.negative") === "true").map((p) => s(p, "adGroupCriterion.keyword.text")!),
+        };
+      }),
+    };
   }
 
   /** Localizações por nome ("Brasil", "Goiás", "Goiânia") → geoTargetConstants. Erro claro se alguma não existir. */

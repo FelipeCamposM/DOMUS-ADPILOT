@@ -663,7 +663,9 @@ body { background: #030205; }
 .cp-ia { position: absolute; right: -4px; bottom: -4px; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center;
   background: rgb(var(--c-brand)); color: #fff; box-shadow: 0 0 0 2px rgb(var(--c-bg-surface)); }
 .cp-nome { display: grid; min-width: 0; flex: 1; }
-.cp-nome b { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cp-nome b { display: block; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cp-nome a { min-width: 0; }
+.cp-nome a:hover b { text-decoration: underline; }
 .cp-nome .subtle { font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cp-status { flex: none; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: rgb(var(--c-bg-elevated)); border: 1px solid rgb(var(--c-border)); }
 .cp-card[data-status="ACTIVE"] .cp-status { background: rgb(var(--c-success) / .1); border-color: rgb(var(--c-success) / .3); color: rgb(var(--c-success)); }

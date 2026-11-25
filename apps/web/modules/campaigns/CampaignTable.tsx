@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, Loader2, MousePointerClick, Pause, Pencil, Play, RefreshCw, Target, Trash2, Wallet, Zap } from "lucide-react";
+import { Bot, Eye, Loader2, MousePointerClick, Pause, Pencil, Play, RefreshCw, Target, Trash2, Wallet, Zap } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -85,7 +85,7 @@ export function CampaignTable({ linhas, podeEditar, destaque }: { linhas: Linha[
               <header className="cp-topo">
                 <span className="cp-logo">{c.provider === "META" ? <MetaLogo size={24} /> : <GoogleAdsLogo size={24} />}</span>
                 <div className="cp-nome">
-                  <b title={c.name}>{c.name}</b>
+                  <Link href={`/campaigns/${c.id}`} title={c.name} style={{ color: "inherit", textDecoration: "none" }}><b>{c.name}</b></Link>
                   <span className="subtle" suppressHydrationWarning>{c.provider === "META" ? "Meta Ads" : "Google Ads"} · {c.account_name} · sync {ago(c.last_synced_at)}</span>
                 </div>
                 <span className="cp-status"><StatusTag s={c.status} /></span>
@@ -116,6 +116,7 @@ export function CampaignTable({ linhas, podeEditar, destaque }: { linhas: Linha[
                 {podeEditar && c.budget_editable && (
                   <button className="btn btn-ghost btn-xs" onClick={() => setEditando(c)}><Pencil aria-hidden /> Orçamento</button>
                 )}
+                <Link className="btn btn-ghost btn-xs" href={`/campaigns/${c.id}`}><Eye aria-hidden /> Detalhes</Link>
                 <Link className="btn btn-ghost btn-xs" href={`/ai?nova=1&campaign=${c.id}`}><Bot aria-hidden /> Analisar</Link>
                 {podeEditar && (
                   <button className="btn btn-ghost btn-xs cp-excluir" onClick={() => excluir(c)} disabled={ocupado === c.id} title="Excluir campanha">

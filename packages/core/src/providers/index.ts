@@ -5,7 +5,7 @@ import type { AdsProvider, Provider } from "./types";
 
 export * from "./types";
 export { MetaAdsProvider, GoogleAdsProvider };
-export { errosGoogle } from "./google";
+export { errosGoogle, type DetalhesGoogle } from "./google";
 
 export function providerFor(provider: Provider | string, credentialsEnc: string): AdsProvider {
   if (provider === "META") return new MetaAdsProvider(decrypt<MetaCredentials>(credentialsEnc));

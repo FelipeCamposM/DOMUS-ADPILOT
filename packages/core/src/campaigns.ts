@@ -1,7 +1,7 @@
 import { audit, type Actor, type AuditSource } from "./audit";
 import { db } from "./db";
 import { toDecimal } from "./money";
-import { providerFor, type CampaignRef } from "./providers";
+import { GoogleAdsProvider, providerFor, type CampaignRef } from "./providers";
 
 interface Loaded {
   id: string; name: string; status: string; daily_budget: string | null; external_id: string; provider: string;
@@ -65,4 +65,11 @@ export async function setCampaignBudget(p: { workspaceId: string; campaignId: st
       entityType: "campaign", entityId: c.id, entityName: c.name, before: { dailyBudget: c.daily_budget }, after: { dailyBudget: value },
     });
   });
+}
+
+/** Detalhes ao vivo no Google (anúncios, palavras, segmentação). Meta ainda não: devolve null. */
+export async function detalhesCampanha(workspaceId: string, campaignId: string) {
+  const c = await load(workspaceId, campaignId);
+  const p = providerFor(c.provider, c.credentials_enc);
+  return p instanceof GoogleAdsProvider ? p.detalhesPesquisa(c.account_external_id, c.external_id) : null;
 }
