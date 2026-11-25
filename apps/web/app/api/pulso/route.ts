@@ -25,6 +25,11 @@ export async function GET(req: NextRequest) {
       ${admin ? sql`(select max(lead_em) from ads.whatsapp_contatos where etapa is not null)` : sql`null`} as l,
       (select lidas_em from ads.notificacoes_lidas where user_id = ${ctx.user.id}) as li,
       (select (last_seen > now() - interval '90 seconds')::text || coalesce(info->>'whatsapp', '') || md5(coalesce(info->>'whatsappQr', '')) from ads.worker_status order by last_seen desc limit 1) as w`;
+  } else if (e === "avisos") {
+    // conversa dos avisos + andamento dos posts (texto refeito, arte gerando, progresso do job)
+    r = await sql`select (select count(*) || max(created_at)::text from ads.whatsapp_envios) as m,
+      (select max(updated_at) from ads.calendario_itens) as i, (select max(updated_at) from ads.video_projects) as p,
+      (select coalesce(sum(progress), 0) || count(*) from ads.jobs where status in ('PENDING','RUNNING')) as j`;
   } else if (e === "calendario") {
     r = await sql`select (select max(updated_at) from ads.calendario_itens where workspace_id = ${ws}) as i, (select max(updated_at) from ads.calendarios where workspace_id = ${ws}) as c`;
   } else if (e === "studio") {

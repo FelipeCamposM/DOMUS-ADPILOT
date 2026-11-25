@@ -10,7 +10,7 @@ const PARADO_MS = 5 * 60_000;
  * então recarrega a página. `continuo` = tela de acompanhar (ao vivo): segue perguntando mesmo sem mexer. Não pergunta com a aba escondida nem quando ninguém mexe há 5 min (aba esquecida aberta);
  * ao voltar, confere na hora.
  */
-export function usePulso(escopo: "mensagens" | "shell" | "calendario" | "studio" | "prospeccao" | "financeiro", ms: number, ativo = true, continuo = false) {
+export function usePulso(escopo: "mensagens" | "avisos" | "shell" | "calendario" | "studio" | "prospeccao" | "financeiro", ms: number, ativo = true, continuo = false) {
   const router = useRouter();
   useEffect(() => {
     if (!ativo) return;

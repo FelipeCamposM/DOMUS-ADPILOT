@@ -1,4 +1,14 @@
 import { CONCURRENCY, SYNC_INTERVAL_MIN, WORKER_ID } from "./env"; // primeiro: carrega o .env
+// Identidade deste worker: o PID fica em .worker-data/worker.pid DENTRO deste projeto.
+// Os scripts de restart matam só esse PID; nunca procuram processo por nome ("worker", "index.ts"),
+// porque há mais de um worker na máquina (AdPilot e Casa) e o filtro por nome derrubava o outro.
+import { mkdirSync as __mk, writeFileSync as __wr } from "node:fs";
+import { join as __join } from "node:path";
+{
+  const dir = __join(process.cwd(), "..", "..", ".worker-data");
+  __mk(dir, { recursive: true });
+  __wr(__join(dir, "worker.pid"), String(process.pid));
+}
 import { claimJob, completeJob, db, enqueueJob, failJob, jobDeSync, jobLog, migrate, recoverJobs, syncConnection, syncInstagram, tiposLivres, type Job, type JobType } from "@domus-ads/core";
 import { runEstilos, type EstilosPayload } from "./video/estilos";
 import { createServer } from "node:net";
@@ -22,6 +32,7 @@ import { arquivarExcesso, restaurar } from "./video/arquivo";
 import { gerarLegenda, type LegendaPayload } from "./instagram/legenda";
 import { publicarInstagram } from "./instagram/publicar";
 import { automatizarCalendario, expirarAtrasados, gerarCalendario, responderWhatsapp, type CalendarioPayload } from "./instagram/calendario";
+import { enviarPush } from "./push";
 import { acaoWhatsapp, avisar, enviarDaFila, estadoWhatsapp, gravarQr, ouvirWhatsapp, vigiarQueda } from "./whatsapp";
 
 /**
@@ -29,10 +40,9 @@ import { acaoWhatsapp, avisar, enviarDaFila, estadoWhatsapp, gravarQr, ouvirWhat
  * FOR UPDATE SKIP LOCKED e grava progresso/resultado no banco; a web só lê. A web nunca manda comando de shell:
  * cada tipo de job tem um handler fixo aqui (allowlist).
  */
-const TIPOS: readonly JobType[] = ["SYNC_META", "SYNC_GOOGLE", "AI_CHAT", "AI_LOGIN", "AI_DETECT", "WORKER_STARTUP", "GENERATE_VIDEO", "GENERATE_IMAGE", "AI_CAMPAIGN", "RESTORE_MEDIA", "SYNC_INSTAGRAM", "PUBLISH_INSTAGRAM", "AI_INSTAGRAM_CAPTION", "AI_USAGE", "WHATSAPP", "AI_CALENDARIO", "GENERATE_AUDIO", "AI_SISTEMA", "WHATSAPP_ENVIAR", "MARCA_CONHECIMENTO", "PROSPECTAR_LEADS", "AI_LEADS", "AI_AJUSTAR_MENSAGEM", "FIN_SYNC", "AI_FINANCEIRO", "ESTILOS"];
+const TIPOS: readonly JobType[] = ["SYNC_META", "SYNC_GOOGLE", "AI_CHAT", "AI_LOGIN", "AI_DETECT", "WORKER_STARTUP", "GENERATE_VIDEO", "GENERATE_IMAGE", "AI_CAMPAIGN", "RESTORE_MEDIA", "SYNC_INSTAGRAM", "PUBLISH_INSTAGRAM", "AI_INSTAGRAM_CAPTION", "AI_USAGE", "WHATSAPP", "AI_CALENDARIO", "GENERATE_AUDIO", "AI_SISTEMA", "WHATSAPP_ENVIAR", "MARCA_CONHECIMENTO", "PROSPECTAR_LEADS", "AI_LEADS", "AI_AJUSTAR_MENSAGEM", "FIN_SYNC", "AI_FINANCEIRO", "ESTILOS", "AVISO_RESPONDER"];
 const sql = db();
 const ativos = new Map<string, AbortController>();
-import { enviarPush } from "./push";
 /** uma busca no Google Maps por vez: duas juntas no mesmo IP chamam o bloqueio */
 let buscando = false;
 let parando = false;
@@ -107,6 +117,10 @@ async function executar(job: Job) {
     } else if (job.type === "WHATSAPP_ENVIAR") {
       // mensagem escrita na tela Mensagens
       result = await enviarDaFila(String(job.payload.id));
+    } else if (job.type === "AVISO_RESPONDER") {
+      // resposta escrita na tela Avisos: mesmo caminho do "sim"/"não"/pedido que chega pelo WhatsApp
+      await responderWhatsapp(String(job.payload.texto));
+      result = { ok: true };
     } else if (job.type === "ESTILOS") {
       // Studio → Estilos: prévia de um estilo pronto ou cópia das referências para o Drive
       result = await runEstilos(job.payload as unknown as EstilosPayload, { signal: ctl.signal, log });
@@ -245,9 +259,9 @@ repetir(publicarAgendados, 30_000);
 repetir(agendarFinSync, 30 * 60_000);
 repetir(async function vendasNoCrm() { const n = await importarVendasCrm(sql); if (n) console.log(`[${agora()}] CRM: ${n} venda(s) do site`); }, 2 * 60_000);
 repetir(automatizarCalendario, 60_000);
+repetir(enviarPush, 20_000); // notificações do PWA (Configurações → Notificações)
 ouvirWhatsapp(responderWhatsapp); // respostas "sim"/"não" das artes mandadas para aprovação
 repetir(async function usoDasContas() { await atualizarUsoContas((m) => console.log(`[${agora()}] ${m}`)); }, 5 * 60_000);
 repetir(async function arquivarNoDrive() { await arquivarExcesso((m) => console.log(`[${agora()}] arquivo: ${m}`)); }, 30 * 60_000);
 repetir(async function detectarContas() { await publicarDetectadas(await detectar()); }, 10 * 60_000);
 await loop();
-repetir(enviarPush, 20_000); // notificações do PWA (Configurações → Notificações)
