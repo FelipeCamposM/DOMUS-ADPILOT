@@ -217,7 +217,7 @@ async function refazer(p: { itemId: string; campo: CampoRefazer; dica?: string }
 
 // ───────────── Automação: gerar, aprovar no WhatsApp, agendar, acompanhar ─────────────
 
-interface Pronto { id: string; workspace_id: string; ig_account_id: string; brand_id: string | null; data_hora: Date; formato: FormatoCal; tema: string; objetivo: string; roteiro: Roteiro; legenda: string; hashtags: string[]; marca: string | null; ws_nome: string }
+interface Pronto { id: string; pedido_arte?: string | null; workspace_id: string; ig_account_id: string; brand_id: string | null; data_hora: Date; formato: FormatoCal; tema: string; objetivo: string; roteiro: Roteiro; legenda: string; hashtags: string[]; marca: string | null; ws_nome: string }
 
 /** Voz dos Reels: a favorita do ElevenLabs (a última marcada, do dono primeiro); sem favorita ou sem chave, a voz local da config. */
 async function vozDosReels(workspaceId: string, padrao: string) {
@@ -234,11 +234,13 @@ async function iniciar(i: Pronto, cfg: ConfigCal) {
   const r = roteiroSchema.parse(i.roteiro);
   const produto = (i.marca ?? i.ws_nome).slice(0, 120).padEnd(2, ".");
   const objetivo = (i.objetivo || i.tema).slice(0, 300);
+  // pedidos feitos na aprovação (WhatsApp) chegam literais à IA da arte: "use o balão de black friday dos materiais"
+  const pedidos = i.pedido_arte ? `\n\nPedidos do cliente ao revisar a arte anterior (siga; se citar um material, use o arquivo de <materiais>):\n${i.pedido_arte}` : "";
   let projeto: { id: string } | undefined;
   if (i.formato === "REELS") {
     const brief = briefSchema.parse({
       produto, objetivo, duracao: r.duracao, formato: "9:16", cta: r.cta, identidade: "workspace", estiloVisual: cfg.estiloVideo, ...(await vozDosReels(i.workspace_id, cfg.voz)), musica: "auto",
-      orientacao: `Tema: ${i.tema}\n\nRoteiro da narração (aprovado pelo cliente; mantenha as ideias e ajuste só para caber no tempo):\n${r.narracao}${r.visual ? `\n\nVisual: ${r.visual}` : ""}`.slice(0, 4000),
+      orientacao: `Tema: ${i.tema}\n\nRoteiro da narração (aprovado pelo cliente; mantenha as ideias e ajuste só para caber no tempo):\n${r.narracao}${r.visual ? `\n\nVisual: ${r.visual}` : ""}${pedidos}`.slice(-4000),
     });
     [projeto] = await sql<{ id: string }[]>`insert into ads.video_projects (workspace_id, brand_id, title, brief, status, step_detail)
       values (${i.workspace_id}, ${i.brand_id}, ${i.tema.slice(0, 120)}, ${sql.json(brief as unknown as Json)}, 'QUEUED', 'Calendário: na fila do worker…') returning id`;
@@ -249,7 +251,7 @@ async function iniciar(i: Pronto, cfg: ConfigCal) {
       ? r.slides.map((s, n) => ({ conceito: `Slide ${n + 1}`, headline: s.headline, apoio: s.apoio, cta: n === r.slides.length - 1 ? r.cta : "", visual: s.visual }))
       : [{ conceito: i.tema.slice(0, 120), headline: r.headline, apoio: r.apoio, cta: r.cta, visual: r.visual }];
     const brief = briefImagemSchema.parse({
-      produto, objetivo, orientacao: i.tema, tipo: carrossel ? "carrossel" : "avulsa", slides: Math.max(2, conceitos.length), formato: "4:5",
+      produto, objetivo, orientacao: `${i.tema}${pedidos}`.slice(0, 4000), tipo: carrossel ? "carrossel" : "avulsa", slides: Math.max(2, conceitos.length), formato: "4:5",
       variacoes: 1, cta: r.cta, identidade: "workspace",
     });
     [projeto] = await sql<{ id: string }[]>`insert into ads.video_projects (workspace_id, brand_id, kind, title, brief, storyboard, status, step_detail)
@@ -282,7 +284,7 @@ async function passada() {
 
   // 1. aprovado (e a IA não está refazendo): gera já, para sobrar tempo de conferir a arte no WhatsApp
   const aprovados = await sql<Pronto[]>`
-    select i.id, i.workspace_id, k.ig_account_id, b.id as brand_id, i.data_hora, i.formato, i.tema, i.objetivo, i.roteiro, i.legenda, i.hashtags, b.nome as marca, w.name as ws_nome
+    select i.id, i.pedido_arte, i.workspace_id, k.ig_account_id, b.id as brand_id, i.data_hora, i.formato, i.tema, i.objetivo, i.roteiro, i.legenda, i.hashtags, b.nome as marca, w.name as ws_nome
     from ads.calendario_itens i join ads.calendarios k on k.id = i.calendario_id join ads.workspaces w on w.id = i.workspace_id
     join ads.instagram_accounts a on a.id = k.ig_account_id
     -- calendário sem marca: a marca cujo nome está no @ do perfil (senão a mais antiga), para a arte nunca sair sem logo e cores
@@ -451,7 +453,8 @@ export async function responderWhatsapp(texto: string) {
     if (!(await ajustarEdicao(i.id, i.project_id, i.workspace_id, pedido))) return;
     return avisar("✍️ Certo! Estou ajustando o seu vídeo com o pedido. Quando ficar pronto, eu mando aqui de novo.");
   }
-  const [ok] = await sql`update ads.calendario_itens set status = 'APROVADO', aprovacao = null, project_id = null, refazendo = 'item', erro = null, updated_at = now()
+  const [ok] = await sql`update ads.calendario_itens set status = 'APROVADO', aprovacao = null, project_id = null, refazendo = 'item', erro = null, updated_at = now(),
+      pedido_arte = right(concat_ws(E'\n', pedido_arte, ${`- ${pedido}`}), 1500)
     where id = ${i.id} and status = 'REVISAO' returning id`;
   if (!ok) return;
   await enqueueJob(sql, { workspaceId: i.workspace_id, type: "AI_CALENDARIO", payload: { itemId: i.id, campo: "item", dica: pedido }, maxAttempts: 1 });
