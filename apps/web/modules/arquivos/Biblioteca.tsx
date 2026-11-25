@@ -27,14 +27,16 @@ const ic = (I: typeof Folder) => <I size={15} aria-hidden />;
  * "gerenciar" (página Arquivos): R2 e Drive separados, seleciona vários, move (botão, arrastando ou botão direito), renomeia e apaga.
  * "escolher" (modal no Studio, Instagram e marca): marca até `max` itens e devolve em onEscolher, na ordem marcada.
  * Envio do computador cai na pasta aberta.
+ * soMateriais (página Materiais): só as pastas de materiais por marca.
  */
-export function Biblioteca({ modo, tipos = ["IMAGE", "VIDEO"], max = 12, jaTem = [], podeEditar, onEscolher, onCancelar, uso }: {
+export function Biblioteca({ modo, tipos = ["IMAGE", "VIDEO"], max = 12, jaTem = [], podeEditar, onEscolher, onCancelar, uso, soMateriais }: {
   modo: "gerenciar" | "escolher"; tipos?: Tipo[]; max?: number; jaTem?: string[]; podeEditar: boolean;
   onEscolher?: (itens: ItemArquivo[]) => void; onCancelar?: () => void;
   /** página Arquivos: cartões de R2 e Drive que também filtram a lista */
   uso?: { uso: UsoArmazenamento; limiteGb: number };
+  soMateriais?: boolean;
 }) {
-  const [pasta, setPasta] = useState<string>("todas");
+  const [pasta, setPasta] = useState<string>(soMateriais ? "mat" : "todas");
   const [q, setQ] = useState("");
   const [busca, setBusca] = useState("");
   const [tipo, setTipo] = useState<Tipo | "todos">(tipos.length === 1 ? tipos[0]! : "todos");
@@ -237,6 +239,7 @@ export function Biblioteca({ modo, tipos = ["IMAGE", "VIDEO"], max = 12, jaTem =
     {uso && <LocaisArmazenamento uso={uso.uso} limiteGb={uso.limiteGb} onde={onde} setOnde={(o) => { setOnde(o); setSel([]); }} />}
     <div className="bib" data-modo={modo}>
       <aside className="bib-lado" onContextMenu={(e) => menuPasta(e)}>
+        {!soMateriais && <>
         {pastaBotao("todas", "Todos os arquivos", <Images size={15} aria-hidden />)}
         {pastaBotao("sem", "Sem pasta", <FolderOpen size={15} aria-hidden />)}
         {pastas.length > 0 && <div className="bib-rotulo">Pastas</div>}
@@ -263,6 +266,7 @@ export function Biblioteca({ modo, tipos = ["IMAGE", "VIDEO"], max = 12, jaTem =
               onKeyDown={(e) => { if (e.key === "Escape") { setNova(null); setParaNova(null); } }} aria-label="Nome da nova pasta" />
           </form>
         ))}
+        </>}
         <div className="bib-rotulo" title="Logos, fotos de produto, fundos e texturas para usar nos posts">Materiais</div>
         {pastaBotao("mat", "Todos os materiais", <Shapes size={15} aria-hidden />)}
         {materiais.map((m) => pastaBotao(m.id, m.nome, <Gem size={15} aria-hidden />, m.n))}

@@ -1,7 +1,7 @@
 "use client";
 
 import { gsap } from "gsap";
-import { Activity, Bot, Boxes, Briefcase, Cable, CalendarDays, Clapperboard, FolderOpen, Globe, Images, Landmark, LayoutDashboard, Mail, Megaphone, Palette, Radar, ScrollText, Settings, Settings2, SlidersHorizontal, Sparkles, TrendingUp, Wallet } from "lucide-react";
+import { Activity, Bot, Boxes, Briefcase, Cable, CalendarDays, Clapperboard, FolderOpen, Gem, Globe, Images, Landmark, LayoutDashboard, Mail, Megaphone, Palette, Radar, ScrollText, Settings, Settings2, SlidersHorizontal, Sparkles, TrendingUp, Wallet } from "lucide-react";
 import Link from "next/link";
 import { InstagramIcon, TikTokIcon, WhatsappIcon } from "../connections/Logos";
 import { usePathname } from "next/navigation";
@@ -14,6 +14,7 @@ export const NAV = [
   { href: "/studio", label: "Studio", icon: Clapperboard, group: "Criação" },
   { href: "/creatives", label: "Criativos", icon: Images, group: "Criação" },
   { href: "/arquivos", label: "Arquivos", icon: FolderOpen, group: "Criação" },
+  { href: "/materiais", label: "Materiais", icon: Gem, group: "Criação" },
   { href: "/instagram", label: "Instagram", icon: InstagramIcon, group: "Criação" },
   { href: "/tiktok", label: "TikTok", icon: TikTokIcon, group: "Criação" },
   { href: "/conteudos", label: "Conteúdos", icon: CalendarDays, group: "Criação" },
