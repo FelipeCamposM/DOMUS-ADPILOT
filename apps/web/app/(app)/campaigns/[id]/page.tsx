@@ -1,5 +1,5 @@
 import { db, detalhesCampanha, type DetalhesGoogle } from "@domus-ads/core";
-import { Bot, ChevronLeft, FileText } from "lucide-react";
+import { AlertCircle, Ban, Bot, CalendarRange, CheckCircle2, ChevronLeft, Clock, Eye, FileText, Gauge, MapPin, MousePointerClick, Target, Wallet } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
@@ -15,11 +15,11 @@ export const metadata = { title: "Campanha" };
 // rótulos dos status do Google em português
 const SITUACAO: Record<string, string> = {
   ELIGIBLE: "Elegível", LEARNING: "Em aprendizado", LIMITED: "Limitada", NOT_ELIGIBLE: "Não veicula", PAUSED: "Pausada", PENDING: "Pendente",
-  ENDED: "Encerrada", REMOVED: "Removida", MISCONFIGURED: "Configuração com problema", ENABLED: "Ativa", APPROVED: "Aprovado",
+  ENDED: "Encerrada", REMOVED: "Removida", MISCONFIGURED: "Configuração com problema", ENABLED: "Ativo", APPROVED: "Aprovado",
   APPROVED_LIMITED: "Aprovado com limitação", DISAPPROVED: "Reprovado", AREA_OF_INTEREST_ONLY: "Só área de interesse", UNKNOWN: "—",
 };
 const MOTIVO: Record<string, string> = {
-  BIDDING_STRATEGY_LEARNING: "o Google está calibrando os lances (3 a 7 dias)",
+  BIDDING_STRATEGY_LEARNING: "o Google está calibrando os lances (leva de 3 a 7 dias)",
   AD_GROUP_CRITERION_RARELY_SERVED: "pouca gente pesquisa este termo",
   AD_GROUP_CRITERION_LOW_QUALITY: "nota de qualidade baixa",
   CAMPAIGN_PENDING: "ainda não começou", CAMPAIGN_ENDED: "já terminou", BUDGET_CONSTRAINED: "limitada pelo orçamento",
@@ -31,6 +31,9 @@ const DIA: Record<string, string> = { MONDAY: "seg", TUESDAY: "ter", WEDNESDAY: 
 const sit = (s: string) => SITUACAO[s] ?? s;
 const motivos = (m: string[]) => m.map((x) => MOTIVO[x] ?? x.toLowerCase().replace(/_/g, " ")).join("; ");
 const data = (s: string | null) => (s ? s.slice(0, 10).split("-").reverse().join("/") : null);
+// verde = rodando, amarelo = rodando com ressalva, cinza = parado
+const tom = (s: string) => (["ELIGIBLE", "ENABLED", "APPROVED"].includes(s) ? "ok" : ["LEARNING", "LIMITED", "PENDING", "APPROVED_LIMITED"].includes(s) ? "atencao" : "parado");
+const dominio = (u: string | null) => { try { return u ? new URL(u).hostname.replace(/^www\./, "") : ""; } catch { return ""; } };
 
 export default async function CampanhaPage({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await requireCtx();
@@ -64,99 +67,125 @@ export default async function CampanhaPage({ params }: { params: Promise<{ id: s
       </div>
 
       <div className="cp-resumo" data-enter>
-        <Kpi rotulo={`Gasto (${f.days} dias)`} valor={money(c.spend, c.currency)} sub={c.daily_budget ? `orçamento ${money(c.daily_budget, c.currency)}/dia` : undefined} />
-        <Kpi rotulo="Impressões" valor={int(d.impressions)} />
-        <Kpi rotulo="Cliques" valor={int(d.clicks)} sub={`CTR ${pct(d.ctr)}`} />
-        <Kpi rotulo="Conversões" valor={d.conversions.toLocaleString("pt-BR")} sub={d.cpa == null ? "sem conversões" : `${money(d.cpa, c.currency)} cada`} />
+        <Kpi icone={<Wallet aria-hidden />} rotulo={`Gasto · ${f.days} dias`} valor={money(c.spend, c.currency)} sub={c.daily_budget ? `de ${money(c.daily_budget, c.currency)}/dia` : undefined} />
+        <Kpi icone={<Eye aria-hidden />} rotulo="Impressões" valor={int(d.impressions)} sub="vezes que o anúncio apareceu" />
+        <Kpi icone={<MousePointerClick aria-hidden />} rotulo="Cliques" valor={int(d.clicks)} sub={`CTR ${pct(d.ctr)}`} />
+        <Kpi icone={<Target aria-hidden />} rotulo="Conversões" valor={d.conversions.toLocaleString("pt-BR")} sub={d.cpa == null ? "sem conversões" : `${money(d.cpa, c.currency)} cada`} />
       </div>
 
-      {erro && <div className="panel error-text small" role="alert" style={{ padding: 16 }}>Não consegui ler os detalhes no Google: {erro}</div>}
-      {!det && !erro && <div className="panel subtle small" style={{ padding: 16 }}>Detalhes de anúncios e segmentação por enquanto só para campanhas do Google Ads.</div>}
+      {erro && <div className="panel cd-aviso" role="alert"><AlertCircle aria-hidden /> Não consegui ler os detalhes no Google: {erro}</div>}
+      {!det && !erro && <div className="panel cd-aviso"><AlertCircle aria-hidden /> Anúncios e segmentação por enquanto só para campanhas do Google Ads.</div>}
       {det && <Detalhes det={det} moeda={c.currency} />}
     </div>
   );
 }
 
-function Kpi({ rotulo, valor, sub }: { rotulo: string; valor: string; sub?: string }) {
-  return <div className="panel cp-kpi"><span><small>{rotulo}</small><strong className="tabular">{valor}</strong>{sub && <em>{sub}</em>}</span></div>;
+function Kpi({ icone, rotulo, valor, sub }: { icone: React.ReactNode; rotulo: string; valor: string; sub?: string }) {
+  return <div className="panel cp-kpi"><span className="cp-kpi-ic">{icone}</span><span><small>{rotulo}</small><strong className="tabular">{valor}</strong>{sub && <em>{sub}</em>}</span></div>;
 }
 
 function Detalhes({ det, moeda }: { det: DetalhesGoogle; moeda: string }) {
-  const linhas: [string, React.ReactNode][] = [
-    ["Situação no Google", <>{sit(det.situacao)}{det.motivos.length > 0 && <span className="subtle"> · {motivos(det.motivos)}</span>}</>],
-    ["Lances", `${LANCE[det.lance] ?? det.lance}${det.cpcMax ? ` · teto ${money(det.cpcMax, moeda)} por clique` : ""}`],
-    ["Orçamento", det.orcamentoDia ? `${money(det.orcamentoDia, moeda)}/dia` : "—"],
-    ["Período", `${data(det.inicio) ?? "—"} até ${data(det.fim) ?? "sem data de fim"}`],
-    ["Locais", det.locais.join(", ") || "Todos"],
-    ...(det.locaisExcluidos.length ? [["Locais excluídos", det.locaisExcluidos.join(", ")] as [string, string]] : []),
-    ["Horário", det.horarios.length ? det.horarios.map((h) => `${DIA[h.dia] ?? h.dia} ${h.de}h–${h.ate}h`).join(", ") : "Todos os dias, o dia todo"],
+  const locais = (l: string[]) => l.map((x) => x.replace(/,Brazil$/, "").replace(/^State of /, "")).join(", ");
+  const config: [React.ReactNode, string, string][] = [
+    [<Gauge key="i" aria-hidden />, "Lances", `${LANCE[det.lance] ?? det.lance}${det.cpcMax ? ` · até ${money(det.cpcMax, moeda)}/clique` : ""}`],
+    [<Wallet key="i" aria-hidden />, "Orçamento", det.orcamentoDia ? `${money(det.orcamentoDia, moeda)} por dia` : "—"],
+    [<CalendarRange key="i" aria-hidden />, "Período", `${data(det.inicio) ?? "—"} → ${data(det.fim) ?? "sem fim"}`],
+    [<MapPin key="i" aria-hidden />, "Onde", (locais(det.locais) || "Todos os locais") + (det.locaisExcluidos.length ? ` (exceto ${locais(det.locaisExcluidos)})` : "")],
+    [<Clock key="i" aria-hidden />, "Quando", det.horarios.length ? det.horarios.map((h) => `${DIA[h.dia] ?? h.dia} ${h.de}h–${h.ate}h`).join(", ") : "Todos os dias, 24 h"],
   ];
+  const motivoTxt = motivos(det.motivos);
   return (
-    <>
-      <section className="panel" style={{ padding: 20 }} data-enter>
-        <h2 className="panel-title" style={{ marginBottom: 12 }}>Configuração no ar</h2>
-        <dl style={{ display: "grid", gridTemplateColumns: "minmax(120px, 180px) 1fr", gap: "8px 16px", margin: 0 }} className="small">
-          {linhas.flatMap(([k, v]) => [<dt key={`k${k}`} className="subtle">{k}</dt>, <dd key={`v${k}`} style={{ margin: 0 }}>{v}</dd>])}
-        </dl>
-        {det.negativas.length > 0 && <Chips titulo={`Palavras negativas da campanha (${det.negativas.length})`} itens={det.negativas} />}
-        {det.sitelinks.length > 0 && <Chips titulo="Sitelinks" itens={det.sitelinks.map((s) => s.texto)} />}
-      </section>
+    <div className="cd-grade">
+      <div className="stack" style={{ gap: 18, minWidth: 0 }}>
+        {det.grupos.map((g) => {
+          const max = Math.max(1, ...g.palavras.map((p) => p.impressoes));
+          const vivas = g.palavras.filter((p) => tom(p.situacao) !== "parado").length;
+          return (
+            <section key={g.nome} className="panel cd-grupo" data-enter>
+              <header className="cd-grupo-topo">
+                <div><small className="cd-rotulo">Grupo de anúncios</small><h2>{g.nome}</h2></div>
+                <span className="cd-pilula" data-tom={tom(g.status)}>{sit(g.status)}</span>
+              </header>
 
-      {det.grupos.map((g) => (
-        <section key={g.nome} className="panel stack" style={{ padding: 20, gap: 16 }} data-enter>
-          <div className="cluster" style={{ justifyContent: "space-between" }}>
-            <h2 className="panel-title">Grupo: {g.nome}</h2>
-            <span className="subtle small">{sit(g.status)}</span>
-          </div>
+              {g.anuncios.map((a, i) => (
+                <div key={i} className="cd-anuncio">
+                  <div className="cd-serp" aria-label="Prévia no Google">
+                    <span className="cd-serp-tag">Patrocinado</span>
+                    <span className="cd-serp-url"><i aria-hidden>{dominio(a.url).charAt(0).toUpperCase()}</i>{dominio(a.url)}{a.caminho && ` › ${a.caminho.replace("/", " › ")}`}</span>
+                    <span className="cd-serp-titulo">{a.titulos.slice(0, 3).join(" | ")}</span>
+                    <span className="cd-serp-desc">{a.descricoes.slice(0, 2).join(" ")}</span>
+                    <span className="cd-serp-nota">Prévia: o Google combina os títulos e as descrições sozinho</span>
+                  </div>
+                  <div className="cd-anuncio-lado">
+                    <div className="cluster" style={{ gap: 6 }}>
+                      <span className="cd-pilula" data-tom={tom(a.aprovacao)}>{a.aprovacao === "APPROVED" ? <CheckCircle2 aria-hidden /> : <AlertCircle aria-hidden />} {sit(a.aprovacao)}</span>
+                      <span className="cd-pilula" data-tom={tom(a.situacao)}>{sit(a.situacao)}</span>
+                    </div>
+                    <Lista titulo="Títulos" itens={a.titulos} limite={30} />
+                    <Lista titulo="Descrições" itens={a.descricoes} limite={90} aberta />
+                    {a.url && <a className="cd-link" href={a.url} target="_blank" rel="noreferrer" title={a.url}>Abrir página de destino ↗</a>}
+                  </div>
+                </div>
+              ))}
 
-          {g.anuncios.map((a, i) => (
-            <div key={i} className="stack" style={{ gap: 8 }}>
-              <div className="cluster small" style={{ gap: 8 }}>
-                <b>Anúncio {g.anuncios.length > 1 ? i + 1 : ""}</b>
-                <span className="badge">{sit(a.aprovacao)}</span>
-                <span className="subtle">{sit(a.situacao)}</span>
-              </div>
-              {a.url && <a href={a.url} target="_blank" rel="noreferrer" className="small" style={{ wordBreak: "break-all" }}>{a.url}</a>}
-              {a.caminho && <span className="subtle caption">Caminho exibido: /{a.caminho}</span>}
-              <Chips titulo={`Títulos (${a.titulos.length})`} itens={a.titulos} />
-              <div className="stack" style={{ gap: 4 }}>
-                <span className="subtle caption">Descrições ({a.descricoes.length})</span>
-                {a.descricoes.map((t) => <p key={t} className="small" style={{ margin: 0 }}>{t}</p>)}
-              </div>
-            </div>
-          ))}
-
-          {g.palavras.length > 0 && (
-            <div className="table-wrap">
-              <table className="data">
-                <thead><tr><th>Palavra-chave</th><th>Tipo</th><th>Situação</th><th>Nota</th><th>Impr. 30d</th><th>Cliques 30d</th></tr></thead>
-                <tbody>
+              {g.palavras.length > 0 && (
+                <div className="cd-kw">
+                  <div className="cd-kw-topo"><b>Palavras-chave</b><span className="subtle">{vivas} de {g.palavras.length} rodando · últimos 30 dias</span></div>
                   {g.palavras.map((p) => (
-                    <tr key={p.texto + p.tipo}>
-                      <td>{p.texto}</td>
-                      <td>{TIPO[p.tipo] ?? p.tipo}</td>
-                      <td style={{ whiteSpace: "normal" }}>{sit(p.situacao)}{p.motivos.length > 0 && <span className="subtle"> · {motivos(p.motivos)}</span>}</td>
-                      <td>{p.nota ?? "—"}</td>
-                      <td>{int(p.impressoes)}</td>
-                      <td>{int(p.cliques)}</td>
-                    </tr>
+                    <div key={p.texto + p.tipo} className="cd-kw-linha" data-tom={tom(p.situacao)}>
+                      <span className="cd-kw-nome"><i className="cd-dot" aria-hidden />
+                        <span>{p.tipo === "EXACT" ? `[${p.texto}]` : p.tipo === "PHRASE" ? `"${p.texto}"` : p.texto}
+                          <small>{TIPO[p.tipo] ?? p.tipo} · {sit(p.situacao).toLowerCase()}{p.motivos.length > 0 ? `: ${motivos(p.motivos)}` : ""}</small></span>
+                      </span>
+                      <span className="cd-kw-barra" title={`${p.impressoes} impressões`}><span style={{ width: `${(p.impressoes / max) * 100}%` }} /></span>
+                      <span className="tabular cd-kw-num">{int(p.impressoes)}<small>impr.</small></span>
+                      <span className="tabular cd-kw-num">{int(p.cliques)}<small>cliques</small></span>
+                      <span className="tabular cd-kw-num">{p.nota ?? "—"}<small>nota</small></span>
+                    </div>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          {g.negativas.length > 0 && <Chips titulo={`Negativas do grupo (${g.negativas.length})`} itens={g.negativas} />}
+                </div>
+              )}
+              {g.negativas.length > 0 && <Negativas titulo="Negativas do grupo" itens={g.negativas} />}
+            </section>
+          );
+        })}
+      </div>
+
+      <aside className="stack cd-lado" style={{ gap: 18 }}>
+        <section className="panel cd-situacao" data-tom={tom(det.situacao)} data-enter>
+          <small className="cd-rotulo">Situação no Google</small>
+          <b><i className="cd-dot" aria-hidden /> {sit(det.situacao)}</b>
+          {motivoTxt && <p>{motivoTxt.charAt(0).toUpperCase() + motivoTxt.slice(1)}.</p>}
         </section>
-      ))}
-    </>
+        <section className="panel cd-config" data-enter>
+          {config.map(([ic, k, v]) => <div key={k} className="cd-config-linha"><span className="cd-config-ic">{ic}</span><span><small>{k}</small>{v}</span></div>)}
+        </section>
+        {det.negativas.length > 0 && <section className="panel cd-caixa" data-enter><Negativas titulo="Palavras negativas" itens={det.negativas} /></section>}
+        {det.sitelinks.length > 0 && (
+          <section className="panel cd-config" data-enter>
+            <small className="cd-rotulo">Sitelinks</small>
+            {det.sitelinks.map((s) => <a key={s.texto} className="cd-link cd-config-linha" href={s.url ?? "#"} target="_blank" rel="noreferrer">{s.texto} ↗</a>)}
+          </section>
+        )}
+      </aside>
+    </div>
   );
 }
 
-function Chips({ titulo, itens }: { titulo: string; itens: string[] }) {
+function Lista({ titulo, itens, limite, aberta }: { titulo: string; itens: string[]; limite: number; aberta?: boolean }) {
   return (
-    <div className="stack" style={{ gap: 6, marginTop: 12 }}>
-      <span className="subtle caption">{titulo}</span>
-      <div className="cluster" style={{ gap: 6, flexWrap: "wrap" }}>{itens.map((t) => <span key={t} className="chip">{t}</span>)}</div>
-    </div>
+    <details className="cd-lista" open={aberta}>
+      <summary><span>{titulo}</span><span className="subtle">{itens.length}</span></summary>
+      <ol>{itens.map((t) => <li key={t}><span>{t}</span><small className="tabular">{t.length}/{limite}</small></li>)}</ol>
+    </details>
+  );
+}
+
+function Negativas({ titulo, itens }: { titulo: string; itens: string[] }) {
+  return (
+    <details className="cd-neg">
+      <summary><Ban aria-hidden /> {titulo} <span className="subtle">{itens.length}</span></summary>
+      <div className="cd-neg-itens">{itens.map((t) => <span key={t}>−{t}</span>)}</div>
+    </details>
   );
 }
