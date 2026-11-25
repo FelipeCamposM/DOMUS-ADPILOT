@@ -25,6 +25,8 @@ const uploadSchema = z.discriminatedUnion("type", [
   width: z.number().int().positive().max(20000).nullable().optional(),
   height: z.number().int().positive().max(20000).nullable().optional(),
   pastaId: z.string().uuid("Pasta inválida").nullable().optional(),
+  /** enviado dentro de Materiais: vai para a pasta da marca (null = sem marca) */
+  material: z.object({ marcaId: z.string().uuid("Marca inválida").nullable() }).optional(),
 }));
 const PASTA = { MUSIC: "music", SFX: "sfx", VOICE: "voices", IMAGE: "images", VIDEO: "videos" } as const;
 
@@ -44,10 +46,11 @@ export async function iniciarUpload(input: unknown) {
     const key = r2Key(ctx.workspace.id, PASTA[u.type], `${id}.${ext}`);
     const storage = storageAtual();
     // pasta só se for deste workspace (senão fica sem pasta)
-    await db()`insert into ads.creatives (id, workspace_id, name, type, status, storage, r2_key, mime, size_bytes, duration_ms, width, height, tags, license, created_by, pasta_id)
+    await db()`insert into ads.creatives (id, workspace_id, name, type, status, storage, r2_key, mime, size_bytes, duration_ms, width, height, tags, license, created_by, pasta_id, material, brand_id)
       values (${id}, ${ctx.workspace.id}, ${u.name.replace(/\.[^.]+$/, "")}, ${u.type}, 'UPLOADING', ${storage}, ${key}, ${u.mime}, ${u.size}, ${u.durationMs},
         ${u.width ?? null}, ${u.height ?? null}, ${u.tags as string[]}, ${u.license || null}, ${ctx.user.id},
-        (select p.id from ads.pastas p where p.id = ${u.pastaId ?? null} and p.workspace_id = ${ctx.workspace.id}))`;
+        (select p.id from ads.pastas p where p.id = ${u.pastaId ?? null} and p.workspace_id = ${ctx.workspace.id}), ${!!u.material},
+        (select b.id from ads.brands b where b.id = ${u.material?.marcaId ?? null} and b.workspace_id = ${ctx.workspace.id}))`;
     return { id, url: storage === "local" ? `/api/creatives/${id}/upload` : await r2Presign(key, "PUT", 900) };
   });
 }

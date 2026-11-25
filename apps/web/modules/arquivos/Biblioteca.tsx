@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, CheckSquare, ExternalLink, Film, Folder, FolderInput, FolderOpen, FolderPlus, Images, Loader2, Pencil, Search, Square, Trash2, Upload, X, Zap } from "lucide-react";
+import { Check, CheckSquare, ExternalLink, Film, Gem, Shapes, Folder, FolderInput, FolderOpen, FolderPlus, Images, Loader2, Pencil, Search, Square, Trash2, Upload, X, Zap } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { UsoArmazenamento } from "@/lib/armazenamento";
 import { enviarArquivo } from "../creatives/upload";
@@ -10,7 +10,7 @@ import { MenuContexto, type ItemMenu, type Menu } from "../shell/MenuContexto";
 import { Seletor } from "../shell/Seletor";
 import { toast } from "../shell/toast";
 import { apagarCriativos } from "../studio/actions";
-import { apagarPasta, criarPasta, listarArquivos, moverArquivos, renomearArquivo, renomearPasta, type ItemArquivo, type Pasta } from "./actions";
+import { apagarPasta, criarPasta, listarArquivos, moverArquivos, renomearArquivo, renomearPasta, type ItemArquivo, type Pasta, type PastaMaterial } from "./actions";
 import { DriveIcone } from "./DriveIcone";
 import { LocaisArmazenamento, type Onde } from "./UsoR2";
 
@@ -40,7 +40,7 @@ export function Biblioteca({ modo, tipos = ["IMAGE", "VIDEO"], max = 12, jaTem =
   const [tipo, setTipo] = useState<Tipo | "todos">(tipos.length === 1 ? tipos[0]! : "todos");
   const [origem, setOrigem] = useState<"todos" | "enviados" | "gerados">("todos");
   const [onde, setOnde] = useState<Onde>("todos");
-  const [dados, setDados] = useState<{ itens: ItemArquivo[]; pastas: Pasta[] } | null>(null);
+  const [dados, setDados] = useState<{ itens: ItemArquivo[]; pastas: Pasta[]; materiais: PastaMaterial[] } | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [versao, setVersao] = useState(0);
   const [sel, setSel] = useState<string[]>([]);
@@ -71,7 +71,12 @@ export function Biblioteca({ modo, tipos = ["IMAGE", "VIDEO"], max = 12, jaTem =
 
   const itens = (dados?.itens ?? []).filter((i) => tipos.includes(i.type) && !jaTem.includes(i.id));
   const pastas = dados?.pastas ?? [];
+  const materiais = dados?.materiais ?? [];
   const pastaAberta = pastas.find((p) => p.id === pasta);
+  // dentro de Materiais: envio vai para a marca aberta ("Todos os materiais" = sem marca)
+  const emMaterial = pasta.startsWith("mat");
+  const materialAberto = materiais.find((m) => m.id === pasta);
+  const nomeAberto = pastaAberta?.nome ?? materialAberto?.nome ?? (pasta === "mat" ? "Materiais" : pasta === "sem" ? "Sem pasta" : null);
   const limite = modo === "escolher" ? max : 400;
   const alternar = (id: string) => setSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : limite === 1 ? [id] : s.length < limite ? [...s, id] : s));
   const abrir = (i: ItemArquivo) => window.open(`${arquivo(i.id)}${i.arquivado ? "?original=1" : ""}`, "_blank", "noopener");
@@ -86,7 +91,7 @@ export function Biblioteca({ modo, tipos = ["IMAGE", "VIDEO"], max = 12, jaTem =
     return true;
   };
   const mover = async (ids: string[], destino: string | null) => {
-    const nome = destino ? pastas.find((p) => p.id === destino)?.nome ?? "nova pasta" : "Sem pasta";
+    const nome = destino ? pastas.find((p) => p.id === destino)?.nome ?? (destino.startsWith("mat") ? `Materiais · ${materiais.find((m) => m.id === destino)?.nome ?? "Sem marca"}` : "nova pasta") : "Sem pasta";
     if (await acao(() => moverArquivos(ids, destino), `${ids.length} arquivo(s) em “${nome}”`)) setSel([]);
   };
   const apagar = async (ids: string[]) => {
@@ -119,13 +124,13 @@ export function Biblioteca({ modo, tipos = ["IMAGE", "VIDEO"], max = 12, jaTem =
     for (const f of Array.from(files ?? [])) {
       try {
         setEnviando(0);
-        novos.push((await enviarArquivo(f, { pastaId: pastaAberta?.id ?? null, onProgresso: setEnviando })).id);
+        novos.push((await enviarArquivo(f, { pastaId: pastaAberta?.id ?? null, material: emMaterial ? { marcaId: pasta.length > 8 ? pasta.slice(4) : null } : undefined, onProgresso: setEnviando })).id);
       } catch (e) { toast.err((e as Error).message); }
     }
     setEnviando(null);
     if (input.current) input.current.value = "";
     if (!novos.length) return;
-    toast.ok(`${novos.length} arquivo(s) enviado(s)${pastaAberta ? ` para “${pastaAberta.nome}”` : ""}`);
+    toast.ok(`${novos.length} arquivo(s) enviado(s)${pasta !== "todas" && nomeAberto ? ` para “${nomeAberto}”` : ""}`);
     if (modo === "escolher") setSel((s) => [...s, ...novos].slice(-limite));
     recarregar();
   };
@@ -138,6 +143,9 @@ export function Biblioteca({ modo, tipos = ["IMAGE", "VIDEO"], max = 12, jaTem =
     ...(pasta !== "sem" ? [{ rotulo: "Sem pasta", icone: ic(FolderOpen), onClick: () => void mover(ids, null) }] : []),
     ...pastas.filter((p) => p.id !== pasta).map((p) => ({ rotulo: p.nome, icone: ic(FolderInput), onClick: () => void mover(ids, p.id) })),
     { rotulo: "Nova pasta…", icone: ic(FolderPlus), onClick: () => novaPasta(ids) },
+    { secao: "Materiais de" },
+    ...materiais.filter((m) => m.id !== pasta).map((m) => ({ rotulo: m.nome, icone: ic(Gem), onClick: () => void mover(ids, m.id) })),
+    ...(!materiais.some((m) => m.id === "mat:sem") && pasta !== "mat" ? [{ rotulo: "Sem marca", icone: ic(Gem), onClick: () => void mover(ids, "mat:sem") }] : []),
   ];
   const menuArquivo = (e: React.MouseEvent, i: ItemArquivo) => {
     if (!gerenciar) return;
@@ -184,7 +192,7 @@ export function Biblioteca({ modo, tipos = ["IMAGE", "VIDEO"], max = 12, jaTem =
       onContextMenu={(e) => menuPasta(e, p)}
       onDragOver={(e) => { if (podeEditar && id !== "todas") { e.preventDefault(); setAlvo(id); } }}
       onDragLeave={() => setAlvo((a) => (a === id ? null : a))}
-      onDrop={(e) => { e.preventDefault(); setAlvo(null); const ids = JSON.parse(e.dataTransfer.getData("application/x-arquivos") || "[]") as string[]; if (ids.length) void mover(ids, id === "sem" ? null : id); }}>
+      onDrop={(e) => { e.preventDefault(); setAlvo(null); const ids = JSON.parse(e.dataTransfer.getData("application/x-arquivos") || "[]") as string[]; if (ids.length) void mover(ids, id === "sem" ? null : id === "mat" ? "mat:sem" : id); }}>
       {icone}<span>{nome}</span>{n != null && <small>{n}</small>}
     </button>
   );
@@ -255,12 +263,15 @@ export function Biblioteca({ modo, tipos = ["IMAGE", "VIDEO"], max = 12, jaTem =
               onKeyDown={(e) => { if (e.key === "Escape") { setNova(null); setParaNova(null); } }} aria-label="Nome da nova pasta" />
           </form>
         ))}
+        <div className="bib-rotulo" title="Logos, fotos de produto, fundos e texturas para usar nos posts">Materiais</div>
+        {pastaBotao("mat", "Todos os materiais", <Shapes size={15} aria-hidden />)}
+        {materiais.map((m) => pastaBotao(m.id, m.nome, <Gem size={15} aria-hidden />, m.n))}
         {gerenciar && <p className="subtle caption bib-dica">Arraste para uma pasta para mover. Botão direito abre as opções.</p>}
       </aside>
 
       <section className="bib-main">
         <div className="bib-barra">
-          <label className="bib-busca"><Search size={15} aria-hidden /><input placeholder={`Pesquisar em ${pastaAberta ? `“${pastaAberta.nome}”` : pasta === "sem" ? "Sem pasta" : "todos os arquivos"}`} value={q} onChange={(e) => setQ(e.target.value)} /></label>
+          <label className="bib-busca"><Search size={15} aria-hidden /><input placeholder={`Pesquisar em ${nomeAberto ? `“${nomeAberto}”` : "todos os arquivos"}`} value={q} onChange={(e) => setQ(e.target.value)} /></label>
           {tipos.length > 1 && (["todos", "IMAGE", "VIDEO"] as const).map((t) => <button key={t} type="button" className="chip" data-active={tipo === t} onClick={() => setTipo(t)}>{t === "todos" ? "Tudo" : t === "IMAGE" ? "Imagens" : "Vídeos"}</button>)}
           <Seletor ariaLabel="Origem" valor={origem} opcoes={ORIGENS} onChange={(v) => setOrigem(v as typeof origem)} className="seletor-alto" />
           {!uso && <Seletor ariaLabel="Onde está" valor={onde} opcoes={[{ valor: "todos", rotulo: "R2 e Drive" }, { valor: "r2", rotulo: "Só no R2" }, { valor: "drive", rotulo: "Só no Drive" }]} onChange={(v) => setOnde(v as Onde)} className="seletor-alto" />}
@@ -274,7 +285,7 @@ export function Biblioteca({ modo, tipos = ["IMAGE", "VIDEO"], max = 12, jaTem =
 
         <div className="bib-grade" aria-busy={carregando} onContextMenu={menuGrade}>
           {carregando && !dados && Array.from({ length: 8 }).map((_, i) => <div key={i} className="bib-card skeleton" style={{ aspectRatio: "1" }} />)}
-          {dados && !itens.length && <p className="subtle small bib-vazio">{busca ? `Nada encontrado para “${busca}”.` : pastaAberta ? "Pasta vazia. Envie arquivos ou arraste para cá." : onde === "drive" ? "Nada arquivado no Drive." : "Nenhum arquivo ainda."}</p>}
+          {dados && !itens.length && <p className="subtle small bib-vazio">{busca ? `Nada encontrado para “${busca}”.` : emMaterial ? "Nenhum material aqui. Envie logos, fotos de produto, fundos ou arraste arquivos para cá." : pastaAberta ? "Pasta vazia. Envie arquivos ou arraste para cá." : onde === "drive" ? "Nada arquivado no Drive." : "Nenhum arquivo ainda."}</p>}
           {separar ? <>
             {noR2.length > 0 && <div className="bib-secao" data-onde="r2"><Zap size={14} aria-hidden /><b>No Cloudflare R2</b><span>{noR2.length} · abrem na hora</span></div>}
             {noR2.map(cartao)}
@@ -292,7 +303,8 @@ export function Biblioteca({ modo, tipos = ["IMAGE", "VIDEO"], max = 12, jaTem =
             {podeEditar && <>
               {sel.length === 1 && <button type="button" className="btn btn-ghost btn-xs" onClick={() => { const i = itens.find((x) => x.id === sel[0]); if (i) setRenomeando({ id: i.id, nome: i.name }); }}><Pencil aria-hidden /> Renomear</button>}
               <Seletor ariaLabel="Mover para a pasta" valor="" icone={<FolderInput size={14} aria-hidden />} disabled={ocupado}
-                opcoes={[{ valor: "", rotulo: "Mover para…" }, { valor: "sem", rotulo: "Sem pasta" }, ...pastas.map((p) => ({ valor: p.id, rotulo: p.nome })), { valor: "+nova", rotulo: "Nova pasta…" }]}
+                opcoes={[{ valor: "", rotulo: "Mover para…" }, { valor: "sem", rotulo: "Sem pasta" }, ...pastas.map((p) => ({ valor: p.id, rotulo: p.nome })), { valor: "+nova", rotulo: "Nova pasta…" },
+                  ...materiais.map((m) => ({ valor: m.id, rotulo: `Materiais · ${m.nome}` })), ...(materiais.some((m) => m.id === "mat:sem") ? [] : [{ valor: "mat:sem", rotulo: "Materiais · Sem marca" }])]}
                 onChange={(v) => { if (v === "+nova") novaPasta(sel); else if (v) void mover(sel, v === "sem" ? null : v); }} />
               <button type="button" className="btn btn-danger btn-xs" disabled={ocupado} onClick={() => void apagar(sel)}>{ocupado ? <Loader2 className="animate-spin" aria-hidden /> : <Trash2 aria-hidden />} Apagar</button>
             </>}

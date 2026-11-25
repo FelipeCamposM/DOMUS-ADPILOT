@@ -13,7 +13,7 @@ import { HeroFx } from "@/modules/shell/HeroFx";
 
 export const metadata = { title: "Criativos" };
 
-const ABAS = [["todos", "Todos"], ["videos", "Vídeos"], ["imagens", "Imagens"], ["musicas", "Músicas"], ["efeitos", "Efeitos sonoros"]] as const;
+const ABAS = [["todos", "Todos"], ["videos", "Vídeos"], ["imagens", "Imagens"], ["musicas", "Músicas"], ["efeitos", "Efeitos sonoros"], ["materiais", "Materiais"]] as const;
 /** Slides de um carrossel viram um cartão só (capa = slide 1); o resto passa como está. */
 function agrupar(itens: CriativoLinha[]) {
   const grupos = new Map<string, { capa: CriativoLinha; slides: CriativoLinha[] }>();
@@ -58,7 +58,7 @@ export default async function CreativesPage({ searchParams }: { searchParams: Pr
   let corpo: React.ReactNode;
   if (aba === "todos") {
     // tudo de uma vez: vídeos e imagens (gerados e enviados) em grade, áudios em lista
-    const itens = await criativos(ws, ["VIDEO", "IMAGE", "MUSIC", "SFX"], q);
+    const itens = await criativos(ws, ["VIDEO", "IMAGE", "MUSIC", "SFX"], q, false);
     const visuais = itens.filter((c) => c.type === "VIDEO" || c.type === "IMAGE");
     const audios = itens.filter((c) => c.type === "MUSIC" || c.type === "SFX");
     corpo = !itens.length ? vazio : (
@@ -81,6 +81,21 @@ export default async function CreativesPage({ searchParams }: { searchParams: Pr
         )}
       </>
     );
+  } else if (aba === "materiais") {
+    // não são posts: arquivos de apoio para usar neles, uma seção por marca
+    const itens = await criativos(ws, ["IMAGE", "VIDEO"], q, true);
+    const porMarca = new Map<string, CriativoLinha[]>();
+    for (const c of itens) porMarca.set(c.marca ?? "Sem marca", [...(porMarca.get(c.marca ?? "Sem marca") ?? []), c]);
+    corpo = !itens.length ? (
+      <div className="panel"><div className="empty">{q ? `Nada encontrado para “${q}”.` : <>Nenhum material ainda. Envie logos, fotos de produto e fundos em <Link href="/arquivos" style={{ textDecoration: "underline" }}>Arquivos › Materiais</Link>.</>}</div></div>
+    ) : (
+      [...porMarca].sort(([a], [b]) => (a === "Sem marca" ? 1 : b === "Sem marca" ? -1 : a.localeCompare(b))).map(([marca, lista]) => (
+        <section key={marca} className="stack" style={{ gap: 10 }}>
+          <div className="panel-title">{marca} <span className="subtle small">({lista.length})</span></div>
+          {grade(agrupar(lista))}
+        </section>
+      ))
+    );
   } else if (aba === "musicas" || aba === "efeitos") {
     const tipo = aba === "musicas" ? "MUSIC" : "SFX";
     const t = q?.trim() ? `%${q.trim().slice(0, 100).replace(/[\\%_]/g, (x) => `\\${x}`)}%` : null;
@@ -94,7 +109,7 @@ export default async function CreativesPage({ searchParams }: { searchParams: Pr
     corpo = <AudioLibrary tipo={tipo} itens={itens} podeEditar={editor} gerando={gerando} />;
   } else {
     const tipo = aba === "imagens" ? "IMAGE" : "VIDEO";
-    const itens = (await criativos(ws, [tipo], q)).filter((c) => gerado(c.tags));
+    const itens = (await criativos(ws, [tipo], q, false)).filter((c) => gerado(c.tags));
     corpo = itens.length === 0 && q ? vazio : itens.length === 0 ? (
       <div className="panel"><div className="empty">Nada ainda. Crie no <Link href={`/studio/novo${tipo === "IMAGE" ? "?tipo=imagem" : ""}`} style={{ textDecoration: "underline" }}>Studio</Link>.</div></div>
     ) : (
