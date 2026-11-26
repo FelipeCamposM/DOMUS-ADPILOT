@@ -23,6 +23,8 @@ export interface RunInput {
   /** Arte (vídeo/imagem): a IA pode ver arquivos da pasta do job. Claude: só a ferramenta Read, que o próprio Claude
    *  limita à pasta (fora dela pede permissão, negada no modo -p). Codex: as imagens vão anexadas com -i. */
   verArquivos?: { imagens: string[] };
+  /** teto da rodada (padrão AI_TURN_TIMEOUT_MS ou 10 min); composição de vídeo precisa de mais */
+  timeoutMs?: number;
 }
 
 export interface RunResult {
@@ -87,7 +89,7 @@ export async function runCli(i: RunInput): Promise<RunResult> {
   const child = spawn(bin, argv, { cwd: i.cwd, env, stdio: ["pipe", "pipe", "pipe"], windowsHide: true });
   const matar = () => child.kill();
   i.signal.addEventListener("abort", matar);
-  const timeout = setTimeout(matar, Number(process.env.AI_TURN_TIMEOUT_MS || 600_000));
+  const timeout = setTimeout(matar, i.timeoutMs ?? Number(process.env.AI_TURN_TIMEOUT_MS || 600_000));
   child.stdin.end(prompt, "utf8");
   child.stderr.on("data", (d) => { stderr = (stderr + d).slice(-8000); });
 

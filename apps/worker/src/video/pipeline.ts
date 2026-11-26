@@ -57,7 +57,7 @@ export async function runVideo(payload: VideoPayload, c: Ctx) {
   // voz do cliente: a transcrição (cache na pasta) manda no roteiro e nos tempos; nada de TTS
   const propria = brief.voz === VOZ_PROPRIA;
   const vozPropria = () => prepararVozPropria(p.workspace_id, brief, pasta, [brief.produto, ctxCriativo.marca].filter(Boolean).join(", "), c);
-  const ia = (sistema: string, prompt: string) => perguntarIA({ workspaceId: p.workspace_id, projetoId: p.id, sistema, prompt, cwd: pasta, signal: c.signal, log: c.log, imagens: ctxCriativo.imagens });
+  const ia = (sistema: string, prompt: string) => perguntarIA({ workspaceId: p.workspace_id, projetoId: p.id, sistema, prompt, cwd: pasta, signal: c.signal, log: c.log, imagens: ctxCriativo.imagens, timeoutMs: 1_800_000 }); // animação Livre longa passa de 10 min
 
   try {
     // 1. Roteiro → storyboard estruturado
