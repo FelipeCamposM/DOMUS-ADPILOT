@@ -25,6 +25,8 @@ export interface RunInput {
   verArquivos?: { imagens: string[] };
   /** teto da rodada (padrão AI_TURN_TIMEOUT_MS ou 10 min); composição de vídeo precisa de mais */
   timeoutMs?: number;
+  /** modelo do Claude só nesta chamada (ex.: correções de vídeo no Sonnet); vazio = o escolhido na web/.env */
+  modeloClaude?: string;
 }
 
 export interface RunResult {
@@ -69,7 +71,7 @@ export function cliEnv(provider: AiProvider, configDir: string): NodeJS.ProcessE
 export async function runCli(i: RunInput): Promise<RunResult> {
   // modelo/esforço escolhidos no topo da web; vazio = .env (AI_*_MODEL) ou padrão do CLI
   const pref = (await iaPreferencias())[i.provider];
-  const modelo = pref.modelo || (i.provider === "claude" ? process.env.AI_CLAUDE_MODEL : process.env.AI_CODEX_MODEL);
+  const modelo = (i.provider === "claude" && i.modeloClaude) || pref.modelo || (i.provider === "claude" ? process.env.AI_CLAUDE_MODEL : process.env.AI_CODEX_MODEL);
   const args = i.provider === "claude"
     ? ["-p", "--output-format", "stream-json", "--verbose", "--include-partial-messages", "--tools", i.verArquivos ? "Read" : "", "--strict-mcp-config",
        "--system-prompt-file", i.systemPromptFile, ...(i.sessionId ? ["--resume", i.sessionId] : []),

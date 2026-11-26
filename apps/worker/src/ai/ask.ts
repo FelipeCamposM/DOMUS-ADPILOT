@@ -19,6 +19,7 @@ export async function perguntarIA(p: {
   /** sistema conectado que pediu (consumo por sistema) e as travas dele: contas permitidas e teto da janela de 5 h */
   sistemaId?: string; contas?: string[] | null; limitePct?: number | null;
   timeoutMs?: number;
+  modeloClaude?: string;
 }): Promise<{ text: string; conta: string; provider: AiProvider; model: string | null; inputTokens: number; outputTokens: number; durationMs: number }> {
   const sql = db();
   const sysFile = join(p.cwd, "instrucoes.md");
@@ -40,7 +41,7 @@ export async function perguntarIA(p: {
     let depois: Usage | null = null;
     const r = await runCli({
       provider: conta.provider, configDir: resolveConfigDir(conta.config_dir), cwd: p.cwd, prompt: p.prompt, systemPromptFile: sysFile,
-      sessionId: null, signal: p.signal, onText: (t) => p.onText?.(t), verArquivos: p.imagens ? { imagens: p.imagens } : undefined, timeoutMs: p.timeoutMs,
+      sessionId: null, signal: p.signal, onText: (t) => p.onText?.(t), verArquivos: p.imagens ? { imagens: p.imagens } : undefined, timeoutMs: p.timeoutMs, modeloClaude: p.modeloClaude,
       onUsage: (u: Usage) => { depois = u; void sql`update ads.ai_accounts set usage = ${sql.json(u as unknown as Json)} where id = ${conta.id}`; },
     });
     const pct = deltaPct(conta.usage?.five_hour, (depois as Usage | null)?.five_hour);

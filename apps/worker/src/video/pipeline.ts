@@ -4,7 +4,7 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { DATA_DIR } from "../env";
 import { bloco, perguntarIA } from "../ai/ask";
-import { DIRECAO_3D, DIRECOES, lerStoryboard, promptAjuste, type Direcao, promptComposicao, promptCorrecao, promptRoteiro, SISTEMA_ROTEIRO, sistemaAjusteCenas, sistemaComposicao, violacoes } from "./compose";
+import { DIRECAO_3D, DIRECOES, lerStoryboard, promptAjuste, type Direcao, promptComposicao, promptCorrecao, aplicarTrechos, promptCorrecaoTrechos, promptRoteiro, SISTEMA_ROTEIRO, sistemaAjusteCenas, sistemaComposicao, violacoes } from "./compose";
 import { contextoCriativo } from "./contexto";
 import { arquivoMusica, arquivoSfx, musicaSobMedida } from "./sfx";
 import { duracao, ffmpeg, hyperframes } from "./tools";
@@ -57,7 +57,7 @@ export async function runVideo(payload: VideoPayload, c: Ctx) {
   // voz do cliente: a transcrição (cache na pasta) manda no roteiro e nos tempos; nada de TTS
   const propria = brief.voz === VOZ_PROPRIA;
   const vozPropria = () => prepararVozPropria(p.workspace_id, brief, pasta, [brief.produto, ctxCriativo.marca].filter(Boolean).join(", "), c);
-  const ia = (sistema: string, prompt: string) => perguntarIA({ workspaceId: p.workspace_id, projetoId: p.id, sistema, prompt, cwd: pasta, signal: c.signal, log: c.log, imagens: ctxCriativo.imagens, timeoutMs: 1_800_000 }); // animação Livre longa passa de 10 min
+  const ia = (sistema: string, prompt: string, modeloClaude?: string) => perguntarIA({ workspaceId: p.workspace_id, projetoId: p.id, sistema, prompt, cwd: pasta, signal: c.signal, log: c.log, imagens: ctxCriativo.imagens, timeoutMs: 1_800_000, modeloClaude }); // animação Livre longa passa de 10 min
 
   try {
     // 1. Roteiro → storyboard estruturado
@@ -220,7 +220,11 @@ export async function runVideo(payload: VideoPayload, c: Ctx) {
       if (rodada === 2) throw new Error(`A composição continuou com erros: ${erros.slice(0, 3).join("; ")}`);
       if (!porIA) throw new Error(`A composição montada tem erros: ${erros.slice(0, 3).join("; ")}`);
       await c.log(`${erros.length} problema(s) na composição; pedindo correção à IA`);
-      html = bloco((await ia(sistema, promptCorrecao(html, erros))).text, "html");
+      // economia (desfaz no .env): VIDEO_CORRECAO_TRECHOS=0 volta a pedir o HTML inteiro; VIDEO_CORRECAO_MODELO= (vazio) volta ao modelo padrão
+      const modeloCorr = process.env.VIDEO_CORRECAO_MODELO ?? "sonnet";
+      const corrigido = process.env.VIDEO_CORRECAO_TRECHOS !== "0" ? aplicarTrechos(html, (await ia(sistema, promptCorrecaoTrechos(html, erros), modeloCorr)).text) : null;
+      if (!corrigido && process.env.VIDEO_CORRECAO_TRECHOS !== "0") await c.log("correção por trechos não encaixou; pedindo o HTML inteiro");
+      html = corrigido ?? bloco((await ia(sistema, promptCorrecao(html, erros), modeloCorr)).text, "html");
     }
     if (direcao && !ajuste) html = marcarDirecao(html, direcao.nome); // ajuste mantém a marca da composição de origem
     await sql`update ads.video_projects set composition = ${html}, updated_at = now() where id = ${p.id}`;

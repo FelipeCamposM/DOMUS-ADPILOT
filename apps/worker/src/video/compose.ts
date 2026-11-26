@@ -232,6 +232,41 @@ ${html}
 </index.html>`;
 }
 
+/** Correção barata: a IA devolve só os trechos que mudam (busca exata → substituição), não o HTML inteiro. */
+export function promptCorrecaoTrechos(html: string, erros: string[]): string {
+  return `A composição abaixo tem problemas. Corrija TODOS, mas NÃO devolva o documento inteiro: responda só com os trechos
+que mudam, cada um neste formato exato (BUSCA = texto copiado literalmente do index.html, único no arquivo, com
+contexto suficiente para não se repetir; NOVO = o texto que entra no lugar):
+
+<<<<<<< BUSCA
+trecho atual
+=======
+trecho novo
+>>>>>>> NOVO
+
+Nada de \`\`\`html nem explicação.
+
+<problemas>
+${erros.map((e) => `- ${e}`).join("\n")}
+</problemas>
+
+<index.html>
+${html}
+</index.html>`;
+}
+
+/** Aplica os trechos da correção; null se nenhum veio ou algum não bate exatamente uma vez (aí pede o HTML inteiro). */
+export function aplicarTrechos(html: string, resposta: string): string | null {
+  let out = html, n = 0;
+  for (const [, busca, novo] of resposta.matchAll(/<<<<<<< BUSCA\r?\n([\s\S]*?)\r?\n=======\r?\n([\s\S]*?)\r?\n?>>>>>>> NOVO/g)) {
+    const i = out.indexOf(busca!);
+    if (!busca || i < 0 || out.indexOf(busca, i + 1) >= 0) return null;
+    out = out.slice(0, i) + novo + out.slice(i + busca.length);
+    n++;
+  }
+  return n ? out : null;
+}
+
 export function promptAjuste(html: string, sb: Storyboard, pedido: string, contexto = ""): string {
   return `${contexto ? `${contexto}
 

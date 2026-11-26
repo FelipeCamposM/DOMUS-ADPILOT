@@ -27,3 +27,12 @@ test("preconnect do Google Fonts (sem barra no fim) é permitido", () => {
   expect(violacoes(html)).toEqual([]);
   expect(violacoes(ok.replace("</head>", '<link href="https://fonts.googleapis.com.evil.io/x"></head>')).length).toBeGreaterThan(0);
 });
+
+test("correção por trechos: aplica, e recusa busca ausente ou repetida", async () => {
+  const { aplicarTrechos } = await import("./compose");
+  const t = (a: string, b: string) => `<<<<<<< BUSCA\n${a}\n=======\n${b}\n>>>>>>> NOVO`;
+  expect(aplicarTrechos("<p>a</p><i>b</i>", `${t("<p>a</p>", "<p>x</p>")}\n${t("<i>b</i>", "")}`)).toBe("<p>x</p>");
+  expect(aplicarTrechos("<p>a</p>", t("<p>z</p>", "y"))).toBeNull();
+  expect(aplicarTrechos("<p>a</p><p>a</p>", t("<p>a</p>", "y"))).toBeNull();
+  expect(aplicarTrechos("<p>a</p>", "sem trechos")).toBeNull();
+});
