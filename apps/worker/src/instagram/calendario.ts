@@ -254,7 +254,7 @@ async function iniciar(i: Pronto, cfg: ConfigCal) {
       : [{ conceito: i.tema.slice(0, 120), headline: r.headline, apoio: r.apoio, cta: r.cta, visual: r.visual }];
     const brief = briefImagemSchema.parse({
       produto, objetivo, orientacao: `${i.tema}${pedidos}`.slice(0, 4000), tipo: carrossel ? "carrossel" : "avulsa", slides: Math.max(2, conceitos.length), formato: "4:5",
-      variacoes: 1, cta: r.cta, identidade: "workspace",
+      variacoes: 1, cta: r.cta, identidade: "workspace", tresD: querMotion3D(`${i.tema}\n${i.pedido_arte ?? ""}`),
     });
     [projeto] = await sql<{ id: string }[]>`insert into ads.video_projects (workspace_id, brand_id, kind, title, brief, storyboard, status, step_detail)
       values (${i.workspace_id}, ${i.brand_id}, 'image', ${i.tema.slice(0, 120)}, ${sql.json(brief as unknown as Json)}, ${sql.json({ conceitos } as unknown as Json)}, 'QUEUED', 'Calendário: na fila do worker…')

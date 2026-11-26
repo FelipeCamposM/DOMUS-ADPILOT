@@ -1,6 +1,7 @@
 import { apagarArquivo, briefImagemSchema, ESTILOS, db, FORMATOS_IMAGEM, guardarArquivo, planoImagemSchema, r2Key, type BriefImagem, type ConceitoImagem, type Json, type PlanoImagem } from "@domus-ads/core";
 import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
 import { DATA_DIR } from "../env";
 import { bloco, perguntarIA } from "../ai/ask";
 import { promptCorrecao, REGRAS_CONTEXTO, violacoes } from "./compose";
@@ -48,7 +49,7 @@ ${REGRAS_CONTEXTO}
   como assinatura fixa (canto superior esquerdo ou rodapé), sempre no mesmo lugar e tamanho; em fundo que brigue com ela, ponha
   a logo sobre uma placa de cor sólida. Confira no PNG que ela aparece nítida. NUNCA desenhe logo, ícone ou símbolo da marca em CSS/SVG (nada de "casinha" ou quadradinho com inicial). Sem arquivo de logo,
   o nome da marca vai só em texto.
-${b.estiloVisual === "clay" ? "" : `- Visual PLANO e limpo: tipografia forte, blocos de cor, ícones de linha, mockup simples de tela. PROIBIDO objeto pseudo-3D
+${b.tresD ? REGRAS_ARTE_3D(w, h) : b.estiloVisual === "clay" ? "" : `- Visual PLANO e limpo: tipografia forte, blocos de cor, ícones de linha, mockup simples de tela. PROIBIDO objeto pseudo-3D
   feito em CSS (portas, casas, celulares "inflados", bolhas com sombra interna, clay, isométrico, vidro) e ilustração figurativa
   (pessoas, mãos, objetos realistas), MESMO que o pedido descreva isso: traduza a ideia para uma versão plana e tipográfica.
 `}- NADA sobrepõe texto: ilustração, mockup e formas ficam em área própria, sem encostar em headline, apoio ou CTA.
@@ -56,6 +57,27 @@ ${b.estiloVisual === "clay" ? "" : `- Visual PLANO e limpo: tipografia forte, bl
 - Nome do produto SEMPRE escrito exatamente “${b.produto}”. Para colorir parte do nome, divida sem repetir letras.
 - Use só fatos do briefing; não invente preço, prazo, estatística ou promessa.`;
 }
+
+/** Arte com visual protagonista em Three.js: objeto 3D de verdade (WebGL), renderizado uma vez, com o texto em HTML por cima. */
+const REGRAS_ARTE_3D = (w: number, h: number) => `- VISUAL PROTAGONISTA EM 3D DE VERDADE (Three.js r159, global THREE): além do GSAP, carregue <script src="assets/three.min.js"></script>.
+  Um <canvas id="gl" width="${w}" height="${h}"> como primeiro filho de #arte (position:absolute; inset:0; z-index:0); textos, CTA e logo
+  em HTML por cima (z-index maior), nunca como texto 3D.
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true }); renderer.setPixelRatio(1);
+  renderer.setSize(${w}, ${h}, false); renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  Desenhe com const render = () => renderer.render(scene, camera); render(); e também tl.to({}, { duration: 1, onUpdate: render }, 0).
+  Nada de requestAnimationFrame, Clock ou loop. Aleatório só com uma função de semente fixa escrita por você (Math.random é proibido).
+- A ideia do post vira um OBJETO/CENA 3D construído em geometria procedural (Box/RoundedBox com bevel via ExtrudeGeometry de Shape,
+  Sphere, Torus, Cylinder, Capsule, Lathe, Extrude de formas desenhadas: celular, cupom, moeda, ticket, calendário, troféu, seta, número
+  extrudado…), grande (40–60% da arte), num ângulo de câmera dramático (perspectiva baixa, 3/4, leve rotação), com composição
+  pensada: objeto-herói + 2 a 5 elementos de apoio em profundidade (menores, desfocados pela distância/fog), sombra de contato suave.
+- Acabamento de estúdio: MeshPhysicalMaterial (clearcoat, roughness 0.15–0.45, metalness onde fizer sentido), cor da marca em áreas grandes,
+  key light forte + rim light colorida por trás recortando o contorno + fill fraco; fundo com gradiente ou cor sólida da marca
+  (scene.background ou o fundo do #arte). Nunca tudo cinza/branco fosco; nunca objetos minúsculos perdidos no fundo.
+- Telas (ex.: celular): a tela é um plano escuro no modelo e o conteúdo da tela (REC, ícone, número) vai em HTML posicionado por cima.
+- Layout: reserve a área dos textos (ex.: headline no topo, 3D no meio, CTA embaixo, ou texto à esquerda e objeto à direita); o 3D não
+  passa por trás de texto com a mesma cor; texto sobre o 3D só com faixa de fundo sólida.
+- Desempenho: até ~80 mil triângulos, até 4 luzes, sombras desligadas (faça a sombra de contato com um plano com gradiente radial).
+`;
 
 const briefingTexto = (b: BriefImagem) => `<briefing>
 Produto: ${b.produto}
@@ -148,6 +170,7 @@ export async function runImagem(payload: ImagemPayload, c: Ctx) {
 
   try {
     const ctx = await contextoCriativo(p.id, p.workspace_id, pasta, c.log);
+    if (b.tresD) copyFileSync(join(dirname(createRequire(import.meta.url).resolve("three")), "three.min.js"), join(pasta, "assets", "three.min.js"));
     const sistema = sistemaImagem(b);
     const ia = (prompt: string) => perguntarIA({ workspaceId: p.workspace_id, projetoId: p.id, sistema, prompt, cwd: pasta, signal: c.signal, log: c.log, imagens: ctx.imagens });
     const modo = payload.mode ?? "full";

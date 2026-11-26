@@ -136,6 +136,7 @@ export const briefImagemSchema = z.object({
   formato: z.enum(Object.keys(FORMATOS_IMAGEM) as [FormatoImagem, ...FormatoImagem[]], { message: "Formato inválido" }),
   variacoes: z.coerce.number().int().min(1, "Mínimo 1 variação").max(4, "Máximo 4 variações").default(3),
   identidade: z.enum(IDENTIDADES).default("workspace"),
+  tresD: z.coerce.boolean().default(false), // visual protagonista em Three.js (WebGL) no lugar do visual plano em CSS
 }).refine(temObjetivo, MSG_OBJETIVO).refine((b) => b.tipo !== "carrossel" || b.formato === "1:1" || b.formato === "4:5", { message: "Carrossel do Instagram: use 1:1 ou 4:5", path: ["formato"] });
 export type BriefImagem = z.infer<typeof briefImagemSchema>;
 
