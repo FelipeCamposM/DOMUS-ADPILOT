@@ -181,6 +181,9 @@ MOTION 3D (OBRIGATÓRIO NESTE VÍDEO): a cena principal é 3D de verdade em Thre
   (nada de tela vazia esperando o texto). Materiais com cor e brilho (MeshPhysicalMaterial com clearcoat, metalness/roughness
   variados, cor da marca em áreas grandes), nunca tudo cinza/branco fosco. Luz de estúdio: key forte + rim light colorida por
   trás recortando o contorno + ambiente fraco. A câmera nunca fica parada.
+- Texto legível sobre o 3D: enquadre os objetos FORA da área dos textos (texto em cima, objeto no meio/baixo, ou o contrário) e
+  nunca ponha texto da cor de um objeto em cima dele (ex.: preço verde-limão sobre balão verde-limão some). Se não der para
+  separar, o texto ganha faixa de fundo sólida. O QA mede o contraste pixel a pixel contra o 3D.
 - Desempenho: até ~60 mil triângulos e até 3 luzes com sombra desligada.
 `;
 

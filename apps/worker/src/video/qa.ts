@@ -77,6 +77,24 @@ function medir(W: number, H: number, T: number, zonas: { x0: number; y0: number;
     const t = (e.children.length > 1 ? [...e.children].map((c) => c.textContent?.trim() ?? "").join(" ") : e.textContent ?? "").trim().replace(/\s+/g, " "); return t.length > 40 ? `${t.slice(0, 40)}…` : t; };
   const fmt = (t: number) => `${t.toFixed(1).replace(".", ",")} s`;
 
+  // motion 3D: texto sem fundo próprio por cima do <canvas id="gl"> precisa contrastar com o que o 3D desenha atrás dele
+  const gl = document.getElementById("gl") as HTMLCanvasElement | null;
+  const ESC = 4, amostra = gl ? document.createElement("canvas") : null;
+  if (amostra) { amostra.width = Math.ceil(W / ESC); amostra.height = Math.ceil(H / ESC); }
+  const ctx2 = amostra?.getContext("2d", { willReadFrequently: true }) ?? null;
+  const lum = (r: number, g: number, b: number) => {
+    const f = (c: number) => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+  };
+  const semFundo = (e: HTMLElement) => {
+    for (let x: HTMLElement | null = e; x && x !== raiz; x = x.parentElement) {
+      const m = getComputedStyle(x).backgroundColor.match(/[\d.]+/g);
+      if (m && (m[3] === undefined ? 1 : +m[3]) > 0.5) return false;
+    }
+    return true;
+  };
+  const apagado = new Map<HTMLElement, number>(), avisado = new Set<HTMLElement>();
+
   const fora = new Map<HTMLElement, number>(), sobre = new Map<string, number>();
   const problemas: string[] = [];
   const corrida = new Map<HTMLElement, { ini: number; max: number }>();
@@ -104,6 +122,34 @@ function medir(W: number, H: number, T: number, zonas: { x0: number; y0: number;
         if (n === 2) problemas.push(zona ? `Texto “${nome(e)}” fica em cima de “${zona.rotulo}” (interface da rede) em ${fmt(t)}`
           : `Texto “${nome(e)}” sai do quadro${vertical ? " ou entra na faixa da interface do Reels" : ""} em ${fmt(t)} (caixa ${Math.round(r.left)},${Math.round(r.top)} até ${Math.round(r.right)},${Math.round(r.bottom)} num quadro ${W}×${H})`);
       } else fora.delete(e);
+    }
+    if (ctx2 && gl) {
+      ctx2.clearRect(0, 0, amostra!.width, amostra!.height);
+      ctx2.drawImage(gl, 0, 0, amostra!.width, amostra!.height);
+      for (const { e, r } of vis) {
+        const cor = getComputedStyle(e).color.match(/[\d.]+/g)?.map(Number);
+        if (!cor || !semFundo(e)) continue;
+        // caixa justa de cada pedaço do texto (cada letra/palavra em span, cada linha): o objeto 3D pode apagar só "10" de "R$10"
+        const rg = document.createRange(); rg.selectNodeContents(e);
+        const lt = lum(cor[0]!, cor[1]!, cor[2]!);
+        let pior = 0;
+        for (const q of [...rg.getClientRects()]) {
+          const x0 = Math.max(0, Math.floor(q.left / ESC)), y0 = Math.max(0, Math.floor(q.top / ESC));
+          const x1 = Math.min(amostra!.width, Math.ceil(q.right / ESC)), y1 = Math.min(amostra!.height, Math.ceil(q.bottom / ESC));
+          if (x1 - x0 < 2 || y1 - y0 < 2) continue;
+          const px = ctx2.getImageData(x0, y0, x1 - x0, y1 - y0).data;
+          let ruins = 0;
+          for (let k = 0; k < px.length; k += 4) {
+            if (px[k + 3]! < 128) continue; // canvas transparente ali: o fundo é o do HTML
+            const lf = lum(px[k]!, px[k + 1]!, px[k + 2]!);
+            if ((Math.max(lt, lf) + 0.05) / (Math.min(lt, lf) + 0.05) < 1.6) ruins++;
+          }
+          pior = Math.max(pior, ruins / ((x1 - x0) * (y1 - y0)));
+        }
+        const n = pior > 0.4 ? (apagado.get(e) ?? 0) + 1 : 0;
+        apagado.set(e, n);
+        if (n === 2 && !avisado.has(e) && avisado.add(e)) problemas.push(`Texto “${nome(e)}” some no objeto 3D atrás dele em ${fmt(t)} (mesma cor/brilho): tire o objeto 3D dessa área, mude a câmera ou dê ao texto uma faixa de fundo sólida`);
+      }
     }
     for (let i = 0; i < vis.length; i++) for (let j = i + 1; j < vis.length; j++) {
       const a = vis[i]!, b = vis[j]!;
