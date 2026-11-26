@@ -101,6 +101,8 @@ ESTRUTURA OBRIGATÓRIA (HyperFrames):
     </script>
   Tudo com tempo absoluto em segundos. Propriedades GSAP livres para transform 3D (x, y, z, rotationX, rotationY, scale, opacity, filter).
   Timelines filhas não podem ser paused. Nada de CSS @keyframes/animation/transition: todo movimento vem do timeline (o render busca quadros).
+  Mostrar/esconder: opacity ou autoAlpha. NUNCA visibility:'visible' (tl.set ou CSS) em elemento dentro de uma cena: o render esconde
+  a cena com visibility:hidden e um filho "visible" continua na tela depois que ela acaba, por cima das outras.
 - PROIBIDO: Math.random, Date.now, new Date, fetch, XMLHttpRequest, WebSocket, import(), eval, iframe, imagens/vídeos externos,
   qualquer <script src> além dos ${b.tresD ? "três" : "dois"} acima. Fontes: pode usar Google Fonts (<link> para fonts.googleapis.com) ou fontes do sistema.
   Formas, gradientes, ícones e ilustrações: CSS e SVG inline.
@@ -175,6 +177,10 @@ MOTION 3D (OBRIGATÓRIO NESTE VÍDEO): a cena principal é 3D de verdade em Thre
   Hemisphere) e Fog. Sem texturas, modelos ou HDR externos. Aleatório só com MK.rand() (semente fixa).
 - Mude o 3D por cena (objetos entrando, câmera viajando, materiais trocando de cor) para casar com o que é dito;
   use as cores da identidade nos materiais e no fundo (scene.background ou o fundo do #root).
+- O 3D é o protagonista, não enfeite: em toda cena um objeto-herói ocupa pelo menos 40% do quadro, desde o primeiro quadro
+  (nada de tela vazia esperando o texto). Materiais com cor e brilho (MeshPhysicalMaterial com clearcoat, metalness/roughness
+  variados, cor da marca em áreas grandes), nunca tudo cinza/branco fosco. Luz de estúdio: key forte + rim light colorida por
+  trás recortando o contorno + ambiente fraco. A câmera nunca fica parada.
 - Desempenho: até ~60 mil triângulos e até 3 luzes com sombra desligada.
 `;
 

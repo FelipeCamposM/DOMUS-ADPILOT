@@ -62,9 +62,11 @@ function medir(W: number, H: number, T: number, zonas: { x0: number; y0: number;
     return dur > 0 && (agora < ini - 1e-6 || agora >= ini + dur - 1e-6);
   };
   const opac = (e: HTMLElement) => {
-    let v = 1;
+    let v = 1, visivel = false;
     for (let x: HTMLElement | null = e; x && x !== document.body; x = x.parentElement) {
-      if (foraDoClip(x)) return 0;
+      // a HyperFrames esconde o clip com visibility:hidden; um filho com visibility:visible (tl.set) continua na tela
+      if (x.style.visibility === "visible") visivel = true;
+      if (foraDoClip(x) && !visivel) return 0;
       const cs = getComputedStyle(x);
       if (cs.display === "none" || cs.visibility === "hidden") return 0;
       v *= parseFloat(cs.opacity || "1");
