@@ -6,7 +6,6 @@ import { WhatsappIcon } from "../connections/Logos";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { ago } from "@/lib/format";
 import { Consultor } from "../ai/Consultor";
 import { Motion } from "../motion/Motion";
 import { Notificacoes, type DadosNotificacoes } from "./Notificacoes";
@@ -20,6 +19,7 @@ import { Sidebar } from "./Sidebar";
 import { Confirmador } from "./confirmar";
 import { Toaster, toast } from "./toast";
 import { UsoIA } from "./UsoIA";
+import { WorkerStatus } from "./WorkerStatus";
 import type { UsoContaIA } from "@/lib/queries";
 import type { IaPreferencias } from "@domus-ads/core";
 
@@ -75,10 +75,7 @@ export function Shell(p: ShellProps) {
           <div className="tb-dir" style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
             <div className="tb-grupo">
             <UsoIA contas={p.contasIA} pref={p.iaPref} podeEditar={p.admin} aberto={menu === "ia"} onToggle={() => setMenu(menu === "ia" ? null : "ia")} onClose={fechar} />
-            <Link href="/settings#worker" className="chip tb-worker" suppressHydrationWarning title={p.worker.lastSeen ? `Último sinal ${ago(p.worker.lastSeen)}` : "O worker nunca se conectou"}>
-              <span className={`dot ${p.worker.online ? "on" : "err"}`} aria-hidden />
-              <span className="tb-rot">Worker {p.worker.online ? "online" : "offline"}</span>
-            </Link>
+            <WorkerStatus online={p.worker.online} lastSeen={p.worker.lastSeen} podeEditar={p.workspaces.find((w) => w.id === p.workspaceId)?.role !== "viewer"} />
             {p.whatsapp.estado && (() => {
               const on = p.whatsapp.estado.state === "open";
               const conteudo = <><span className="tb-zap" data-on={on}><WhatsappIcon aria-hidden /></span><span className="tb-rot">{on ? "WhatsApp" : "WhatsApp desconectado"}</span></>;
