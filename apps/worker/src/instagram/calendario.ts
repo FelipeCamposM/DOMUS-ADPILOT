@@ -238,8 +238,10 @@ async function iniciar(i: Pronto, cfg: ConfigCal) {
   const pedidos = i.pedido_arte ? `\n\nPedidos do cliente ao revisar a arte anterior (siga; se citar um material, use o arquivo de <materiais>):\n${i.pedido_arte}` : "";
   let projeto: { id: string } | undefined;
   if (i.formato === "REELS") {
+    const tresD = querMotion3D(`${i.tema}\n${i.pedido_arte ?? ""}`);
     const brief = briefSchema.parse({
-      produto, objetivo, duracao: r.duracao, formato: "9:16", cta: r.cta, identidade: "workspace", estiloVisual: cfg.estiloVideo, ...(await vozDosReels(i.workspace_id, cfg.voz)), musica: "auto",
+      produto, objetivo, duracao: r.duracao, formato: "9:16", cta: r.cta, identidade: "workspace", estiloVisual: tresD ? "livre" : cfg.estiloVideo, tresD,
+      ...(await vozDosReels(i.workspace_id, cfg.voz)), musica: "auto",
       orientacao: `Tema: ${i.tema}\n\nRoteiro da narração (aprovado pelo cliente; mantenha as ideias e ajuste só para caber no tempo):\n${r.narracao}${r.visual ? `\n\nVisual: ${r.visual}` : ""}${pedidos}`.slice(-4000),
     });
     [projeto] = await sql<{ id: string }[]>`insert into ads.video_projects (workspace_id, brand_id, title, brief, status, step_detail)
@@ -419,6 +421,12 @@ async function pedirAprovacao(i: Pronto & { project_id: string; creative_id: str
 const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ\u{1F3FB}-\u{1F3FF}]/gu, "").toLowerCase().replace(/\s+/g, " ").trim();
 const SIM = /^(sim|s|ss|si|ok|okay|pode|pode sim|pode postar|pode agendar|aprovo|aprova|aprovado|aprovada|manda|manda ver|bora|isso|beleza|blz|show|perfeito|top|👍|✅|👌)[\s!.]*$/u;
 const NAO = /^(nao|n|no|negativo|ainda nao|👎|❌)[\s!.]*$/u;
+
+/** Reels em Three.js quando o pedido (WhatsApp) ou o tema fala "3D"/"three.js"; a última menção vale ("2D"/"gsap" volta ao 2D). */
+export function querMotion3D(texto: string): boolean {
+  const ult = [...norm(texto).matchAll(/(?<![\p{L}\p{N}])(3 ?d|three(?:\.?js)?|2 ?d|gsap)(?![\p{L}\p{N}])/gu)].pop()?.[1];
+  return !!ult && /^(3|t)/.test(ult);
+}
 
 /** "sim" / "não" / pedido de mudança ("não, muda X" vira o pedido "muda X"). */
 export function lerResposta(texto: string): { tipo: "sim" | "nao" } | { tipo: "pedido"; pedido: string } {
